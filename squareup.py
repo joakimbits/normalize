@@ -9,9 +9,8 @@ That specific file is write-protected to not accidentally remove it.
 Dependencies:
 numpy
 Pillow
-$ ( ln -s
-> /mnt/data1/DATASETS/hillebrand_autumn_2022/object_includes_its_box_slot/partial_images/2022-10-31T06_37_04.435150.jpg
-> bottle-top_has_bottle_and_also_its_box_slot.jpg ) || true
+$ python3 -c "from PIL import Image; Image.new('RGB', (640, 360)).save('blank.jpg')"
+$ mv blank.jpg bottle-top_has_bottle_and_also_its_box_slot.jpg
 """
 
 import os
