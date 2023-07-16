@@ -1,4 +1,53 @@
-"""Print Makefile for handling bringup, test and clean of builds for the parent module, and exit
+"""Print a Makefile for handling a python module and exit
+
+Adds the following command line options:
+
+--makemake: Print a Makefile.
+
+--generic: Generalize so that any Makefile can include the Makefile.
+
+--dep <file>: Create a make file for just the bringup of a module.
+
+--test: Verify usage examples in the module and exit.
+
+Only the last command requires argparser.parse_args() as in the Usage section below.
+
+
+USER MANUAL
+
+To integrate a tool.py module that uses makemake, check the Dependencies section in its
+header. Dependencies can include pip installation lines as well as bash commands.
+
+To self-test a tool.py that uses makemake - while adding its dependencies into python3:
+$ python3 tool.py --makemake > tool.mk && make -f tool.mk
+
+To self-test all such tools in a folder - while adding their dependencies into venv:
+$ python3 tool.py --makemake --generic > Makefile
+$ make
+<modify any .py in the same folder>
+$ make
+
+To use a tools/tool.py in another Makefile:
+
+Makefile:
+    tooled.txt: tools/tool.py tools/build/tool.py.bringup | tools/Makefile  # (1, 4)
+        tools/venv/bin/python $< > $@  # (5)
+    tools/Makefile:
+        python3 tools/tool.py --makemake --generic >$@  # (2)
+    -include tools/Makefile  # (0, 3)
+
+$ make tooled.txt
+
+How it works:
+    0. Make tries to include tools/Makefile but continues without it. (The - continues.)
+    1. Make wants tooled.txt, needs tools/build/tool.py.bringup, but can't build it.
+    2. Make also needs tools/Makefile and builds that. (The | ignores its timestamp.)
+    3. Make detects a tools/Makefile to include and therefore restarts.
+    4. Make wants tooled.txt, needs tools/build/tool.py.bringup that needs tools/venv.
+       Make builds tools/venv and then tools/build/tool.py.bringup using it. (The
+       Dependencies for tools/tool.py gets added to tools/venv and possibly elsewhere).
+    5. Make builds tooled.txt using tools/tool.py and that same tools/venv.
+       (The $< becomes tools/tool.py, and the $@ becomes tooled.txt).
 
 Usage:
     import makemake  # before importing (other) external dependencies
@@ -6,9 +55,10 @@ Usage:
     if __name__ == '__main__':
         import argparse
 
-        argparser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                            description=__doc__,
-                                            epilog='''Command-line examples:
+        argparser = argparse.ArgumentParser(
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=__doc__,
+            epilog='''Examples:
     $ echo hello world''')
 
         makemake.add_arguments(argparser)
@@ -26,79 +76,94 @@ from argparse import Action
 
 
 parent_module = sys.modules['.'.join(__name__.split('.')[:-1]) or '__main__']
-parent_dir = os.path.split(os.path.split(parent_module.__file__)[0])[1]
-dir_var = f"{parent_dir}_dir"
-build_dir_var = f"{parent_dir}_build_dir"
-prog_py = sys.argv[0]
-prog_dir, prog_filename = os.path.split(prog_py)
-prog, ext = os.path.splitext(prog_filename)
+dir = os.path.split(os.path.split(parent_module.__file__)[0])[1]
+module_path = sys.argv[0]
+module_dir, module_py = os.path.split(module_path)
+module, ext = os.path.splitext(module_py)
 
-MAKEFILE_HEADER_FROM_BUILD_DIR = f"""# {parent_dir}$ python3 {" ".join(sys.argv)}
-# Generic builder inspired from C template on https://makefiletutorial.com/ Thanks to Job Vranish
-# It automatically determines dependencies for you. 
-# All you have to do is put your Python/C/C++ files in the {parent_dir} folder.
-# Intermediate files are always built into {parent_dir}/build/, even if PWD is not {parent_dir}.
-# That means this builder can be included in any other builder without risking mixup
-# - as long as the {parent_dir}_* variables here are not used elsewhere.
+MAKEFILE_FROM_BUILD_DIR = f"""# $ {" ".join(sys.argv)}
+# Change to FORMAT=github within a github workflow
+FORMAT := text
 
-.DELETE_ON_ERROR:
-
+# Figure out where to find and build files
 makefile_abspath := $(abspath $(lastword $(MAKEFILE_LIST)))
-normalize_abspath := $(dir $(makefile_abspath))
-{dir_var} := $(subst $(PWD)/,,$(normalize_abspath))
-{build_dir_var} := $(subst $(PWD)/,,$(normalize_abspath)%s)
+_{dir}_abspath := $(dir $(makefile_abspath))
+_{dir} := $(subst $(PWD)/,,$(_{dir}_abspath))
+_{dir}_build := $(subst $(PWD)/,,$(_{dir}_abspath)%s)
+ifeq ($(_{dir}),)
+  _{dir}_dir := ./
+else
+  _{dir}_dir := $(_{dir})
+endif
+_{dir}_python = $(_{dir}_dir)venv/bin/python
 
-# We build .dep, .bringup and .test for .py almost like .d, .o and tests for .c/.cpp
+# Find all the Python files
+_{dir}_PY := $(wildcard $(_{dir})*.py)
 
-.PHONY: all, test
-"""
+# List the make, test and tested targets for Python files
+_{dir}_DEPS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.d)
+_{dir}_BRINGUPS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.bringup)
+_{dir}_TESTEDS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.tested)
 
-MAKEFILE_FOOTER = f"""
-# Find all the C, C++ and ASM files we want to compile
-# Note the single quotes around the * expressions. Make will incorrectly expand these otherwise.
-{parent_dir}_SRCS := $(shell find $({dir_var}) -name '*.cpp' -or -name '*.c' -or -name '*.s')
+# Default rule
+.DELETE_ON_ERROR:
+.PHONY: $(_{dir})all
+$(_{dir})all: $(_{dir})style $(_{dir}_TESTEDS)
 
-# String substitution for every C/C++ file.
-# As an example, {parent_dir}/hello.cpp turns into {parent_dir}/build/hello.cpp.o
-{parent_dir}_OBJS := $({parent_dir}_OBJS:$({dir_var})%=$({build_dir_var})%.o)
+# Auto-generated python dependencies.
+# Each .d here makes one $(_{dir}_build)%%.py.bringup within a common local python venv.
+# Note: Any conflicts between bringups are just ignored: The last bringup wins.
+# If that is a problem, split this {dir} into separate directories with different venvs.
+$(_{dir})venv $(_{dir}_python): | $(_{dir})makemake.py
+	python3 -m venv $(_{dir})venv
+$(_{dir}_build)%%.py.d: $(_{dir})%%.py
+	python3 $< --generic --dep $@
 
-# String substitution (suffix version without %).
-# As an example, build/hello.cpp.o turns into build/hello.cpp.d
-{parent_dir}_DEPS := $({parent_dir}_OBJS:.o=.d)
+# Check Python 3.9 syntax
+$(_{dir})syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
+	$(_{dir}_python) -m ruff \\
+	    --format=$(FORMAT) --select=E9,F63,F7,F82 \\
+	    --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
+$(_{dir})venv/bin/ruff: | $(_{dir}_python)
+	$(_{dir}_python) -m pip install ruff
 
-# Every source folder in {parent_dir} will need to be passed to GCC so that it can find header files
-{parent_dir}_INC_DIRS := $(shell find $({dir_var}) -type d)
-# Add a prefix to {parent_dir}_INC_DIRS. So moduleA would become -ImoduleA. GCC understands this -I flag
-{parent_dir}_INC_FLAGS := $(addprefix -I,$({parent_dir}_INC_DIRS))
+# Check Python 3.9 style
+$(_{dir})style: $(_{dir})syntax
+	$(_{dir}_python) -m ruff --fix \\
+	  --format=$(FORMAT) --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
 
-# The -MMD and -MP flags together generate Makefiles for us!
-# These files will have .d instead of .o as the output.
-{parent_dir}_CPPFLAGS := $({parent_dir}_INC_FLAGS) -MMD -MP
+# Check usage examples
+$(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.bringup \\
+  | $(_{dir}_python)
+	$(_{dir}_python) $< --test > $@
 
-# The final build step.
-$({build_dir_var}){parent_dir}: $({parent_dir}_OBJS)
-	$(CXX) $({parent_dir}_OBJS) -o $@ $(LDFLAGS)
+# Find all the C, C++ and ASM source files
+_{dir}_SRC := $(shell find $(_{dir}_dir) -name '*.cpp' -or -name '*.c' -or -name '*.s')
 
-# Build step for C source
-$({build_dir_var})%.c.o: $({dir_var})%.c
+# List the wanted binaries and their build dependencies
+_{dir}_OBJS := $(_{dir}_SRCS:$(_{dir}_dir)%%.c=$(_{dir}_build_dir)%%.c.o)
+_{dir}_OBJS += $(_{dir}_SRCS:$(_{dir}_dir)%%.cpp=$(_{dir}_build_dir)%%.cpp.o)
+_{dir}_DEPS += $(_{dir}_OBJS:.o=.d)
+_{dir}_INC_DIRS := $(shell find $(_{dir}_dir) -type d)
+_{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
+_{dir}_CPPFLAGS := $(_{dir}_INC_FLAGS) -MMD -MP
+
+# The final executable links all the binaries
+$(_{dir}_build_dir)_{dir}: $(_{dir}_OBJS)
+	$(CXX) $(_{dir}_OBJS) -o $@ $(LDFLAGS)
+
+$(_{dir}_build_dir)%%.c.o: $(_{dir}_dir)%%.c
 	mkdir -p $(dir $@)
-	$(CC) $({parent_dir}_CPPFLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) $(_{dir}_CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-# Build step for C++ source
-$({build_dir_var})%.cpp.o: $({dir_var})%.cpp
+$(_{dir}_build_dir)%%.cpp.o: $(_{dir}_dir)%%.cpp
 	mkdir -p $(dir $@)
-	$(CXX) $({parent_dir}_CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(_{dir}_CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-.PHONY: clean, clean_{parent_dir}
-clean: clean_{parent_dir}
-clean_{parent_dir}:
-	rm -r $({build_dir_var})
+# Include all build dependencies
+-include $(_{dir}_DEPS)
+"""  # noqa: E101
 
-# Include the .d makefiles. The - at the front suppresses the errors of missing
-# Makefiles. Initially, all the .d files will be missing, and we don't want those
-# errors to show up.
--include $({parent_dir}_DEPS)
-"""
 COMMENT_GROUP_PATTERN = re.compile("(\s*#.*)?$")
 
 
@@ -107,12 +172,13 @@ def make_rule(rule, commands, file=sys.stdout):
     print('\t' + " \\\n\t".join(commands), file=file)
 
 
-def build_commands(doc, heading, embed="%s", end="", pip=False):
-    before_after = re.split(f'{heading}\s*((?:\S.*\r?\n)*)', doc, maxsplit=1)
+def build_commands(doc, heading, embed="%s", end="", pip=""):
+    before_after = doc.split(f"{heading}\n", maxsplit=1)
     commands = []
     if len(before_after) >= 2:
         for line in before_after[1].split('\n'):
-            command_lines, comment_lines, output_lines = commands[-1] if commands else ([], [], [])
+            command_lines, comment_lines, output_lines = (
+                commands[-1] if commands else ([], [], []))
             command, comment, _ = re.split(COMMENT_GROUP_PATTERN, line, maxsplit=1)
             if comment is None:
                 comment = ""
@@ -129,7 +195,7 @@ def build_commands(doc, heading, embed="%s", end="", pip=False):
             elif command_lines and not pip:
                 output_lines.append(command)
             elif command and pip:
-                commands.append((["pip3 install " + command], [comment], []))
+                commands.append(([f"{pip} install " + command], [comment], []))
 
     return commands
 
@@ -139,81 +205,88 @@ def run_command_examples(commands):
 
     for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
         command = "\n".join(command_lines)
-        if prog_dir:
-            command = f"( cd {prog_dir} && {command} )"
+        if module_dir:
+            command = f"( cd {module_dir} && {command} )"
         output = "\n".join(output_lines)
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=3)
-        assert not result.returncode, f"Example {i + 1} failed during execution of $ {command}"
+        result = subprocess.run(command, shell=True, capture_output=True, text=True,
+                                timeout=3)
+        assert not result.returncode, f"Example {i + 1} failed: $ {command}"
         received = result.stdout or ""
-        assert received == output, f"Example {i + 1}: $ {command}\nExpected: {repr(output)}\nReceived: {repr(received)}"
-
+        assert received == output, (
+            f"Example {i + 1}: $ {command}\n"
+            f"Expected: {repr(output)}\n"
+            f"Received: {repr(received)}")
 
 if parent_module.__name__ == '__main__':
     dependencies = '--makemake' in sys.argv[1:]
-    generic_dependencies = '--makemake_generic' in sys.argv[1:]
-    separate_bringup = '--makemake_dep' in sys.argv[1:]
-    gcc_builder = '--makemake_gcc' in sys.argv[1:]
-    if dependencies or generic_dependencies or separate_bringup:
-        assert len(sys.argv) == sum([1, dependencies, generic_dependencies, separate_bringup * 2, gcc_builder]), (
-            sys.argv, [1, dependencies, generic_dependencies, separate_bringup * 2, gcc_builder])
+    generic_dependencies = '--generic' in sys.argv[1:]
+    dep_path = '--dep' in sys.argv[1:]
+    if dependencies or generic_dependencies or dep_path:
+        assert len(sys.argv) == sum([1, dependencies, generic_dependencies,
+                                     dep_path * 2]), (
+            sys.argv, [1, dependencies, generic_dependencies,
+                       dep_path * 2])
 
-        if separate_bringup:
-            dep_file = sys.argv[sys.argv.index('--makemake_dep', 1) + 1]
+        if dep_path:
+            dep_file = sys.argv[sys.argv.index('--dep', 1) + 1]
             assert dep_file[:2] != "__", sys.argv
             dep_dir, dep_filename = os.path.split(dep_file)
             dep_dir_now = dep_dir
             if dep_dir:
-                dep_dir = (dep_dir + "/").removeprefix(parent_dir + "/")
+                dep_dir = (dep_dir + "/").removeprefix(dir + "/")
         else:
-            dep_dir = "build/"
-            dep_filename = prog + ".dep"
-            dep_file = f"build/{prog}.dep"
+            dep_dir_now = dep_dir = 'build/'
+            dep_filename = f'{module_py}.d'
+            dep_file = f'build/{module_py}.d'
 
         if generic_dependencies:
             if dependencies:
-                print(MAKEFILE_HEADER_FROM_BUILD_DIR % dep_dir)
+                print(MAKEFILE_FROM_BUILD_DIR % dep_dir)
             pattern = '%'
             source = '$<'
             stem = '$*'
-            src_dir = f"$({dir_var})"
-            build_dir = f"$({build_dir_var})"
+            python = f'$(_{dir}_python)'
+            src_dir = f'$(_{dir}_dir)'
+            build_dir = f'$(_{dir}_build)'
             build_dir_var_value = f"{src_dir}{dep_dir}"
-            dep_pattern = f"{build_dir}{dep_filename.replace(prog, pattern)}"
-            generic = " --makemake_generic"
+            dep_pattern = f"{build_dir}{dep_filename.replace(module, pattern)}"
+            generic = " --generic"
         else:
-            pattern = prog
-            source = prog_py
-            stem = prog
+            pattern = module
+            source = module_path
+            stem = module
+            python = 'python3'
             src_dir = ""
             build_dir = dep_dir
             dep_pattern = dep_file
             generic = ""
 
-        bringup_rule = f"{build_dir}{prog}.bringup: {src_dir}{prog}.py {build_dir}{dep_filename}"
+        bringup_rule = (f"{build_dir}{module}.py.bringup:"
+                        f" {src_dir}{module}.py {build_dir}{dep_filename}")
 
         commands = []
-        rules = [
-            (f"all: test", []),
-            (f"test: {build_dir}{prog}.tested", []),
-            (f"{build_dir}{pattern}.tested: {src_dir}{pattern}.py {dep_pattern} {build_dir}{pattern}.bringup",
-             [f"python3 {source} --test > $@"]),
-            (bringup_rule,
-             commands),
-            (f"{dep_pattern}: {src_dir}{pattern}.py",
-             [f"python3 {source} --makemake_dep $@{generic}"]),
-        ]
-
-        if not gcc_builder:
-            rules += [(f"clean_{src_dir}{pattern}:",
-                       [f"rm {dep_pattern.replace(pattern, stem)} {build_dir}{stem}.bringup {build_dir}{stem}.tested"]),
-                      (f"clean: clean_{src_dir}{prog}", []),]
 
         if generic_dependencies:
-            embed, end = f"( if [ $({dir_var})_ != _ ]; then cd $({dir_var}) ; fi && %s", " )"
+            embed = f"( if [ $(_{dir})_ != _ ]; then cd $(_{dir}) ; fi && %s"
+            end = " )"
+            rules = [(bringup_rule,
+                      commands)]
         else:
-            embed, end = "%s", ""
+            embed = "%s"
+            end = ""
+            rules = [
+                (f"all: {build_dir}{pattern}.py.tested",
+                 []),
+                (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {dep_pattern}"
+                 f" {build_dir}{pattern}.py.bringup",
+                 [f"{python} {source} --test > $@"]),
+                (f"{dep_pattern}: {src_dir}{pattern}.py",
+                 [f"{python} {source} --dep $@{generic}"]),
+                (bringup_rule,
+                 commands)]
 
-        bringups = build_commands(parent_module.__doc__, "Dependencies:", embed, end, pip=True)
+        bringups = build_commands(parent_module.__doc__, 'Dependencies:', embed, end,
+                                  pip=f"{python} -m pip")
         if bringups:
             op = ">"
             remaining = len(bringups)
@@ -222,14 +295,15 @@ if parent_module.__name__ == '__main__':
                 glue = " &&" if remaining else ""
                 commands += command_lines[:-1]
                 commands.append(f'{command_lines[-1]} {op} $@{glue}')
-                op = ">>"
+                op = '>>'
 
         if not commands:
             commands += ["touch $@"]
 
         for rule, commands in rules:
-            if separate_bringup and rule == bringup_rule:
-                print(f"include {build_dir}{dep_filename}")
+            if rule == bringup_rule and (dep_path or generic_dependencies):
+                if not generic_dependencies:
+                    print(f"include {build_dir}{dep_filename}")
                 if dep_dir and not os.path.exists(dep_dir_now):
                     os.makedirs(dep_dir_now)
                 with open(dep_file, 'w+') as dep:
@@ -237,64 +311,60 @@ if parent_module.__name__ == '__main__':
             elif dependencies:
                 make_rule(rule, commands)
 
-        if gcc_builder:
-            print(MAKEFILE_FOOTER)
-
         exit(0)
 
 
 class Test(Action):
-    """
-    Doctest python examples in parent_module, test command usage examples in this argparser epilog, and exit
+    """Doctest python examples in parent_module
+
+    Test also command usage examples in this argparser epilog, and exit
     """
     def __call__(self, parser, args, values, option_string=None):
         import doctest
 
-        doctest.testmod(parent_module)
-        run_command_examples(build_commands(parser.epilog, "Examples:"))
+        result = doctest.testmod(parent_module)
+        print(f"All {result.attempted} python usage examples PASS", )
+        examples = build_commands(parser.epilog, "Examples:")
+        run_command_examples(examples)
+        print(f"All {len(examples)} command usage examples PASS")
         exit(0)
 
 
 def add_arguments(argparser):
     argparser.add_argument('--makemake', action='store_true',
-                           help=f"Print Makefile for {prog_py}, and exit")
-    argparser.add_argument('--makemake_generic', action='store_true',
-                           help=f"Print generic Makefile for {prog_py}, and exit")
-    argparser.add_argument('--makemake_dep', action='store',
-                           help=f"Build a {prog}.dep target, print its Makefile include statement, and exit")
-    argparser.add_argument('--makemake_gcc', action='store_true',
-                           help=f"Print a generic gcc builder for C/C++/ASM source in {parent_dir}, and exit")
-    argparser.add_argument('--test', nargs=0, action=Test, help="Verify examples and exit")
+                           help=f"Print Makefile for {module_path}, and exit")
+    argparser.add_argument('--generic', action='store_true',
+                           help=f"Print generic Makefile for {module_path}, and exit")
+    argparser.add_argument('--dep', action='store', help=(
+        f"Build a {module}.dep target, print its Makefile include statement, and exit"))
+    argparser.add_argument('--test', nargs=0, action=Test, help=(
+        "Verify examples and exit"))
 
 
 if __name__ == '__main__':
     import argparse
 
-    argparser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                        description=__doc__,
-                                        epilog="""Examples:
-$ python3 makemake.py --makemake_dep makemake.dep
+    argparser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        epilog="""Examples:
+$ python3 makemake.py --dep makemake.dep
 include makemake.dep
 
 $ cat makemake.dep
-makemake.bringup: makemake.py makemake.dep
-	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 9), sys.version' > $@ && \\
-	pip3 install pip >> $@
+makemake.py.bringup: makemake.py makemake.dep
+	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 9), sys.version' > $@"""
+               """ && \\
+	python3 -m pip install pip >> $@
 
-$ python3 makemake.py --makemake_dep makemake.dep --makemake
-all: test
+$ python3 makemake.py --dep makemake.dep --makemake
+all: makemake.py.tested
 	
-test: makemake.tested
-	
-makemake.tested: makemake.py makemake.dep makemake.bringup
+makemake.py.tested: makemake.py makemake.dep makemake.py.bringup
 	python3 makemake.py --test > $@
-include makemake.dep
 makemake.dep: makemake.py
-	python3 makemake.py --makemake_dep $@
-clean_makemake:
-	rm makemake.dep makemake.bringup makemake.tested
-clean: clean_makemake
-	
+	python3 makemake.py --dep $@
+include makemake.dep
 """)
     add_arguments(argparser)
     args = argparser.parse_args()
