@@ -115,7 +115,7 @@ $(_{dir})all: $(_{dir})style $(_{dir}_TESTEDS)
 # Note: Any conflicts between bringups are just ignored: The last bringup wins.
 # If that is a problem, split this {dir} into separate directories with different venvs.
 $(_{dir})venv $(_{dir}_python): | $(_{dir})makemake.py
-	python3 -m venv $(_{dir})venv
+	python3 -m venv $(_{dir})venv && $(_{dir}_python) -m pip install --upgrade pip
 $(_{dir}_build)%%.py.d: $(_{dir})%%.py
 	python3 $< --generic --dep $@
 
