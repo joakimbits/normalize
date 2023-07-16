@@ -1,15 +1,13 @@
 """Move objects into square crops of an image
 
-This will make the objects trainable on square detector with as much of its natural environment as possible.
-
-Notes:
-Tests only work on Poltergeist due to a jpg test file dependency - see Dependencies below.
-That specific file is write-protected to not accidentally remove it.
+This will make the objects trainable on square detector with as much of its natural
+environment as possible.
 
 Dependencies:
 numpy
 Pillow
-$ python3 -c "from PIL import Image; Image.new('RGB', (640, 360)).save('blank.jpg')"
+$ (venv/bin/python
+>    -c "from PIL import Image; Image.new('RGB', (640, 360)).save('blank.jpg')")
 $ mv blank.jpg bottle-top_has_bottle_and_also_its_box_slot.jpg
 """
 
@@ -41,7 +39,7 @@ class BndBox(np.ndarray):
     rec.array([[(1, 3, 50, 70)],
                [(2, 4, 60, 80)]],
               dtype=[('xmin', '<i8'), ('ymin', '<i8'), ('xmax', '<i8'), ('ymax', '<i8')])
-    """
+    """  # noqa: E501
 
     COORDS = 'xmin', 'ymin', 'xmax', 'ymax'
     DTYPE = np.dtype(list(zip(COORDS, [int] * 4)))
@@ -52,7 +50,8 @@ class BndBox(np.ndarray):
         if xmin.shape == ():
             return np.array((xmin, ymin, xmax, ymax), dtype=int).view(cls)
 
-        return np.array(np.stack((xmin, ymin, xmax, ymax), axis=-1), dtype=int).view(cls)
+        return np.array(
+            np.stack((xmin, ymin, xmax, ymax), axis=-1), dtype=int).view(cls)
 
     def __repr__(self):
         return self.__str__(self.__class__.__name__)
@@ -61,8 +60,8 @@ class BndBox(np.ndarray):
         if self.shape == (4,):
             return class_name + repr(tuple(self))
 
-        n = len(self.shape)
-        return f"{class_name}(* {self.transpose([-1] + list(range(len(self.shape) - 1))).view(np.ndarray)})"
+        pars = self.transpose([-1] + list(range(len(self.shape) - 1))).view(np.ndarray)
+        return f"{class_name}(* {pars})"
 
     @property
     def coords(self):
@@ -150,16 +149,17 @@ class Crop(BndBox):
 class FileStructure:
     """Locations for original and normalized image and voc files"""
 
-    def __init__(self, image_file, normalized_image_dir='normalized', voc_dir=None, normalized_voc_dir=None):
+    def __init__(self, image_file, normalized_image_dir='normalized', voc_dir=None,
+                 normalized_voc_dir=None):
         assert os.path.exists(image_file), f"{image_file} not found in {os.getcwd()}"
 
         image_dir, image_filename = os.path.split(image_file)
         name, image_ext = os.path.splitext(image_filename)
 
-        if voc_dir == None:
+        if voc_dir is None:
             voc_dir = image_dir
 
-        if normalized_voc_dir == None:
+        if normalized_voc_dir is None:
             normalized_voc_dir = normalized_image_dir
 
         voc_file = os.path.join(voc_dir, name + ".xml")
@@ -258,7 +258,7 @@ class Norm(Crop):
     >>> for norm in _(): print(Image.open(norm.image).size, repr(norm))
     Ignoring box at [563 142]: No pixels!
     (168, 168) Norm('normalized/no_pixel_box_and_empty_box_0.xml', None, array([168, 138]), array([168, 138]), array([168, 138]))
-    """
+    """  # noqa: E501
 
     class EfficientDet:
         """The input layer is a square"""
@@ -268,28 +268,33 @@ class Norm(Crop):
         L4 = (640, 640)
 
     def __repr__(self):
-        return self.__class__.__name__ + repr((self.template, self.objects_filter, self.large, self.normal, self.small))
+        return self.__class__.__name__ + repr((self.template, self.objects_filter,
+                                               self.large, self.normal, self.small))
 
-    def __new__(cls, template='bottle-top_has_bottle_and_also_its_box_slot.xml', objects_filter=['box'],
-                large=None, normal=None, small=None, image=None):
+    def __new__(cls, template='bottle-top_has_bottle_and_also_its_box_slot.xml',
+                objects_filter=['box'], large=None, normal=None, small=None,
+                image=None):
         """
         Grab bndboxes for all matching objects in a VOC .xml file.
         Find their most normal and small sized bndbox.
         """
         voc = ET.parse(template).getroot()
 
-        if objects_filter != None:
-            objects = [o for o in voc.iter('object') if o.findtext('name') in objects_filter]
+        if objects_filter is not None:
+            objects = [o for o in voc.iter('object')
+                       if o.findtext('name') in objects_filter]
         else:
             objects = voc.findall('object')
 
-        bndboxes = np.array([[o.find('bndbox').findtext(c) for c in BndBox.COORDS] for o in objects], dtype=int)
+        bndboxes = np.array([[o.find('bndbox').findtext(c) for c in BndBox.COORDS]
+                             for o in objects], dtype=int)
         self = bndboxes.view(cls)
 
         pixels = np.atleast_1d(self.pixels())
         waste = (pixels == 0).nonzero()[0]
         for i in waste:
-            print(f"Ignoring {objects[i].findtext('name')} at {self[i].offset}: No pixels!")
+            print(f"Ignoring {objects[i].findtext('name')} at {self[i].offset}:"
+                  " No pixels!")
 
         if waste.size:
             ok = pixels.nonzero()[0]
@@ -317,24 +322,28 @@ class Norm(Crop):
 
         return self
 
-    def __call__(self, image_file=None, normalized_image_dir='normalized', voc_dir=None, normalized_voc_dir=None,
-                 square=True):
+    def __call__(self, image_file=None, normalized_image_dir='normalized',
+                 voc_dir=None, normalized_voc_dir=None, square=True):
         """
         Crop an image and move each object into the crop where it is most embedded.
         """
         if not self.size:
             return
 
-        if image_file == None:
+        if image_file is None:
             image_file = os.path.splitext(self.template)[0] + ".jpg"
 
-        fs = FileStructure(image_file, normalized_image_dir, voc_dir, normalized_voc_dir)
+        fs = FileStructure(image_file, normalized_image_dir,
+                           voc_dir, normalized_voc_dir)
 
         image = Image.open(image_file)
         items = Norm(fs.voc_file, None)
-        bndboxes_crops_inner_margins = items.corners[..., np.newaxis, 0, :] - self.corners[..., 0, :]
-        bndboxes_crops_outer_margins = self.corners[..., 1, :] - items.corners[..., np.newaxis, 1, :]
-        bndboxes_crops_margins = np.concatenate((bndboxes_crops_inner_margins, bndboxes_crops_outer_margins), axis=-1)
+        bndboxes_crops_inner_margins = (
+                items.corners[..., np.newaxis, 0, :] - self.corners[..., 0, :])
+        bndboxes_crops_outer_margins = (
+                self.corners[..., 1, :] - items.corners[..., np.newaxis, 1, :])
+        bndboxes_crops_margins = np.concatenate(
+            (bndboxes_crops_inner_margins, bndboxes_crops_outer_margins), axis=-1)
         bndboxes_crops_worst_margin = np.min(bndboxes_crops_margins, axis=-1)
         bndboxes_cropindex = np.atleast_1d(bndboxes_crops_worst_margin.argmax(axis=-1))
 
@@ -344,7 +353,8 @@ class Norm(Crop):
         if not os.path.isdir(fs.normalized_voc_dir):
             os.makedirs(fs.normalized_voc_dir)
 
-        image_file_for_crop = os.path.join(fs.normalized_image_dir, fs.name + "_%s" + fs.image_ext)
+        image_file_for_crop = os.path.join(fs.normalized_image_dir,
+                                           fs.name + "_%s" + fs.image_ext)
         voc_file_for_crop = os.path.join(fs.normalized_voc_dir, fs.name + "_%s.xml")
         filename = items.voc.find('filename')
         width, height = map(items.voc.find('size').find, ('width', 'height'))
@@ -395,11 +405,11 @@ class Norm(Crop):
 if __name__ == '__main__':
     import argparse
 
-    argparser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                        description=__doc__,
-                                        epilog="""Examples:
+    argparser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__, epilog="""Examples:
 $ rm -rf normalized/
-$ python3 squareup.py bottle-top_has_bottle_and_also_its_box_slot.jpg
+$ venv/bin/python squareup.py bottle-top_has_bottle_and_also_its_box_slot.jpg
 bottle-top_has_bottle_and_also_its_box_slot.jpg
 [179 132] ['box'] normalized/bottle-top_has_bottle_and_also_its_box_slot_0.xml in (179, 179) normalized/bottle-top_has_bottle_and_also_its_box_slot_0.jpg
 [165 116] ['box'] normalized/bottle-top_has_bottle_and_also_its_box_slot_1.xml in (165, 165) normalized/bottle-top_has_bottle_and_also_its_box_slot_1.jpg
@@ -407,26 +417,34 @@ bottle-top_has_bottle_and_also_its_box_slot.jpg
 [134 137] ['box'] normalized/bottle-top_has_bottle_and_also_its_box_slot_3.xml in (137, 137) normalized/bottle-top_has_bottle_and_also_its_box_slot_3.jpg
 [171 110] ['box'] normalized/bottle-top_has_bottle_and_also_its_box_slot_4.xml in (171, 171) normalized/bottle-top_has_bottle_and_also_its_box_slot_4.jpg
 [180 118] ['box'] normalized/bottle-top_has_bottle_and_also_its_box_slot_5.xml in (180, 180) normalized/bottle-top_has_bottle_and_also_its_box_slot_5.jpg
-""")
+""")  # noqa: E501
     makemake.add_arguments(argparser)
 
-    argparser.add_argument('-o', '--object', action='store', default=['box'],
-                           nargs='+', help="Template object(s) for defining normal and smallest crop sizes (box)")
-    argparser.add_argument('image_file', action='store',
-                           nargs='+', help="Image file to shape-up (*.jpg)")
-    argparser.add_argument('-nid', '--normalized_image_dir', action='store', default="normalized",
-                           help="Output directory for cropped images (normalized)")
-    argparser.add_argument('-vd', '--voc_dir', action='store', default=None,
-                           help="Input directory for voc files (directory of IMAGE_FILE)")
-    argparser.add_argument('-nvd', '--normalized_voc_dir', action='store', default=None,
-                           help="Output directory for cropped voc files (NORMALIZED_IMAGE_DIR)")
+    argparser.add_argument(
+        '-o', '--object', action='store',
+        default=['box'], nargs='+', help=(
+            "Template object(s) for defining normal and smallest crop sizes (box)"))
+    argparser.add_argument(
+        'image_file', action='store',
+        nargs='+', help="Image file to shape-up (*.jpg)")
+    argparser.add_argument(
+        '-nid', '--normalized_image_dir', action='store',
+        default="normalized", help="Output directory for cropped images (normalized)")
+    argparser.add_argument(
+        '-vd', '--voc_dir', action='store',
+        default=None, help="Input directory for voc files (directory of IMAGE_FILE)")
+    argparser.add_argument(
+        '-nvd', '--normalized_voc_dir', action='store',
+        default=None, help=(
+            "Output directory for cropped voc files (NORMALIZED_IMAGE_DIR)"))
     args = argparser.parse_args()
-
-    # template='bottle-top_has_bottle_and_also_its_box_slot.xml', objects=['box'], normal=None, small=None
 
     for image_file in args.image_file:
         print(image_file)
-        fs = FileStructure(image_file, args.normalized_image_dir, args.voc_dir, args.normalized_voc_dir)
+        fs = FileStructure(image_file, args.normalized_image_dir,
+                           args.voc_dir, args.normalized_voc_dir)
         squareup = Norm(fs.voc_file, args.object)
-        for norm in squareup(fs.image_file, fs.normalized_image_dir, fs.voc_dir, fs.normalized_voc_dir):
-            print(norm.large, args.object, norm.template, "in", Image.open(norm.image).size, norm.image)
+        for norm in squareup(fs.image_file, fs.normalized_image_dir,
+                             fs.voc_dir, fs.normalized_voc_dir):
+            print(norm.large, args.object, norm.template, "in",
+                  Image.open(norm.image).size, norm.image)
