@@ -3,7 +3,7 @@ Detect many small objects inside their parent objects
 
 This is a suite of tools for detecting objects in two stages: first large and easy-to-detect objects, and then smaller objects inside them.
 
-It focusses on what was most difficult to detect: Small capsules of bottles visible within cardboard insets inside cardboard boxes.
+It focuses on what was most difficult to detect: Small capsules of bottles visible within cardboard insets inside cardboard boxes.
 
 The previously trained object detector was used only to detect parent objects reliably, and the new object-in-object 
 detector was used to detect what was inside them reliably also.
@@ -21,22 +21,16 @@ to reliable and instant. Also it allowed much smaller networks to be used, which
 used only a single Coral edgeTPU on a single Raspberry Pi 4.
 
 ## Tool for generating build dependencies: makemake.py
-This tool generates the pip and bash commands needed for bringup of a python module.
+Any python module that imports makemake (and makemake itself) can print a Makefile for handling its dependencies and
+tests. It can also print a generic Makefile for handling all source code in its directory, including .py, .c, cpp, .s.
 
-It outputs the commands as a build rule that can be imported in a Makefile.
+Example: 
+$ python3 makemake.py --makemake --generic > Makefile && make
 
-It can also print such a Makefile.
+The generic Makefile builds exactly the same targets also when included in a parent Makefile, and will not cause
+conflict with the existing python environment since it creates its own python venv from it. 
 
-See its Usage and Examples.
-
-## Generic build rules: Makefile
-Rules for bringup of tools coded in Python, C, C++ and ASM.
-
-Assumes each python module generates its own bringup rule and can be used as a standalone tool.
-
-Any .c, .cpp, .s file here gets compiled and linked together into a single tool named as the parent directory.
-
-It builds exactly the same targets also when included in a parent Makefile.
+Python version 3.9 or later is required.
 
 ## Many items in multiple boxes: bottle-top_has_bottle_and_also_its_box_slot.xml
 A template with precise labelling of object sizes within a complex image.
