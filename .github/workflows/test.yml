@@ -15,17 +15,14 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff pytest
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Install workflow tools
+        run: python3 makemake.py --makemake --generic > Makefile && make venv
       - name: Check for Python syntax errors and undefined names
-        run: ruff --format=github --select=E9,F63,F7,F82 --target-version=py39 .
+        run: make syntax
       - name: Check for Python style mismatches
-        run: ruff --format=github --target-version=py39 .
-      - name: Test Python
-        run: pytest -
+        run: make style
+      - name: Test Python and bash usage examples (implicitly building anything else not yet built)
+        run: make
       - name: List files in the repository
         run: ls
       - run: echo "🍏 This job's status is ${{ job.status }}."
