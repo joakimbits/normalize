@@ -12,9 +12,10 @@ import makemake
 if __name__ == '__main__':
     import argparse
 
-    argparser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                        description=__doc__,
-                                        epilog="""Examples:
+    argparser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        epilog="""Examples:
 $ python3 classes.py bottle-top_has_bottle_and_also_its_box_slot.xml
 bottle-top
 can-top
