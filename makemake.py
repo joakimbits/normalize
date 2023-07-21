@@ -249,7 +249,6 @@ if parent_module.__name__ == '__main__':
             src_dir = f'$(_{dir}_dir)'
             build_dir = f'$(_{dir}_build)'
             build_dir_var_value = f"{src_dir}{dep_dir}"
-            dep_pattern = f"{build_dir}{dep_filename.replace(module, pattern)}"
             generic = " --generic"
         else:
             pattern = module
@@ -258,33 +257,32 @@ if parent_module.__name__ == '__main__':
             python = 'python3'
             src_dir = ""
             build_dir = dep_dir
-            dep_pattern = dep_file
             generic = ""
-
-        bringup_rule = (f"{build_dir}{module}.py.bringup:"
-                        f" {src_dir}{module}.py {build_dir}{dep_filename}")
-
-        commands = []
 
         if generic_dependencies:
             embed = f"( if [ $(_{dir})_ != _ ]; then cd $(_{dir}) ; fi && %s"
             end = " )"
-            rules = [(bringup_rule,
-                      commands)]
+            rules = []  # The generic rules are already printed
         else:
             embed = "%s"
             end = ""
             rules = [
                 (f"all: {build_dir}{pattern}.py.tested",
-                 []),
-                (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {dep_pattern}"
-                 f" {build_dir}{pattern}.py.bringup",
-                 [f"{python} {source} --test > $@"]),
-                (f"{dep_pattern}: {src_dir}{pattern}.py",
-                 [f"{python} {source} --dep $@{generic}"]),
-                (bringup_rule,
-                 commands)]
+                 [])]
+            if dep_path:
+                rules += [
+                    ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
+                      f" {dep_file} {build_dir}{pattern}.py.bringup"),
+                    [f"{python} {source} --test > $@"]),
+                    (f"{dep_file}: {src_dir}{pattern}.py",
+                     [f"{python} {source} --dep $@{generic}"])]
+            else:
+                rules.append(
+                    ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
+                      f" {build_dir}{pattern}.py.bringup"),
+                     [f"{python} {source} --test > $@"]))
 
+        commands = []
         bringups = build_commands(parent_module.__doc__, 'Dependencies:', embed, end,
                                   pip=f"{python} -m pip")
         if bringups:
@@ -296,6 +294,16 @@ if parent_module.__name__ == '__main__':
                 commands += command_lines[:-1]
                 commands.append(f'{command_lines[-1]} {op} $@{glue}')
                 op = '>>'
+
+        bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py"
+        if generic_dependencies or dep_path:
+            bringup_rule += f" {build_dir}{dep_filename}"
+        else:
+            commands = [f"mkdir {build_dir}" + (" &&" if commands else "")] + commands
+
+        rules.append(
+            (bringup_rule,
+             commands))
 
         if not commands:
             commands += ["touch $@"]
