@@ -33,22 +33,22 @@ jobs:
         run: make -f makemake_complete.mk
       - name: List files in the repository
         run: ls
-      - name: Report the generic build
-        run: -
+      - name: Report the generic Makefile build
+        run: |
           cat Makefile
           ls build_generic
           cat build_generic/makemake.py.d
           cat build_generic/makemake.py.bringup
           cat build_generic/makemake.py.tested
-      - name: Report the basic build
-        run:  -
+      - name: Report the basic Makefile build
+        run:  |
           cat makemake.mk
           ls build_basic
           cat build_basic/makemake.py.d
           cat build_basic/makemake.py.bringup
           cat build_basic/makemake.py.tested
-      - name: Report the non-generic build
-        run:  -
+      - name: Report the self-contained Makefile build
+        run:  |
           cat makemake_complete.mk
           ls build
           cat build/makemake.py.bringup
