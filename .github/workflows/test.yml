@@ -15,7 +15,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Install workflow tools
+      - name: Setup for testing with a generic Makefile
         run: python3 makemake.py --makemake --generic > Makefile && make venv
       - name: Check for Python syntax errors and undefined names
         run: make syntax
@@ -23,6 +23,10 @@ jobs:
         run: make style
       - name: Test Python and bash usage examples (implicitly building anything else not yet built)
         run: make
+      - name: Setup for testing with a non-generic Makefile
+        run: python3 makemake.py --makemake --dep build_basic/makemake.py.d > makemake.mk
+      - name: Verify that the non-generic Makefile can also test the usage examples.
+        run: make -f makemake.mk
       - name: List files in the repository
         run: ls
       - run: echo "🍏 This job's status is ${{ job.status }}."
