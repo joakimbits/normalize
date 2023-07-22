@@ -233,7 +233,10 @@ if parent_module.__name__ == '__main__':
             dep_dir, dep_filename = os.path.split(dep_file)
             dep_dir_now = dep_dir
             if dep_dir:
-                dep_dir = (dep_dir + "/").removeprefix(dir + "/")
+                prefix = dir + "/"
+                dep_dir = prefix
+                if dep_dir.startswith(prefix):
+                    dep_dir = dep_dir[len(prefix):]
         else:
             dep_dir_now = dep_dir = 'build/'
             dep_filename = f'{module_py}.d'
@@ -373,6 +376,31 @@ makemake.py.tested: makemake.py makemake.dep makemake.py.bringup
 makemake.dep: makemake.py
 	python3 makemake.py --dep $@
 include makemake.dep
+
+$ mkdir hello_from_assembly && (
+> cd hello_from_assembly && echo <<EOF
+> global _start
+> 
+> section .text
+> 
+> _start:
+>   mov rax, 1        ; write(
+>   mov rdi, 1        ;   STDOUT_FILENO,
+>   mov rsi, msg      ;   "Hello, world!\n",
+>   mov rdx, msglen   ;   sizeof("Hello, world!\n")
+>   syscall           ; );
+> 
+>   mov rax, 60       ; exit(
+>   mov rdi, 0        ;   EXIT_SUCCESS
+>   syscall           ; );
+> 
+> section .rodata
+>   msg: db "Hello, world!", 10
+>   msglen: equ $ - msg
+> EOF > hello.s &&
+> python3 ../makemake.py --makemake --generic > Makefile && make && 
+> ./hello_from_assembly )
+Hello, world!
 """)
     add_arguments(argparser)
     args = argparser.parse_args()
