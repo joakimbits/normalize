@@ -65,7 +65,7 @@ Usage:
         args = argparser.parse_args()
 
 Dependencies:
-$ python3 -c 'import sys; assert sys.version_info[:2] >= (3, 9), sys.version'
+$ python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version'
 pip  # Fake module dependency
 """
 
@@ -361,7 +361,7 @@ include makemake.dep
 
 $ cat makemake.dep
 makemake.py.bringup: makemake.py makemake.dep
-	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 9), sys.version' > $@"""
+	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@"""
                """ && \\
 	python3 -m pip install pip >> $@
 
