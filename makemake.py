@@ -76,12 +76,13 @@ from argparse import Action
 
 
 parent_module = sys.modules['.'.join(__name__.split('.')[:-1]) or '__main__']
-dir = os.path.split(os.path.split(parent_module.__file__)[0])[1]
-module_path = sys.argv[0]
-module_dir, module_py = os.path.split(module_path)
-module, ext = os.path.splitext(module_py)
+if hasattr(parent_module, '__file__'):
+    dir = os.path.split(os.path.split(parent_module.__file__)[0])[1]
+    module_path = sys.argv[0]
+    module_dir, module_py = os.path.split(module_path)
+    module, ext = os.path.splitext(module_py)
 
-MAKEFILE_FROM_BUILD_DIR = f"""# $ {" ".join(sys.argv)}
+    MAKEFILE_FROM_BUILD_DIR = f"""# $ {" ".join(sys.argv)}
 # Change to FORMAT=github within a github workflow
 FORMAT := text
 
@@ -114,7 +115,7 @@ $(_{dir})all: $(_{dir})style $(_{dir}_TESTEDS)
 # Each .d here makes one $(_{dir}_build)%%.py.bringup within a common local python venv.
 # Note: Any conflicts between bringups are just ignored: The last bringup wins.
 # If that is a problem, split this {dir} into separate directories with different venvs.
-$(_{dir})venv $(_{dir}_python): | $(_{dir})makemake.py
+$(_{dir})venv $(_{dir}_python):
 	python3 -m venv $(_{dir})venv && $(_{dir}_python) -m pip install --upgrade pip
 $(_{dir}_build)%%.py.d: $(_{dir})%%.py
 	python3 $< --generic --dep $@
@@ -138,227 +139,249 @@ $(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.brin
 	$(_{dir}_python) $< --test > $@
 
 # Find all the C, C++ and ASM source files
-_{dir}_SRC := $(shell find $(_{dir}_dir) -name '*.cpp' -or -name '*.c' -or -name '*.s')
+_{dir}_SRCS := $(shell find $(_{dir}_dir) -name '*.cpp' -or -name '*.c' -or -name '*.s')
+_{dir}_SRCS := $(_{dir}_SRCS:./%%=%%)
 
 # List the wanted binaries and their build dependencies
 _{dir}_OBJS := $(_{dir}_SRCS:$(_{dir}_dir)%%.c=$(_{dir}_build_dir)%%.c.o)
-_{dir}_OBJS += $(_{dir}_SRCS:$(_{dir}_dir)%%.cpp=$(_{dir}_build_dir)%%.cpp.o)
-_{dir}_DEPS += $(_{dir}_OBJS:.o=.d)
+_{dir}_OBJS := $(_{dir}_OBJS:$(_{dir}_dir)%%.cpp=$(_{dir}_build_dir)%%.cpp.o)
+_{dir}_DEPS += $($(filter %%.o,$(_{dir}_OBJS)):.o=.d)
+_{dir}_OBJS := $(_{dir}_OBJS:$(_{dir})%%.s=$(_{dir}_build)%%.s.o)
 _{dir}_INC_DIRS := $(shell find $(_{dir}_dir) -type d)
 _{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
 _{dir}_CPPFLAGS := $(_{dir}_INC_FLAGS) -MMD -MP
 
 # The final executable links all the binaries
-$(_{dir}_build_dir)_{dir}: $(_{dir}_OBJS)
-	$(CXX) $(_{dir}_OBJS) -o $@ $(LDFLAGS)
+$(_{dir}){dir}: $(_{dir}_OBJS)
+	$(LD) $(_{dir}_OBJS) -o $@ $(LDFLAGS)
 
-$(_{dir}_build_dir)%%.c.o: $(_{dir}_dir)%%.c
+$(_{dir}_build)%%.c.o: $(_{dir})%%.c
 	mkdir -p $(dir $@)
 	$(CC) $(_{dir}_CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-$(_{dir}_build_dir)%%.cpp.o: $(_{dir}_dir)%%.cpp
+$(_{dir}_build)%%.cpp.o: $(_{dir})%%.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(_{dir}_CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(_{dir}_build)%%.s.o: $(_{dir})%%.s
+	mkdir -p $(dir $@)
+	$(AS) $< -o $@
 
 # Include all build dependencies
 -include $(_{dir}_DEPS)
 """  # noqa: E101
 
-COMMENT_GROUP_PATTERN = re.compile("(\s*#.*)?$")
+    COMMENT_GROUP_PATTERN = re.compile("(\s*#.*)?$")
 
+    def make_rule(rule, commands, file=sys.stdout):
+        print(rule, file=file)
+        print('\t' + " \\\n\t".join(commands), file=file)
 
-def make_rule(rule, commands, file=sys.stdout):
-    print(rule, file=file)
-    print('\t' + " \\\n\t".join(commands), file=file)
-
-
-def build_commands(doc, heading, embed="%s", end="", pip=""):
-    before_after = doc.split(f"{heading}\n", maxsplit=1)
-    commands = []
-    if len(before_after) >= 2:
-        for line in before_after[1].split('\n'):
-            command_lines, comment_lines, output_lines = (
-                commands[-1] if commands else ([], [], []))
-            command, comment, _ = re.split(COMMENT_GROUP_PATTERN, line, maxsplit=1)
-            if comment is None:
-                comment = ""
-            if command[:2] == '$ ':
-                commands.append(([embed % command[2:] + end], [comment], []))
-            elif command[:2] == '> ':
-                command_lines[-1] = command_lines[-1][:-len(end)]
-                command_lines.append(command[2:] + end)
-                comment_lines.append(comment)
-            elif command_lines and not output_lines and command_lines[-1][-1] == '\\':
-                command_lines[-1] = command_lines[-1][:-len(end)]
-                command_lines.append(embed % command + end)
-                comment_lines.append(comment)
-            elif command_lines and not pip:
-                output_lines.append(command)
-            elif command and pip:
-                commands.append(([f"{pip} install " + command], [comment], []))
-
-    return commands
-
-
-def run_command_examples(commands):
-    import subprocess
-
-    for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
-        command = "\n".join(command_lines)
-        if module_dir:
-            command = f"( cd {module_dir} && {command} )"
-        output = "\n".join(output_lines)
-        result = subprocess.run(command, shell=True, capture_output=True, text=True,
-                                timeout=3)
-        assert not result.returncode, f"Example {i + 1} failed: $ {command}"
-        received = result.stdout or ""
-        assert received == output, (
-            f"Example {i + 1}: $ {command}\n"
-            f"Expected: {repr(output)}\n"
-            f"Received: {repr(received)}")
-
-if parent_module.__name__ == '__main__':
-    dependencies = '--makemake' in sys.argv[1:]
-    generic_dependencies = '--generic' in sys.argv[1:]
-    dep_path = '--dep' in sys.argv[1:]
-    if dependencies or generic_dependencies or dep_path:
-        assert len(sys.argv) == sum([1, dependencies, generic_dependencies,
-                                     dep_path * 2]), (
-            sys.argv, [1, dependencies, generic_dependencies,
-                       dep_path * 2])
-
-        if dep_path:
-            dep_file = sys.argv[sys.argv.index('--dep', 1) + 1]
-            assert dep_file[:2] != "__", sys.argv
-            dep_dir, dep_filename = os.path.split(dep_file)
-            dep_dir_now = dep_dir
-            if dep_dir:
-                prefix = dir + "/"
-                dep_dir = prefix
-                if dep_dir.startswith(prefix):
-                    dep_dir = dep_dir[len(prefix):]
-        else:
-            dep_dir_now = dep_dir = 'build/'
-            dep_filename = f'{module_py}.d'
-            dep_file = f'build/{module_py}.d'
-
-        if generic_dependencies:
-            if dependencies:
-                print(MAKEFILE_FROM_BUILD_DIR % dep_dir)
-            pattern = '%'
-            source = '$<'
-            stem = '$*'
-            python = f'$(_{dir}_python)'
-            src_dir = f'$(_{dir}_dir)'
-            build_dir = f'$(_{dir}_build)'
-            build_dir_var_value = f"{src_dir}{dep_dir}"
-            generic = " --generic"
-        else:
-            pattern = module
-            source = module_path
-            stem = module
-            python = 'python3'
-            src_dir = ""
-            build_dir = dep_dir
-            generic = ""
-
-        if generic_dependencies:
-            embed = f"( if [ $(_{dir})_ != _ ]; then cd $(_{dir}) ; fi && %s"
-            end = " )"
-            rules = []  # The generic rules are already printed
-        else:
-            embed = "%s"
-            end = ""
-            rules = [
-                (f"all: {build_dir}{pattern}.py.tested",
-                 [])]
-            if dep_path:
-                rules += [
-                    ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
-                      f" {dep_file} {build_dir}{pattern}.py.bringup"),
-                    [f"{python} {source} --test > $@"]),
-                    (f"{dep_file}: {src_dir}{pattern}.py",
-                     [f"{python} {source} --dep $@{generic}"])]
-            else:
-                rules.append(
-                    ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
-                      f" {build_dir}{pattern}.py.bringup"),
-                     [f"{python} {source} --test > $@"]))
-
+    def build_commands(doc, heading, embed="%s", end="", pip=""):
+        before_after = doc.split(f"{heading}\n", maxsplit=1) if doc else ()
         commands = []
-        bringups = build_commands(parent_module.__doc__, 'Dependencies:', embed, end,
-                                  pip=f"{python} -m pip")
-        if bringups:
-            op = ">"
-            remaining = len(bringups)
-            for command_lines, comment_lines, output_lines in bringups:
-                remaining -= 1
-                glue = " &&" if remaining else ""
-                commands += command_lines[:-1]
-                commands.append(f'{command_lines[-1]} {op} $@{glue}')
-                op = '>>'
+        if len(before_after) >= 2:
+            for line in before_after[1].split('\n'):
+                command_lines, comment_lines, output_lines = (
+                    commands[-1] if commands else ([], [], []))
+                command, comment, _ = re.split(COMMENT_GROUP_PATTERN, line, maxsplit=1)
+                if comment is None:
+                    comment = ""
 
-        bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py"
-        if generic_dependencies or dep_path:
-            bringup_rule += f" {build_dir}{dep_filename}"
-        else:
-            commands = [f"mkdir {build_dir}" + (" &&" if commands else "")] + commands
+                if command in ('$', '>') and comment[:1] == ' ':
+                    command += comment[:1]
+                    comment = comment[1:]
 
-        rules.append(
-            (bringup_rule,
-             commands))
+                if command[:2] == '$ ':
+                    commands.append(([embed % command[2:] + end], [comment], []))
+                elif command[:2] == '> ':
+                    if end:
+                        command_lines[-1] = command_lines[-1][:-len(end)]
+                    command_lines.append(command[2:] + end)
+                    comment_lines.append(comment)
+                elif (command_lines and not output_lines
+                      and command_lines[-1][-1] == '\\'):
+                    command_lines[-1] = command_lines[-1][:-len(end)]
+                    command_lines.append(embed % command + end)
+                    comment_lines.append(comment)
+                elif command_lines and not pip:
+                    output_lines.append(command)
+                elif command and pip:
+                    commands.append(([f"{pip} install " + command], [comment], []))
 
-        if not commands:
-            commands += ["touch $@"]
+        return commands
 
-        for rule, commands in rules:
-            if rule == bringup_rule and (dep_path or generic_dependencies):
-                if not generic_dependencies:
-                    print(f"include {build_dir}{dep_filename}")
-                if dep_dir and not os.path.exists(dep_dir_now):
-                    os.makedirs(dep_dir_now)
-                with open(dep_file, 'w+') as dep:
-                    make_rule(rule, commands, file=dep)
-            elif dependencies:
-                make_rule(rule, commands)
+    def run_command_examples(commands):
+        import subprocess
 
-        exit(0)
+        for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
+            command = "\n".join(command_lines)
+            if module_dir:
+                command = f"( cd {module_dir} && {command} )"
+            output = "\n".join(output_lines)
+            result = subprocess.run(command, shell=True, capture_output=True, text=True,
+                                    timeout=3)
+            assert not result.returncode, f"Example {i + 1} failed: $ {command}"
+            received = result.stdout or ""
+            assert received == output, (
+                f"Example {i + 1}: $ {command}\n"
+                f"Expected: {repr(output)}\n"
+                f"Received: {repr(received)}")
 
+    if parent_module.__name__ == '__main__':
+        dependencies = '--makemake' in sys.argv[1:]
+        generic_dependencies = '--generic' in sys.argv[1:]
+        dep_path = '--dep' in sys.argv[1:]
+        if dependencies or generic_dependencies or dep_path:
+            assert len(sys.argv) == sum([1, dependencies, generic_dependencies,
+                                         dep_path * 2]), (
+                sys.argv, [1, dependencies, generic_dependencies,
+                           dep_path * 2])
 
-class Test(Action):
-    """Doctest python examples in parent_module
+            if dep_path:
+                dep_file = sys.argv[sys.argv.index('--dep', 1) + 1]
+                assert dep_file[:2] != "__", sys.argv
+                dep_dir, dep_filename = os.path.split(dep_file)
+                dep_dir_now = dep_dir
+                if dep_dir:
+                    prefix = dir + "/"
+                    dep_dir = prefix
+                    if dep_dir.startswith(prefix):
+                        dep_dir = dep_dir[len(prefix):]
+            else:
+                dep_dir_now = dep_dir = 'build/'
+                dep_filename = f'{module_py}.d'
+                dep_file = f'build/{module_py}.d'
 
-    Test also command usage examples in this argparser epilog, and exit
-    """
-    def __call__(self, parser, args, values, option_string=None):
-        import doctest
+            if generic_dependencies:
+                if dependencies:
+                    print(MAKEFILE_FROM_BUILD_DIR % dep_dir)
+                pattern = '%'
+                source = '$<'
+                stem = '$*'
+                python = f'$(_{dir}_python)'
+                src_dir = f'$(_{dir}_dir)'
+                build_dir = f'$(_{dir}_build)'
+                build_dir_var_value = f"{src_dir}{dep_dir}"
+                generic = " --generic"
+            else:
+                pattern = module
+                source = module_path
+                stem = module
+                python = 'python3'
+                src_dir = ""
+                build_dir = dep_dir
+                generic = ""
 
-        result = doctest.testmod(parent_module)
-        print(f"All {result.attempted} python usage examples PASS", )
-        examples = build_commands(parser.epilog, "Examples:")
-        run_command_examples(examples)
-        print(f"All {len(examples)} command usage examples PASS")
-        exit(0)
+            if generic_dependencies:
+                embed = f"( if [ $(_{dir})_ != _ ]; then cd $(_{dir}) ; fi && %s"
+                end = " )"
+                rules = []  # The generic rules are already printed
+            else:
+                embed = "%s"
+                end = ""
+                rules = [
+                    (f"all: {build_dir}{pattern}.py.tested",
+                     [])]
+                if dep_path:
+                    rules += [
+                        ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
+                          f" {dep_file} {build_dir}{pattern}.py.bringup"),
+                        [f"{python} {source} --test > $@"]),
+                        (f"{dep_file}: {src_dir}{pattern}.py",
+                         [f"{python} {source} --dep $@{generic}"])]
+                else:
+                    rules.append(
+                        ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
+                          f" {build_dir}{pattern}.py.bringup"),
+                         [f"{python} {source} --test > $@"]))
 
+            commands = []
+            bringups = build_commands(parent_module.__doc__, 'Dependencies:', embed,
+                                      end, pip=f"{python} -m pip")
+            if bringups:
+                op = ">"
+                remaining = len(bringups)
+                for command_lines, comment_lines, output_lines in bringups:
+                    remaining -= 1
+                    glue = " &&" if remaining else ""
+                    commands += command_lines[:-1]
+                    commands.append(f'{command_lines[-1]} {op} $@{glue}')
+                    op = '>>'
 
-def add_arguments(argparser):
-    argparser.add_argument('--makemake', action='store_true',
-                           help=f"Print Makefile for {module_path}, and exit")
-    argparser.add_argument('--generic', action='store_true',
-                           help=f"Print generic Makefile for {module_path}, and exit")
-    argparser.add_argument('--dep', action='store', help=(
-        f"Build a {module}.dep target, print its Makefile include statement, and exit"))
-    argparser.add_argument('--test', nargs=0, action=Test, help=(
-        "Verify examples and exit"))
+            bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py"
+            if generic_dependencies or dep_path:
+                bringup_rule += f" {build_dir}{dep_filename}"
+            else:
+                commands = [f"mkdir {build_dir}" + (" &&" if commands else "")
+                            ] + commands
 
+            rules.append(
+                (bringup_rule,
+                 commands))
 
-if __name__ == '__main__':
-    import argparse
+            if not commands:
+                commands += ["touch $@"]
 
-    argparser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=__doc__,
-        epilog="""Examples:
+            for rule, commands in rules:
+                if rule == bringup_rule and (dep_path or generic_dependencies):
+                    if not generic_dependencies:
+                        print(f"include {build_dir}{dep_filename}")
+                    if dep_dir and not os.path.exists(dep_dir_now):
+                        os.makedirs(dep_dir_now)
+                    with open(dep_file, 'w+') as dep:
+                        make_rule(rule, commands, file=dep)
+                elif dependencies:
+                    make_rule(rule, commands)
+
+            exit(0)
+
+    class Test(Action):
+        """Doctest python examples in parent_module
+
+        Test also command usage examples in this argparser epilog, and exit
+        """
+        def __call__(self, parser, args, values, option_string=None):
+            import doctest
+
+            try:
+                result = doctest.testmod(parent_module)
+                print(f"All {result.attempted} python usage examples PASS", )
+                examples = build_commands(parser.epilog, "Examples:")
+                run_command_examples(examples)
+                print(f"All {len(examples)} command usage examples PASS")
+            except Exception as err:
+                print(err, file=sys.stderr)
+                exit(1)
+
+            exit(0)
+
+    class Command(Action):
+        """Execute a program as string and exit"""
+        def __call__(self, parser, args, values, option_string=None):
+            exec(values[0], parent_module.__dict__, locals())
+            exit(0)
+
+    def add_arguments(argparser):
+        argparser.add_argument('--makemake', action='store_true', help=(
+            f"Print Makefile for {module_path}, and exit"))
+        argparser.add_argument('--generic', action='store_true', help=(
+            f"Print generic Makefile for {module_path}, and exit"))
+        argparser.add_argument('--dep', action='store', help=(
+            f"Build a {module}.dep target,"
+            " print its Makefile include statement, and exit"))
+        argparser.add_argument('--test', nargs=0, action=Test, help=(
+            "Verify examples and exit"))
+        argparser.add_argument('-c', nargs=1, action=Command, help=(
+            "Program passed in as string"))
+
+    if __name__ == '__main__':
+        import argparse
+
+        argparser = argparse.ArgumentParser(
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=__doc__,
+            epilog="""Examples:
 $ python3 makemake.py --dep makemake.dep
 include makemake.dep
 
@@ -377,30 +400,61 @@ makemake.dep: makemake.py
 	python3 makemake.py --dep $@
 include makemake.dep
 
-$ mkdir hello_from_assembly && (
-> cd hello_from_assembly && echo <<EOF
-> global _start
-> 
-> section .text
-> 
+$ mkdir hello && ( cd hello && 
+> cat << EOF > hi.s
+> # greeting on stdout
+> .global _start
+> .text
 > _start:
->   mov rax, 1        ; write(
->   mov rdi, 1        ;   STDOUT_FILENO,
->   mov rsi, msg      ;   "Hello, world!\n",
->   mov rdx, msglen   ;   sizeof("Hello, world!\n")
->   syscall           ; );
+>     # write(1, msg, 17)
+>     mov     \$1, %rax    # system call 1 is write
+>     mov     \$1, %rdi    # file handle 1 is stdout
+>     mov     \$msg, %rsi  # address of string to output
+>     mov     \$17, %rdx   # number of bytes to output
+>     syscall             # invoke operating system to do the write
 > 
->   mov rax, 60       ; exit(
->   mov rdi, 0        ;   EXIT_SUCCESS
->   syscall           ; );
+>     # exit(0)
+>     mov     \$60, %rax   # system call 60 is exit
+>     xor     %rdi, %rdi  # return code 0 is no error
+>     syscall             # invoke operating system to exit
+> msg:
+>     .ascii  "Hello from hi.s!\\n"
 > 
-> section .rodata
->   msg: db "Hello, world!", 10
->   msglen: equ $ - msg
-> EOF > hello.s &&
-> python3 ../makemake.py --makemake --generic > Makefile && make && 
-> ./hello_from_assembly )
-Hello, world!
+> EOF
+> cat << EOF > __main__.py
+> '''Test hi.s
+> 
+> Dependencies:
+> $ make hello
+> '''
+> import sys
+> sys.path.append('..')
+> import makemake
+> 
+> if __name__ == '__main__':
+>     import argparse
+> 
+>     argparser = argparse.ArgumentParser(
+>         formatter_class=argparse.RawDescriptionHelpFormatter,
+>         description=__doc__,
+>         epilog='''Examples:
+> $ ./hello
+> Hello from hi.s!
+> ''')
+>     makemake.add_arguments(argparser)
+>     argparser.parse_args()
+> 
+> EOF
+> python3 __main__.py --makemake --generic > Makefile && make hello
+> )
+make[1]: Entering directory '/mnt/c/home/joakim/normalize/hello'
+mkdir -p build/
+as hi.s -o build/hi.s.o
+ld build/hi.s.o -o hello 
+make[1]: Leaving directory '/mnt/c/home/joakim/normalize/hello'
+
+$ ./hello/hello
+Hello from hi.s!
 """)
-    add_arguments(argparser)
-    args = argparser.parse_args()
+        add_arguments(argparser)
+        args = argparser.parse_args()
