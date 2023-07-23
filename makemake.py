@@ -245,6 +245,7 @@ $(_{dir}_build)%%.s.o: $(_{dir})%%.s
                 dep_dir_now = dep_dir
                 if dep_dir:
                     prefix = dir + "/"
+                    dep_dir = dep_dir + "/"
                     if dep_dir.startswith(prefix):
                         dep_dir = dep_dir[len(prefix):]
             else:
