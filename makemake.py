@@ -245,7 +245,6 @@ $(_{dir}_build)%%.s.o: $(_{dir})%%.s
                 dep_dir_now = dep_dir
                 if dep_dir:
                     prefix = dir + "/"
-                    dep_dir = prefix
                     if dep_dir.startswith(prefix):
                         dep_dir = dep_dir[len(prefix):]
             else:
@@ -327,8 +326,10 @@ $(_{dir}_build)%%.s.o: $(_{dir})%%.s
                 if rule == bringup_rule and (dep_path or generic_dependencies):
                     if not generic_dependencies:
                         print(f"include {build_dir}{dep_filename}")
+
                     if dep_dir and not os.path.exists(dep_dir_now):
                         os.makedirs(dep_dir_now)
+
                     with open(dep_file, 'w+') as dep:
                         make_rule(rule, commands, file=dep)
                 elif dependencies:
