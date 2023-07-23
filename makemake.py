@@ -431,7 +431,7 @@ $ mkdir hello && ( cd hello &&
 > '''
 > import sys
 > sys.path.append('..')
-> import makemake
+> import makemake  # noqa: E402
 > 
 > if __name__ == '__main__':
 >     import argparse
@@ -447,13 +447,11 @@ $ mkdir hello && ( cd hello &&
 >     argparser.parse_args()
 > 
 > EOF
-> python3 __main__.py --makemake --generic > Makefile && make hello
+> python3 __main__.py --makemake --generic > Makefile && make hello --no-print-directory
 > )
-make[1]: Entering directory '/mnt/c/home/joakim/normalize/hello'
 mkdir -p build/
 as hi.s -o build/hi.s.o
 ld build/hi.s.o -o hello 
-make[1]: Leaving directory '/mnt/c/home/joakim/normalize/hello'
 
 $ ./hello/hello
 Hello from hi.s!
