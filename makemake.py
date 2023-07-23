@@ -402,7 +402,7 @@ makemake.dep: makemake.py
 	python3 makemake.py --dep $@
 include makemake.dep
 
-$ mkdir hello && ( cd hello && 
+$ mkdir -p hello && ( cd hello && 
 > cat << EOF > hi.s
 > # greeting on stdout
 > .global _start
