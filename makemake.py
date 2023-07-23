@@ -136,7 +136,7 @@ $(_{dir})style: $(_{dir})syntax
 # Check usage examples
 $(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.bringup \\
   | $(_{dir}_python)
-	$(_{dir}_python) $< --test > $@
+	$(_{dir}_python) $< --test > $@ || (cat $@ && false)
 
 # Find all the C, C++ and ASM source files
 _{dir}_SRCS := $(shell find $(_{dir}_dir) -name '*.cpp' -or -name '*.c' -or -name '*.s')
