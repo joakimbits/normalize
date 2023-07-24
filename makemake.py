@@ -188,8 +188,8 @@ $(_{dir}_build)%%.s.o: $(_{dir})%%.s
                 if comment is None:
                     comment = ""
 
-                if command in ('$', '>') and comment[:1] == ' ':
-                    command += comment[:1]
+                if command in ('$', '>') and (not comment or comment.startswith(' ')):
+                    command += ' '
                     comment = comment[1:]
 
                 if command[:2] == '$ ':
