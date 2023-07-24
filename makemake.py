@@ -352,7 +352,7 @@ $(_{dir}_build)%%.s.o: $(_{dir})%%.s
                 examples = build_commands(parser.epilog, "Examples:")
                 run_command_examples(examples)
                 print(f"All {len(examples)} command usage examples PASS")
-            except Exception as err:
+            except AssertionError as err:
                 print(err, file=sys.stderr)
                 exit(1)
 
