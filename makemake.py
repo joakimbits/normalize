@@ -215,7 +215,7 @@ $(_{dir}_build)%%.s.o: $(_{dir})%%.s
         import subprocess
 
         for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
-            command = "\n".join(command_lines)
+            command = "\n".join(map("".join, zip(command_lines, comment_lines)))
             if module_dir:
                 command = f"( cd {module_dir} && {command} )"
             output = "\n".join(output_lines)
