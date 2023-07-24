@@ -77,7 +77,7 @@ from argparse import Action
 
 parent_module = sys.modules['.'.join(__name__.split('.')[:-1]) or '__main__']
 if hasattr(parent_module, '__file__'):
-    dir = os.path.split(os.path.split(parent_module.__file__)[0])[1]
+    dir = os.path.split(os.getcwd())[1]
     module_path = sys.argv[0]
     module_dir, module_py = os.path.split(module_path)
     module, ext = os.path.splitext(module_py)
