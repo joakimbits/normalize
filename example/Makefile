@@ -9,5 +9,8 @@ ALL += $(_example)build.mk
 all: $(ALL)
 $(_example)build.mk:
 	python3 $(_example)../makemake.py --makemake --generic > $@
+clean:
+	rm -rf build/
+	rm -f build.mk example
 
 -include $(_example)build.mk

@@ -404,8 +404,10 @@ makemake.dep: makemake.py
 	python3 makemake.py --dep $@
 include makemake.dep
 
-$ ( cd example && rm -f build.mk build/* example &&
+$ ( cd example && make clean --no-print-directory &&
 >   make --no-print-directory && cat build/example.tested )
+rm -rf build/
+rm -f build.mk example
 python3 ../makemake.py --makemake --generic > build.mk
 g++ -S -nostartfiles -no-pie -I./ -MMD -MP  -c main.c -o build/main.c.s
 g++ -S -nostartfiles -no-pie -I./ -MMD -MP  -c greeter.cpp -o build/greeter.cpp.s

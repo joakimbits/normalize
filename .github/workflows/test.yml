@@ -18,6 +18,7 @@ jobs:
       - run: make venv
       - run: make syntax
       - run: make style
+      - run: make test_example_project
       - run: make
       - run: make report
       - run: echo "🍏 This job's status is ${{ job.status }}."

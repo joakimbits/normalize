@@ -9,6 +9,12 @@ _dir_build := $(subst $(PWD)/,,$(_dir_abspath)build/)
 all: $(_dir)build.mk
 $(_dir)build.mk:
 	python3 makemake.py --makemake --generic > $@
+test_example_project:
+	( cd example && make clean --no-print-directory && \
+	  make --no-print-directory && cat build/example.tested )
+clean:
+	rm -rf venv/ build/
+	rm -f build.mk style syntax makemake.dep
 
 -include $(_dir)build.mk
 
