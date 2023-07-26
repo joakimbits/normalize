@@ -168,8 +168,7 @@ $(_{dir})style: $(_{dir})syntax
 	  --format=$(FORMAT) --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
 
 # Check Python and command line usage examples
-$(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.bringup \\
-  | $(_{dir}_python)
+$(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.bringup
 	$(_{dir}_python) $< --test > $@ || (cat $@ && false)
 $(_{dir}_build)%%.py.d: $(_{dir})%%.py
 	python3 $< --generic --dep $@  # Makefile for $(_{dir}_build)%%.bringup
@@ -319,6 +318,8 @@ $(_{dir}_build)%%.py.d: $(_{dir})%%.py
             bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py"
             if generic_dependencies or dep_path:
                 bringup_rule += f" {build_dir}{dep_filename}"
+                if generic_dependencies:
+                    bringup_rule += f" $(_{dir}_python)"
             else:
                 commands = [f"mkdir {build_dir}" + (" &&" if commands else "")
                             ] + commands
