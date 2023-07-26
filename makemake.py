@@ -101,52 +101,48 @@ endif
 _{dir}_S := $(wildcard $(_{dir})*.s)
 _{dir}_C := $(wildcard $(_{dir})*.c)
 _{dir}_CPP := $(wildcard $(_{dir})*.cpp)
-_{dir}_SRCS := $(_{dir}_CPP) $(_{dir}_C) $(_{dir}_S)
 _{dir}_PY := $(wildcard $(_{dir})*.py)
 
 # Prepare for compilation
-_{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.o)
-_{dir}_DEPS += $($(filter-out %%.s.o,$(_{dir}_OBJS)):.o=.d)
+_{dir}_SRCS := $(_{dir}_C) $(_{dir}_CPP)
+_{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.s)
+_{dir}_DEPS += $(_{dir}_OBJS:.s=.d)
+_{dir}_OBJS += $(_{dir}_S)
 _{dir}_INC_DIRS := $(shell find $(_{dir}_dir) -type d)
 _{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
-_{dir}_CPPFLAGS := $(_{dir}_INC_FLAGS) -MMD -MP
+ifneq ($(strip $(_{dir}_S)),)
+  _{dir}_LDFLAGS += -nostartfiles
+  _{dir}_LDFLAGS += -no-pie
+endif
+_{dir}_CPPFLAGS := -S $(_{dir}_LDFLAGS) $(_{dir}_INC_FLAGS) -MMD -MP
 
 # Prepare for testing
 _{dir}_python = $(_{dir}_dir)venv/bin/python
 _{dir}_DEPS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.d)
-_{dir}_BRINGUPS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.bringup)
-_{dir}_TESTEDS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.tested)
-
-# Add default targets
-ifneq ($(strip $(_{dir}_SRCS)),)
+ifneq ($(strip $(_{dir}_OBJS)),)
   ALL += $(_{dir}_build){dir}.tested
 endif
 ifneq ($(strip $(_{dir}_PY)),)
-  ALL += $(_{dir})style $(_{dir}_TESTEDS)
+  ALL += $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.tested)
 endif
 
 # Default rule
 .DELETE_ON_ERROR:
 all: $(ALL)
 
-# Compile assembly
-$(_{dir}_build)%%.s.o: $(_{dir})%%.s
-	mkdir -p $(dir $@)
-	$(AS) $< -o $@
-
 # Compile C
-$(_{dir}_build)%%.c.o: $(_{dir})%%.c
+$(_{dir}_build)%%.c.s: $(_{dir})%%.c
 	mkdir -p $(dir $@)
 	$(CC) $(_{dir}_CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # Compile C++
-$(_{dir}_build)%%.cpp.o: $(_{dir})%%.cpp
+$(_{dir}_build)%%.cpp.s: $(_{dir})%%.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(_{dir}_CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 # Link executable
 $(_{dir}){dir}: $(_{dir}_OBJS)
-	$(LD) $^ -o $@ $(LDFLAGS)
+	$(CC) $(_{dir}_LDFLAGS) $(LDFLAGS) $^ -o $@
 
 # Test executable:
 $(_{dir}_build){dir}.tested: $(_{dir}){dir}
