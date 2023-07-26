@@ -1,6 +1,6 @@
 // greeting on stdout
 #include <stdio.h>
-#include "Greeter.h"
+#include "greeter.h"
 using namespace std;
 
 void Greeter::greet(void) {
