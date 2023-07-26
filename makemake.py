@@ -409,9 +409,12 @@ include makemake.dep
 $ ( cd example && rm -f build.mk build/* example &&
 >   make --no-print-directory && cat build/example.tested )
 python3 ../makemake.py --makemake --generic > build.mk
-cc -nostartfiles -no-pie  _start.s -o example
+mkdir -p build/
+cc -S -nostartfiles -no-pie -I./ -MMD -MP  -c main.c -o build/main.c.s
+cc -nostartfiles -no-pie  build/main.c.s _start.s -o example
 ./example > build/example.tested || (cat build/example.tested && false)
 Hello from _start.s!
+Hello from main.c!
 """)
         add_arguments(argparser)
         args = argparser.parse_args()

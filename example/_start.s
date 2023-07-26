@@ -9,6 +9,9 @@ _start:
     mov     $21, %rdx   # number of bytes to output
     syscall             # invoke operating system to do the write
 
+    # main()
+    call    main
+
     # exit(0)
     mov     $60, %rax   # system call 60 is exit
     xor     %rdi, %rdi  # return code 0 is no error
