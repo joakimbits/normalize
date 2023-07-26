@@ -406,7 +406,8 @@ makemake.dep: makemake.py
 	python3 makemake.py --dep $@
 include makemake.dep
 
-$ ( cd example && make --no-print-directory && cat build/example.tested )
+$ ( cd example && rm -f build.mk build/* example &&
+>   make --no-print-directory && cat build/example.tested )
 python3 ../makemake.py --makemake --generic > build.mk
 cc -nostartfiles -no-pie  _start.s -o example
 ./example > build/example.tested || (cat build/example.tested && false)
