@@ -408,8 +408,7 @@ include makemake.dep
 
 $ ( cd example && make --no-print-directory && cat build/example.tested )
 python3 ../makemake.py --makemake --generic > build.mk
-mkdir -p build/\nas _start.s -o build/_start.s.o
-ld build/_start.s.o -o example 
+cc -nostartfiles -no-pie  _start.s -o example
 ./example > build/example.tested || (cat build/example.tested && false)
 Hello from _start.s!
 """)
