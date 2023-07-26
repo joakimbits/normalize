@@ -108,7 +108,7 @@ _{dir}_SRCS := $(_{dir}_C) $(_{dir}_CPP)
 _{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.s)
 _{dir}_DEPS += $(_{dir}_OBJS:.s=.d)
 _{dir}_OBJS += $(_{dir}_S)
-_{dir}_INC_DIRS := $(shell find $(_{dir}_dir) -type d)
+_{dir}_INC_DIRS := ./
 _{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
 ifneq ($(strip $(_{dir}_S)),)
   _{dir}_LDFLAGS += -nostartfiles
