@@ -10,4 +10,4 @@ its own dependencies into a local python venv.
 
 The non-generic Makefile variant does not isolate its dependences. It can only be included from within the same folder.
 
-Python version 3.9 or later is required.
+Python version 3.7 or later is required.
