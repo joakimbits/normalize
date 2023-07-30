@@ -380,6 +380,7 @@ def add_arguments(argparser):
     argparser.add_argument('-c', nargs=1, action=Command, help=(
         "Program passed in as string"))
 
+
 if __name__ == '__main__':
     import argparse
 
