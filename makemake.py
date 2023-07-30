@@ -1,18 +1,15 @@
 """Print a Makefile for handling a python module and exit
 
-Adds the following command line options:
+Adds the following command line options to the main module:
 
 --makemake: Print a Makefile.
-
 --generic: Generalize so that any Makefile can include the Makefile.
+--dep <file>: Create a Makefile for bringup of the module.
 
---dep <file>: Create a make file for just the bringup of a module.
+Makes it easy to add the following command line options to the parent module:
 
 --test: Verify usage examples in the module and exit.
-
--c <string>: Execute a program string and exit.
-
-Only the last command requires argparser.parse_args() as in the Usage section below.
+-c <string>: Execute a program string in the module and exit.
 
 
 USER MANUAL
