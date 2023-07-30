@@ -172,12 +172,14 @@ $(_{dir}_build)%%.py.d: $(_{dir})%%.py
 
 COMMENT_GROUP_PATTERN = re.compile("(\s*#.*)?$")
 
+
 def make_rule(rule, commands, file=sys.stdout):
     print(rule, file=file)
     print('\t' + " \\\n\t".join(commands), file=file)
 
+
 def build_commands(doc, heading, embed="%s", end="", pip=""):
-    before_after = doc.split(f"{heading}\n", maxsplit=1) if doc else ()
+    before_after = doc.split(f"{heading}\n", maxsplit=1)
     commands = []
     if len(before_after) >= 2:
         for line in before_after[1].split('\n'):
@@ -198,8 +200,7 @@ def build_commands(doc, heading, embed="%s", end="", pip=""):
                     command_lines[-1] = command_lines[-1][:-len(end)]
                 command_lines.append(command[2:] + end)
                 comment_lines.append(comment)
-            elif (command_lines and not output_lines
-                  and command_lines[-1][-1] == '\\'):
+            elif command_lines and not output_lines and command_lines[-1][-1] == '\\':
                 command_lines[-1] = command_lines[-1][:-len(end)]
                 command_lines.append(embed % command + end)
                 comment_lines.append(comment)
@@ -209,6 +210,7 @@ def build_commands(doc, heading, embed="%s", end="", pip=""):
                 commands.append(([f"{pip} install " + command], [comment], []))
 
     return commands
+
 
 def run_command_examples(commands):
     import subprocess
@@ -296,8 +298,8 @@ if parent_module.__name__ == '__main__':
                      [f"{python} {source} --test > $@"]))
 
         commands = []
-        bringups = build_commands(parent_module.__doc__, 'Dependencies:', embed,
-                                  end, pip=f"{python} -m pip")
+        bringups = build_commands(parent_module.__doc__, 'Dependencies:', embed, end,
+                                  pip=f"{python} -m pip")
         if bringups:
             op = ">"
             remaining = len(bringups)
@@ -314,8 +316,7 @@ if parent_module.__name__ == '__main__':
             if generic_dependencies:
                 bringup_rule += f" $(_{dir}_python)"
         else:
-            commands = [f"mkdir {build_dir}" + (" &&" if commands else "")
-                        ] + commands
+            commands = [f"mkdir {build_dir}" + (" &&" if commands else "")] + commands
 
         rules.append(
             (bringup_rule,
@@ -339,6 +340,7 @@ if parent_module.__name__ == '__main__':
 
         exit(0)
 
+
 class Test(Action):
     """Doctest python examples in parent_module
 
@@ -359,11 +361,13 @@ class Test(Action):
 
         exit(0)
 
+
 class Command(Action):
     """Execute a program as string and exit"""
     def __call__(self, parser, args, values, option_string=None):
         exec(values[0], parent_module.__dict__, locals())
         exit(0)
+
 
 def add_arguments(argparser):
     argparser.add_argument('--makemake', action='store_true', help=(
@@ -371,8 +375,7 @@ def add_arguments(argparser):
     argparser.add_argument('--generic', action='store_true', help=(
         f"Print generic Makefile for {module_path}, and exit"))
     argparser.add_argument('--dep', action='store', help=(
-        f"Build a {module}.dep target,"
-        " print its Makefile include statement, and exit"))
+        f"Build a {module}.dep target, print its Makefile include statement, and exit"))
     argparser.add_argument('--test', nargs=0, action=Test, help=(
         "Verify examples and exit"))
     argparser.add_argument('-c', nargs=1, action=Command, help=(
