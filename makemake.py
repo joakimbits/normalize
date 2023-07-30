@@ -10,6 +10,8 @@ Adds the following command line options:
 
 --test: Verify usage examples in the module and exit.
 
+-c <string>: Execute a program string and exit.
+
 Only the last command requires argparser.parse_args() as in the Usage section below.
 
 
@@ -363,7 +365,7 @@ class Test(Action):
 
 
 class Command(Action):
-    """Execute a program as string and exit"""
+    """Execute a program string and exit"""
     def __call__(self, parser, args, values, option_string=None):
         exec(values[0], parent_module.__dict__, locals())
         exit(0)
