@@ -403,6 +403,9 @@ makemake.dep: makemake.py
 	python3 makemake.py --dep $@
 include makemake.dep
 
+$ python -m makemake -c "print(module_py)"
+makemake.py
+
 $ ( cd example && make clean --no-print-directory &&
 >   make --no-print-directory && cat build/example.tested )
 rm -rf build/
