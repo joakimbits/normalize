@@ -11,14 +11,19 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to ${{ github.workspace }} on the runner."
-      - name: Set up Python 3.9
+      - name: Set up Python 3.7
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.7'
       - run: make venv
       - run: make syntax
       - run: make style
-      - run: make test_example_project
       - run: make
+      - run: make tested
+      - run: make example/venv
+      - run: make example/bringup
+      - run: make example/tested
+      - run: make example/report
       - run: make report
+      - run: make clean && make report
       - run: echo "🍏 This job's status is ${{ job.status }}."
