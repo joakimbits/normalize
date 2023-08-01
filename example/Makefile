@@ -26,7 +26,7 @@ endif
 
 # Define an initial default build target $(_example)all: A definition of how to build stuff here.
 $(_example)all: $(_example)build.mk
-$(_example)build.mk: $(_example)makemake.py
+$(_example)build.mk: $(_example)../makemake.py | $(_example)makemake.py
 	$(_inside_example)python3 -m makemake --makemake --generic $(_outside_example)> $@
 $(_example)makemake.py:
 	$(_inside_example)ln -sf ../makemake.py makemake.py $(_outside_example)
@@ -41,8 +41,3 @@ ifeq ($(filter $(_example)clean clean,$(MAKECMDGOALS)),)
   # Redefine the default build target $(_example)all to build stuff from source files found here.
   -include $(_example)build.mk
 endif
-
-# Report test results here.
-$(_example)report: $(_example_TESTED)
-	@$(foreach tested,$^,echo "___ $(tested): ____" && cat $(tested) ; )
-

@@ -7,12 +7,12 @@
 
 # Define an initial default build target $(_example)all: A definition of how to build stuff here.
 all: build.mk
-build.mk:
+build.mk: makemake.py
 	python3 -m makemake --makemake --generic > $@
 
-# Report test results: First those of an example sub-project (by a target after |) and then those here.
-report: build/makemake.py.tested | example/report
-	@$(foreach tested,$^,echo "___ $(tested): ____" && cat $(tested) ; )
+# Report example also.
+.PHONY: report example/report
+report: | example/report
 
 # Remove built stuff: First those of an example sub-project (by a target after :) and then those here.
 clean: example/clean
