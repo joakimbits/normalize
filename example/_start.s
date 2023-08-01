@@ -18,4 +18,3 @@ _start:
     syscall             # invoke operating system to exit
 msg:
     .ascii  "Hello from _start.s!\n"
-
