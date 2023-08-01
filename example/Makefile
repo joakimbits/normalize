@@ -41,3 +41,6 @@ ifeq ($(filter $(_example)clean clean,$(MAKECMDGOALS)),)
   # Redefine the default build target $(_example)all to build stuff from source files found here.
   -include $(_example)build.mk
 endif
+
+# Compilation steps are still under development, so this rule applies here.
+$(_example_DEPS) $(_example_OBJS): $(_example)Makefile $(_example)build.mk
