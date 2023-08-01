@@ -21,7 +21,10 @@ jobs:
       - run: make
       - run: make tested
       - run: make example/venv
+      - run: make example/syntax
+      - run: make example/style
       - run: make example/bringup
+      - run: ( cd example && ./test.py )
       - run: make example/tested
       - run: make example/report
       - run: make report
