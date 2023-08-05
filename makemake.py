@@ -208,10 +208,10 @@ ifndef pandoc
 pandoc:=/usr/bin/pandoc
 $(pandoc): /usr/bin/latex
 	# Need a small general text processing framework: pandoc
-	sudo apt install pandoc
+	sudo apt install -y pandoc
 /usr/bin/latex:
 	# Need a modern pdf generation framework: xelatex
-	sudo apt install -y texlive-base texlive-xetex
+	sudo apt install -y texlive-xetex
 endif
 $(_{dir})%%.pdf: $(_{dir}_build)%%.md | $(pandoc)
 	pandoc $^ -o $@ -V geometry:margin=1in
