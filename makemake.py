@@ -214,7 +214,7 @@ $(pandoc): /usr/bin/latex
 	sudo apt install -y texlive-xetex
 endif
 $(_{dir})%%.pdf: $(_{dir}_build)%%.md | $(pandoc)
-	pandoc $^ -o $@ -V geometry:margin=1in
+	pandoc $^ -o $@ -V geometry:margin=1in --pdf-engine=xelatex
 
 # Make a markdown document.
 $(_{dir}_build)%%.md: $(_{dir})%%
