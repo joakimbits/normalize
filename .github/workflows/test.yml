@@ -4,7 +4,6 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: pandoc/ubuntu-latex
     steps:
       - run: echo "🎉 A test job was automatically triggered by a ${{ github.event_name }} event."
       - run: echo "🐧 It runs on an ${{ runner.os }} server hosted by GitHub."
