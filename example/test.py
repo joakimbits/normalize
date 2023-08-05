@@ -39,7 +39,6 @@ Here is how make does our bringup:
     \t( cd $(_example_dir) && make example --no-print-directory ) > $@ && \\
     \t$(_example_python) -m pip install fire >> $@
 
-    Our main ./Makefile includes
     Here is that recipy output on first bringup:
 
     $ cat build/test.py.bringup

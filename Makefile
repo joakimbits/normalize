@@ -11,13 +11,12 @@ build.mk: makemake.py
 	python3 -m makemake --makemake --generic > $@
 
 # Report example also.
-.PHONY: report example/report
 report: | example/report
 
-# Remove built stuff: First those of an example sub-project (by a target after :) and then those here.
+# Remove built stuff.
 clean: example/clean
 	rm -rf venv/ build/
-	rm -f build.mk style syntax makemake.dep
+	rm -f build.mk style syntax makemake.dep report.pdf
 
 # If we do want to build stuff:
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
@@ -25,5 +24,5 @@ ifeq ($(filter clean,$(MAKECMDGOALS)),)
   -include build.mk
 endif
 
-# Include an example include-from-anywhere sub-project.
+# Include example sub-project.
 -include example/Makefile
