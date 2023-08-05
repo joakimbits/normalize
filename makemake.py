@@ -206,9 +206,12 @@ $(_{dir})report: $(_{dir}_TESTED)
 # Make a pdf document.
 ifndef pandoc
 pandoc:=/usr/bin/pandoc
-$(pandoc):
+$(pandoc): /usr/bin/latex
 	# Need a small general text processing framework: pandoc
 	sudo apt install pandoc
+/usr/bin/latex:
+	# Need a pdf generation framework: latex
+	sudo apt-get install texlive-latex-extra
 endif
 $(_{dir})%%.pdf: $(_{dir}_build)%%.md | $(pandoc)
 	pandoc $^ -o $@ -V geometry:margin=1in
