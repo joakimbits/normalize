@@ -204,14 +204,14 @@ $(_{dir})report: $(_{dir}_TESTED)
 	@$(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; )
 
 # Make a pdf document.
-ifndef pandoc
-pandoc:=/usr/bin/pandoc
-%%.pdf: | /usr/bin/pandoc /usr/bin/xelatex \
+$(_normalize)%%.pdf: $(_normalize_build)%%.md | /usr/bin/pandoc /usr/bin/xelatex \
   /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \
   /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
 	pandoc $^ -o $@ \
 	       -V geometry:margin=1in --pdf-engine=xelatex \
 	       --variable mainfont="Carlito" --variable monofont="Cousine"
+ifndef pandoc
+pandoc:=/usr/bin/pandoc
 /usr/bin/pandoc:
 	# Need a small general text processing framework: pandoc
 	sudo apt install -y pandoc
@@ -247,11 +247,10 @@ $(_{dir}_build)%%.tested.md: $(_{dir}_build)%%.tested
 # Report the project.
 _{dir}/* := Makefile $(_{dir}_S) $(_{dir}_SRCS) $(_{dir}_PY)
 _{dir}_build/* := $(_{dir}_DEPS) $(_{dir}_BRINGUP) $(_{dir}_TESTED)
-_{dir}_report := $(_example_build)report.md 
 _{dir}_report += $(_{dir}/*:$(_{dir})%%=$(_{dir}_build)%%.md)
 _{dir}_report += $(_{dir}_build/*:%%=%%.md)
 $(_{dir})pdf: $(_{dir})report.pdf
-$(_{dir})report.pdf:: $(_example_report)
+$(_{dir})report.pdf:: $(_{dir}_report)
 $(_{dir}_build)report.md:
 	echo "# {dir} - an include-from-anywhere project" >$@
 
