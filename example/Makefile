@@ -7,7 +7,7 @@
 #   makemake.py: Install ../makemake.py here.
 #   example: Compile any .cpp, .c and .s files into this executable named as its parent folder.
 #   venv: Bringup a local python environment here.
-#   build/%.d: Build dependencies with optional installation recipy here.
+#   build/%.mk: Build installation recipy here.
 #   build/%.bringup: Install and report output here.
 #   build/%.tested: Test and report output here.
 #   report: Test everything that still needs testing, and print a test summary if all tests are OK.
@@ -36,7 +36,7 @@ $(_example)makemake.py:
 # Remove built stuff here.
 $(_example)clean:
 	rm -rf $(_example)build/ $(_example)venv/ $(_example).ruff_cache/
-	rm -f $(_example)makemake.py $(_example)syntax $(_example)style $(_example)build.mk
+	rm -f $(_example)makemake.py $(_example)build.mk
 	rm -f $(_example)example $(_example)*.pdf
 
 # If we do want to build stuff:

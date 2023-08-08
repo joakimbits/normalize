@@ -97,11 +97,7 @@ _{dir}_abspath := $(dir $(makefile_abspath))
 _{dir} := $(subst $(PWD)/,,$(_{dir}_abspath))
 __{dir}_build := %s
 _{dir}_build := $(subst $(PWD)/,,$(_{dir}_abspath)$(__{dir}_build))
-ifeq ($(_{dir}),)
-  _{dir}_dir := ./
-else
-  _{dir}_dir := $(_{dir})
-endif
+_{dir}_dir := ./$(_{dir})
 
 # Find all source files
 _{dir}_MD := $(wildcard $(_{dir})*.md)
@@ -117,7 +113,7 @@ _{dir}_MD_TESTED := $(_{dir}_MD:$(_{dir})%%=$(_{dir}_build)%%.sh-test.tested)
 # Prepare for compilation
 _{dir}_SRCS := $(_{dir}_C) $(_{dir}_CPP)
 _{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.s)
-_{dir}_DEPS += $(_{dir}_OBJS:.s=.d)
+_{dir}_DEPS += $(_{dir}_OBJS:.s=.mk)
 _{dir}_OBJS += $(_{dir}_S)
 _{dir}_INC_DIRS := $(_{dir}_dir)
 _{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
@@ -132,7 +128,7 @@ _{dir}_TESTED := $(_{dir}_S_TESTED) $(_{dir}_PY_TESTED) $(_{dir}_MD_TESTED)
 
 # Prepare for bringup
 _{dir}_python := $(_{dir}_dir)venv/bin/python
-_{dir}_DEPS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.d)
+_{dir}_DEPS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.mk)
 
 # Default rule
 .DELETE_ON_ERROR:
@@ -154,11 +150,11 @@ $(_{dir}){dir}: $(_{dir}_OBJS)
 	$(CC) $(_{dir}_LDFLAGS) $(LDFLAGS) $^ -o $@
 
 # Test executable:
-$(_{dir}_build){dir}.tested: $(_{dir}){dir}
-	./$< > $@ || (cat $@ && false)
+$(_{dir}_build){dir}.tested: $(_{dir}_dir){dir}
+	$< > $@ || (cat $@ && false)
 
 # Check Python 3.9 syntax
-$(_{dir})syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
+$(_{dir}_build)syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
 	$(_{dir}_python) -m ruff \\
 	    --format=$(FORMAT) --select=E9,F63,F7,F82 \\
 	    --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
@@ -168,16 +164,16 @@ $(_{dir})venv $(_{dir}_python):
 	python3 -m venv $(_{dir})venv && $(_{dir}_python) -m pip install --upgrade pip
 
 # Check Python 3.9 style
-$(_{dir})style: $(_{dir})syntax
+$(_{dir}_build)style: $(_{dir}_build)syntax
 	$(_{dir}_python) -m ruff --fix \\
 	  --format=$(FORMAT) --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
 
 # Check Python and command line usage examples in .py files
-$(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.bringup \\
-  $(_{dir})style $(_{dir}_S_TESTED)
+$(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.mk $(_{dir}_build)%%.bringup \\
+  $(_{dir}_build)style $(_{dir}_S_TESTED)
 	$(_{dir}_python) $< --test > $@ || (cat $@ && false)
-$(_{dir}_build)%%.py.d: $(_{dir})%%.py
-	cd $(_{dir}_dir) && python3 $*.py --generic --dep $(__{dir}_build)$*.py.d
+$(_{dir}_build)%%.py.mk: $(_{dir})%%.py
+	cd $(_{dir}_dir) && python3 $*.py --generic --dep $(__{dir}_build)$*.py.mk
 $(_{dir}_BRINGUP): $(_{dir}_EXE) $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.exe)
 $(_{dir}_build)%%.exe: $(_{dir})%%
 	chmod +x $< >$@
@@ -218,7 +214,7 @@ $(_{dir})report: $(_{dir}_TESTED)
 $(_{dir})%%.pdf: $(_{dir}_build)%%.md | /usr/bin/pandoc /usr/bin/xelatex \\
   /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
   /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
-	pandoc $^ -o $@ \
+	pandoc $^ -o $@ \\
 	       -V geometry:margin=1in --pdf-engine=xelatex \\
 	       --variable mainfont="Carlito" --variable monofont="Cousine"
 ifndef pandoc
@@ -247,14 +243,18 @@ pandoc:=/usr/bin/pandoc
 endif
 
 # Make a markdown document.
-$(_{dir}_build)%%.md: $(_{dir})%%
-	( echo "## $< \\n~~~ {{$(suffix $<) .numberLines}}" && cat $< && echo "~~~\\n" ) >$@
 $(_{dir}_build)Makefile.md: $(_{dir})Makefile
-	( echo "## $< \\n~~~ {{.Makefile .numberLines}}" && cat $< && echo "~~~\\n" ) >$@
-$(_{dir}_build)%%.d.md: $(_{dir}_build)%%.d
-	( echo "## $< \\n~~~ {{.Makefile}}" && cat $< && echo "~~~\\n" ) >$@
+	( echo "## $<\\n\\\\\\footnotesize\\n~~~ {{.mk .numberLines}}" && \\
+	  cat $< && echo "~~~\\n\\\\\\normalsize\\n" ) >$@
+$(_{dir}_build)%%.md: $(_{dir})%%
+	( echo "## $<\\n\\\\\\footnotesize\\n~~~ {{$(suffix $<) .numberLines}}" && \\
+	  cat $< && echo "~~~\\n\\\\\\normalsize\\n" ) >$@
+$(_{dir}_build)%%.md: $(_{dir}_build)%%
+	( echo "## $<\\n\\\\\\footnotesize\\n~~~ {{$(suffix $<)}}" && \\
+	  cat $< && echo "~~~\\n\\\\\\normalsize\\n" ) >$@
 $(_{dir}_build)%%.bringup.md: $(_{dir}_build)%%.bringup
-	( echo "## $< \\n~~~ {{.bash}}" && cat $< && echo "~~~\\n" ) >$@
+	( echo "## $<\\n\\\\\\footnotesize\\n~~~ {{.sh}}" && cat $< && \\
+	  echo "~~~\\n\\\\\\normalsize\\n" ) >$@
 $(_{dir}_build)%%.tested.md: $(_{dir}_build)%%.tested
 	( echo "## $<" && cat $< )  | sed -z -e "s/\\n/\\n/g;s/\\n/\\n\\n/g" >$@
 
@@ -360,8 +360,8 @@ if parent_module.__name__ == '__main__':
                     dep_dir = dep_dir[len(prefix):]
         else:
             dep_dir_now = dep_dir = 'build/'
-            dep_filename = f'{module_py}.d'
-            dep_file = f'build/{module_py}.d'
+            dep_filename = f'{module_py}.mk'
+            dep_file = f'build/{module_py}.mk'
 
         if generic_dependencies:
             if dependencies:

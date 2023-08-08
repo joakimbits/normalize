@@ -16,7 +16,7 @@ report: | example/report
 # Remove built stuff.
 clean: example/clean
 	rm -rf venv/ build/ .ruff_cache/
-	rm -f build.mk style syntax makemake.dep *.pdf
+	rm -f build.mk makemake.dep *.pdf
 
 # If we do want to build stuff:
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
@@ -26,3 +26,6 @@ endif
 
 # Include example sub-project.
 -include example/Makefile
+
+# Compilation steps are still under development, so this rule applies here.
+$(_normalize_DEPS) $(_normalize_OBJS): Makefile build.mk

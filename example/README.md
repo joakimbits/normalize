@@ -3,7 +3,7 @@
 The Makefile here allows building from anywhere. It uses makemake to generate path prefix 
 variables and generic rules to achieve that. 
 
-Makemake builds and includes build.mk which in turn builds and includes build/*.d. 
+Makemake builds and includes build.mk which in turn builds and includes build/*.mk. 
 
 Its default target builds an executable and brings up a venv for the python module.
 
@@ -16,23 +16,27 @@ This is how prefixes are used in the Makefiles:
 
 \footnotesize
 ~~~ {.sh}
-$ cat build.mk | grep -E '^_example_build |^_example_python |^_example '
+$ cat build.mk | grep -E '^_example_build |^_example_python |^_example |^__|^_example_dir '
 _example := $(subst $(PWD)/,,$(_example_abspath))
+__example_build := build/
 _example_build := $(subst $(PWD)/,,$(_example_abspath)$(__example_build))
+_example_dir := ./$(_example)
 _example_python := $(_example_dir)venv/bin/python
 
 ~~~
 
 ~~~ {.sh}
-$ cat build/test.py.d
-$(_example_build)test.py.bringup: $(_example)test.py $(_example_build)test.py.d $(_example_python)
+$ cat build/test.py.mk
+$(_example_build)test.py.bringup: $(_example)test.py $(_example_build)test.py.mk $(_example_python)
 	( cd $(_example_dir) && make example --no-print-directory ) > $@ && \
 	$(_example_python) -m pip install fire >> $@
 
 ~~~
+\normalsize
 
 Usage examples:
 
+\footnotesize
 ~~~ {.sh}
 $ ./example
 Hello from _start.s!
@@ -68,7 +72,7 @@ All 7 command usage examples PASS
 ```
 \normalsize
 
-The help text includes the two command usage examples that were tested.
+The python help text includes the two command usage examples that were tested.
 
 \footnotesize
 ~~~ {.sh}
