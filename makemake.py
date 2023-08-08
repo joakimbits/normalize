@@ -256,7 +256,7 @@ $(_{dir}_build)%%.d.md: $(_{dir}_build)%%.d
 $(_{dir}_build)%%.bringup.md: $(_{dir}_build)%%.bringup
 	( echo "## $< \\n~~~ {{.bash}}" && cat $< && echo "~~~\\n" ) >$@
 $(_{dir}_build)%%.tested.md: $(_{dir}_build)%%.tested
-	( echo "## $<" && cat $< ) | sed '{{:q;N;s/\\n/\\n\\n/g;t q}}' >$@
+	( echo "## $<" && cat $< )  | sed -z -e "s/\\n/\\n/g;s/\\n/\\n\\n/g" >$@
 
 # Report the project.
 _{dir}/* := $(_{dir})Makefile $(_{dir}_S) $(_{dir}_SRCS) $(_{dir}_PY)
