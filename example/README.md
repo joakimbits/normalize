@@ -76,7 +76,7 @@ The python help text includes the two command usage examples that were tested.
 
 \footnotesize
 ~~~ {.sh}
-$ ./test.py -h | sed 's/^/  /'
+$ ./test.py -h | sed 's/^/  /;s/optional arguments:/options:/'
   usage: test.py [-h] [--makemake] [--generic] [--dep DEP] [--timeout TIMEOUT]
                  [--test] [--sh-test SH_TEST] [-c C]
                  ...
