@@ -3,13 +3,15 @@
 
 Adds the following command line options to the main module:
 
---makemake: Print a Makefile.
---generic: Generalize so that any Makefile can include the Makefile.
---dep <file>: Create a Makefile for bringup of the module.
+--makemake: Print a Makefile for bringup and test of the parent module.
+--generic: Generalize it so that any other Makefile can include the Makefile.
+--dep <file>: Create a separate Makefile for a bringup.
 
 Makes it easy to add the following command line options to the parent module:
 
---test: Verify usage examples in the module and exit.
+--timeout: Time in seconds before giving up on a command-line test.
+--sh-test <file>: Test command line usage examples in a file.
+--test: Verify python and command line usage examples in the module and exit.
 -c <string>: Execute a program string in the module and exit.
 
 
