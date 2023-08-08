@@ -154,6 +154,7 @@ $(_{dir}_build){dir}.tested: $(_{dir}_dir){dir}
 	$< > $@ || (cat $@ && false)
 
 # Check Python 3.9 syntax
+$(_{dir})syntax: $(_{dir}_build)syntax
 $(_{dir}_build)syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
 	$(_{dir}_python) -m ruff \\
 	    --format=$(FORMAT) --select=E9,F63,F7,F82 \\
@@ -164,6 +165,7 @@ $(_{dir})venv $(_{dir}_python):
 	python3 -m venv $(_{dir})venv && $(_{dir}_python) -m pip install --upgrade pip
 
 # Check Python 3.9 style
+$(_{dir})style: $(_{dir}_build)style
 $(_{dir}_build)style: $(_{dir}_build)syntax
 	$(_{dir}_python) -m ruff --fix \\
 	  --format=$(FORMAT) --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
