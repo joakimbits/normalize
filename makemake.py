@@ -462,7 +462,11 @@ class Test(Action):
         try:
             result = doctest.testmod(
                 parent_module,
-                optionflags=doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)
+                optionflags=(doctest.ELLIPSIS |
+                             doctest.NORMALIZE_WHITESPACE |
+                             doctest.FAIL_FAST |
+                             doctest.IGNORE_EXCEPTION_DETAIL))
+            assert result.failed == 0, result
             print(f"All {result.attempted} python usage examples PASS", )
             examples = build_commands(parser.epilog, "Examples:")
             run_command_examples(examples, args.timeout)
