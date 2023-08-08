@@ -104,33 +104,34 @@ else
 endif
 
 # Find all source files
+_{dir}_MD := $(wildcard $(_{dir})*.md)
 _{dir}_S := $(wildcard $(_{dir})*.s)
 _{dir}_C := $(wildcard $(_{dir})*.c)
 _{dir}_CPP := $(wildcard $(_{dir})*.cpp)
 _{dir}_PY := $(shell cd $(_{dir}_dir) && find . -maxdepth 1 -type f -name '*.py')
 _{dir}_PY := $(subst ./,$(_{dir}),$(_{dir}_PY))
-ifneq ($(strip $(_{dir}_PY)),)
-  _{dir}_BRINGUP := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.bringup)
-  _{dir}_TESTED := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.tested)
-endif
+_{dir}_BRINGUP := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.bringup)
+_{dir}_PY_TESTED := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.tested)
+_{dir}_MD_TESTED := $(_{dir}_MD:$(_{dir})%%=$(_{dir}_build)%%.sh-test.tested)
 
 # Prepare for compilation
 _{dir}_SRCS := $(_{dir}_C) $(_{dir}_CPP)
 _{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.s)
 _{dir}_DEPS += $(_{dir}_OBJS:.s=.d)
 _{dir}_OBJS += $(_{dir}_S)
-_{dir}_INC_DIRS := ./
+_{dir}_INC_DIRS := $(_{dir}_dir)
 _{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
 ifneq ($(strip $(_{dir}_S)),)
   _{dir}_EXE += $(_{dir}){dir}
   _{dir}_LDFLAGS += -nostartfiles
   _{dir}_LDFLAGS += -no-pie
-  _{dir}_TESTED += $(_{dir}_build){dir}.tested
+  _{dir}_S_TESTED := $(_{dir}_build){dir}.tested
 endif
 _{dir}_CPPFLAGS := -S $(_{dir}_LDFLAGS) $(_{dir}_INC_FLAGS) -MMD -MP
+_{dir}_TESTED := $(_{dir}_S_TESTED) $(_{dir}_PY_TESTED) $(_{dir}_MD_TESTED)
 
 # Prepare for bringup
-_{dir}_python = $(_{dir}_dir)venv/bin/python
+_{dir}_python := $(_{dir}_dir)venv/bin/python
 _{dir}_DEPS := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.d)
 
 # Default rule
@@ -171,15 +172,25 @@ $(_{dir})style: $(_{dir})syntax
 	$(_{dir}_python) -m ruff --fix \\
 	  --format=$(FORMAT) --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
 
-# Check Python and command line usage examples
-$(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.bringup \
-  $(_{dir})style
+# Check Python and command line usage examples in .py files
+$(_{dir}_build)%%.tested: $(_{dir})%% $(_{dir}_build)%%.d $(_{dir}_build)%%.bringup \\
+  $(_{dir})style $(_{dir}_S_TESTED)
 	$(_{dir}_python) $< --test > $@ || (cat $@ && false)
 $(_{dir}_build)%%.py.d: $(_{dir})%%.py
 	cd $(_{dir}_dir) && python3 $*.py --generic --dep $(__{dir}_build)$*.py.d
 $(_{dir}_BRINGUP): $(_{dir}_EXE) $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.exe)
 $(_{dir}_build)%%.exe: $(_{dir})%%
 	chmod +x $< >$@
+
+# Check command line usage examples in .md files
+$(_{dir}_build)%%.sh-test.tested: $(_{dir}_build)%%.sh-test $(_{dir}_PY_TESTED) | \\
+  $(_{dir})makemake.py
+	( cd $(_{dir}_dir) && \\
+	  ./makemake.py --timeout 60 --sh-test $(__{dir}_build)$*.sh-test ) >$@
+$(_{dir}_build)%%.md.sh-test: $(_{dir})%%.md | /usr/bin/pandoc /usr/bin/jq
+	pandoc -i $< -t json --preserve-tabs | \\
+	jq -r -c '.blocks[] | select(.t | contains("CodeBlock"))? | .c | \
+select(.[0][1][0] | contains("sh"))? | .[1]' > $@
 
 .PHONY: $(_{dir})s $(_{dir})a $(_{dir})d $(_{dir})b $(_{dir})report
 
@@ -204,11 +215,11 @@ $(_{dir})report: $(_{dir}_TESTED)
 	@$(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; )
 
 # Make a pdf document.
-$(_normalize)%%.pdf: $(_normalize_build)%%.md | /usr/bin/pandoc /usr/bin/xelatex \
-  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \
+$(_{dir})%%.pdf: $(_{dir}_build)%%.md | /usr/bin/pandoc /usr/bin/xelatex \\
+  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
   /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
 	pandoc $^ -o $@ \
-	       -V geometry:margin=1in --pdf-engine=xelatex \
+	       -V geometry:margin=1in --pdf-engine=xelatex \\
 	       --variable mainfont="Carlito" --variable monofont="Cousine"
 ifndef pandoc
 pandoc:=/usr/bin/pandoc
@@ -223,34 +234,37 @@ pandoc:=/usr/bin/pandoc
 	sudo apt-get install fonts-crosextra-carlito
 /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
 	# Need a more screen-readable fixed-size font: cousine
-	( sudo mkdir -p $(dir $@) && cd $(dir $@) && \
-	  fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \
-	  sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \
-	  sudo wget $$fonts/cousine/Cousine-Bold.ttf && \
-	  sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \
-	  sudo wget $$fonts/cousine/Cousine-Italic.ttf && \
+	( sudo mkdir -p $(dir $@) && cd $(dir $@) && \\
+	  fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \\
+	  sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \\
+	  sudo wget $$fonts/cousine/Cousine-Bold.ttf && \\
+	  sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \\
+	  sudo wget $$fonts/cousine/Cousine-Italic.ttf && \\
 	  sudo wget $$fonts/cousine/Cousine-Regular.ttf )
+/usr/bin/jq:
+	# Need a tool to filter json: jq
+	sudo apt install -y jq
 endif
 
 # Make a markdown document.
 $(_{dir}_build)%%.md: $(_{dir})%%
-	( echo "## $< \\n~~~ {{$(suffix $<) .numberLines}}" && cat $< && echo "~~~" ) >$@
+	( echo "## $< \\n~~~ {{$(suffix $<) .numberLines}}" && cat $< && echo "~~~\\n" ) >$@
 $(_{dir}_build)Makefile.md: $(_{dir})Makefile
-	( echo "## $< \\n~~~ {{.Makefile .numberLines}}" && cat $< && echo "~~~" ) >$@
+	( echo "## $< \\n~~~ {{.Makefile .numberLines}}" && cat $< && echo "~~~\\n" ) >$@
 $(_{dir}_build)%%.d.md: $(_{dir}_build)%%.d
-	( echo "## $< \\n~~~ {{.Makefile}}" && cat $< && echo "~~~" ) >$@
+	( echo "## $< \\n~~~ {{.Makefile}}" && cat $< && echo "~~~\\n" ) >$@
 $(_{dir}_build)%%.bringup.md: $(_{dir}_build)%%.bringup
-	( echo "## $< \\n~~~ {{.bash}}" && cat $< && echo "~~~" ) >$@
+	( echo "## $< \\n~~~ {{.bash}}" && cat $< && echo "~~~\\n" ) >$@
 $(_{dir}_build)%%.tested.md: $(_{dir}_build)%%.tested
 	( echo "## $<" && cat $< ) | sed '{{:q;N;s/\\n/\\n\\n/g;t q}}' >$@
 
 # Report the project.
-_{dir}/* := Makefile $(_{dir}_S) $(_{dir}_SRCS) $(_{dir}_PY)
+_{dir}/* := $(_{dir})Makefile $(_{dir}_S) $(_{dir}_SRCS) $(_{dir}_PY)
 _{dir}_build/* := $(_{dir}_DEPS) $(_{dir}_BRINGUP) $(_{dir}_TESTED)
 _{dir}_report += $(_{dir}/*:$(_{dir})%%=$(_{dir}_build)%%.md)
 _{dir}_report += $(_{dir}_build/*:%%=%%.md)
 $(_{dir})pdf: $(_{dir})report.pdf
-$(_{dir})report.pdf:: $(_{dir}_report)
+$(_{dir})report.pdf:: $(_{dir}_MD) $(_{dir}_report)
 $(_{dir}_build)report.md:
 	echo "# {dir} - an include-from-anywhere project" >$@
 
@@ -267,14 +281,17 @@ def make_rule(rule, commands, file=sys.stdout):
     print('\t' + " \\\n\t".join(commands), file=file)
 
 
-def build_commands(doc, heading, embed="%s", end="", pip=""):
+def build_commands(doc, heading=None, embed="%s", end="", pip=""):
     if not doc:
         return []
 
-    before_after = doc.split(f"{heading}\n", maxsplit=1)
+    if heading:
+        before_after = doc.split(f"{heading}\n", maxsplit=1)
+        doc = before_after[1] if len(before_after) >= 2 else ""
+
     commands = []
-    if len(before_after) >= 2:
-        for line in before_after[1].split('\n'):
+    if doc:
+        for line in doc.split('\n'):
             command_lines, comment_lines, output_lines = (
                 commands[-1] if commands else ([], [], []))
             command, comment, _ = re.split(COMMENT_GROUP_PATTERN, line, maxsplit=1)
@@ -304,7 +321,7 @@ def build_commands(doc, heading, embed="%s", end="", pip=""):
     return commands
 
 
-def run_command_examples(commands):
+def run_command_examples(commands, timeout=3):
     import subprocess
 
     for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
@@ -313,7 +330,7 @@ def run_command_examples(commands):
             command = f"( cd {module_dir} && {command} )"
         output = "\n".join(output_lines)
         result = subprocess.run(command, shell=True, capture_output=True, text=True,
-                                timeout=3)
+                                timeout=timeout)
         assert not result.returncode, f"Example {i + 1} failed: $ {command}"
         received = result.stdout or ""
         assert received == output, (
@@ -448,7 +465,22 @@ class Test(Action):
                 optionflags=doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)
             print(f"All {result.attempted} python usage examples PASS", )
             examples = build_commands(parser.epilog, "Examples:")
-            run_command_examples(examples)
+            run_command_examples(examples, args.timeout)
+            print(f"All {len(examples)} command usage examples PASS")
+        except AssertionError as err:
+            print(err, file=sys.stderr)
+            exit(1)
+
+        exit(0)
+
+
+class ShTest(Action):
+    """Test command usage examples in a file, and exit
+    """
+    def __call__(self, parser, args, values, option_string=None):
+        try:
+            examples = build_commands(open(values).read())
+            run_command_examples(examples, args.timeout)
             print(f"All {len(examples)} command usage examples PASS")
         except AssertionError as err:
             print(err, file=sys.stderr)
@@ -471,8 +503,12 @@ def add_arguments(argparser):
         f"Print generic Makefile for {module_path}, and exit"))
     argparser.add_argument('--dep', action='store', help=(
         f"Build a {module}.dep target, print its Makefile include statement, and exit"))
+    argparser.add_argument('--timeout', type=int, default=3, help=(
+        "Test timeout in seconds (3)"))
     argparser.add_argument('--test', nargs=0, action=Test, help=(
         "Verify examples and exit"))
+    argparser.add_argument('--sh-test', default=None, action=ShTest, help=(
+        "Verify command examples in file and exit"))
     argparser.add_argument('-c', nargs=1, action=Command, help=(
         "Program passed in as string"))
 
