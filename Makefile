@@ -15,8 +15,8 @@ report: | example/report
 
 # Remove built stuff.
 clean: example/clean
-	rm -rf venv/ build/
-	rm -f build.mk style syntax makemake.dep report.pdf
+	rm -rf venv/ build/ .ruff_cache/
+	rm -f build.mk style syntax makemake.dep *.pdf
 
 # If we do want to build stuff:
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
