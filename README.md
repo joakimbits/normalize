@@ -1,24 +1,44 @@
 ## Tool for generating build dependencies: makemake.py
-Any python module that imports makemake (and makemake itself) can print a Makefile for handling its dependencies and
-tests. It can also print a generic Makefile for handling all source code in its directory, including .py, .c, cpp, .s.
 
-Compile local sources and bringup a local venv ready to run all local python modules.
+---
+
 ```
 $ python3 makemake.py --makemake --generic > Makefile && make
 ```
 
-Test the python and command line usage examples, and generate a project report.
+- Compiles local sources and installs a local venv ready to run all local python modules.
+
 ```
-$ make pdf
+$ make pdf html slides
 ```
 
-The generic Makefile builds exactly the same targets also when included in a parent Makefile anywhere. It also isolates
-its own dependencies into a local python venv.
+- Tests the python and command line usage examples, and generates project reports.
 
-The non-generic Makefile variant does not isolate its dependencies. It can only be included from within the same folder.
+---
 
-Python version 3.7 or later is required.
+- The generic Makefile builds exactly the same when included in a parent Makefile anywhere. 
+- It also isolates its own dependencies into a local python venv. 
+
+There is a simpler variant:
+
+- It can only be included from within the same directory, without a venv.
+
+---
+
+```sh
+$ python3 makemake.py --makemake
+all: build/makemake.py.tested
+	
+build/makemake.py.tested: makemake.py build/makemake.py.bringup
+	python3 makemake.py --test > $@
+build/makemake.py.bringup: makemake.py
+	mkdir build/ && \
+	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@ && \
+	python3 -m pip install pip >> $@ && \
+	chmod +x $< >> $@
+
+```
+
+- Python version 3.7 or later is required.
 
 [example/README.md](example/README.md)
-
-[example/report.html](example/report.html)
