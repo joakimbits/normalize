@@ -20,3 +20,5 @@ The non-generic Makefile variant does not isolate its dependencies. It can only 
 Python version 3.7 or later is required.
 
 [example/README.md](example/README.md)
+
+[example/report.html](example/report.html)

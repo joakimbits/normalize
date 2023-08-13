@@ -1,19 +1,9 @@
-# Example include-from-anywhere project builder
-#
-# Each target gets a prefix which is the path to here from the current working director .
-#
-# Targets defined:
-#   all: Use makemake to build everything below except makemake.py and clean.
-#   makemake.py: Install ../makemake.py here.
-#   example: Compile any .cpp, .c and .s files into this executable named as its parent folder.
-#   venv: Bringup a local python environment here.
-#   build/%.mk: Build installation recipy here.
-#   build/%.bringup: Install and report output here.
-#   build/%.tested: Test and report output here.
-#   report: Test everything that still needs testing, and print a test summary if all tests are OK.
-#   pdf: Build a software project report here.
-#   clean: Remove everything built here.
-
+# all (default): Install everything.
+# venv: Install a python environment.
+# tested: Test everything.
+# report: Print a test summary.
+# pdf, html, slides: Print a project report.
+# clean: Remove everything built here.
 
 # Figure out how to reach here from the current working directory.
 _example_abspath := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -37,7 +27,7 @@ $(_example)makemake.py:
 $(_example)clean:
 	rm -rf $(_example)build/ $(_example)venv/ $(_example).ruff_cache/
 	rm -f $(_example)makemake.py $(_example)build.mk
-	rm -f $(_example)example $(_example)*.pdf
+	rm -f $(_example)example $(_example)*.pdf $(_example)*.html
 
 # If we do want to build stuff:
 ifeq ($(filter $(_example)clean clean,$(MAKECMDGOALS)),)
