@@ -99,7 +99,11 @@ _{dir}_abspath := $(dir $(makefile_abspath))
 _{dir} := $(subst $(PWD)/,,$(_{dir}_abspath))
 __{dir}_build := %s
 _{dir}_build := $(subst $(PWD)/,,$(_{dir}_abspath)$(__{dir}_build))
-_{dir}_dir := ./$(_{dir})
+ifeq ($(_{dir}),)
+  _{dir}_dir := ./
+else
+  _{dir}_dir := $(_{dir})
+endif
 
 # Find all source files
 _{dir}_MD := $(wildcard $(_{dir})*.md)
@@ -176,7 +180,7 @@ $(_{dir}_build)style: $(_{dir}_build)syntax
 	$(_{dir}_python) -m ruff --fix \\
 	  --format=$(FORMAT) --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
 
-# Bringup python
+# Build a recipy for $(_{dir}_build)%%.py.bringup
 $(_{dir}_build)%%.py.mk: $(_{dir})%%.py
 	cd $(_{dir}_dir) && python3 $*.py --generic --dep $(__{dir}_build)$*.py.mk
 
@@ -185,7 +189,7 @@ $(_{dir}_build)%%.py.tested: $(_{dir})%%.py $(_{dir}_build)%%.py.mk \\
   $(_{dir}_build)style $(_{dir}_build)%%.py.bringup $(_{dir}_EXE_TESTED)
 	$(_{dir}_python) $< --test > $@ || (cat $@ && false)
 
-# Check command line usage examples in .md files 
+# Check command line usage examples in .md files
 $(_{dir}_build)%%.sh-test.tested: $(_{dir}_build)%%.sh-test $(_{dir}_PY_TESTED) | \\
   $(_{dir})makemake.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
@@ -422,10 +426,8 @@ def run_command_examples(commands, timeout=3):
         if module_dir:
             command = f"( cd {module_dir} && {command} )"
         output = "\n".join(output_lines)
-
         result = subprocess.run(command, shell=True, capture_output=True, text=True,
                                 timeout=timeout)
-
         assert not result.returncode, (
             f"Example {i + 1} failed: $ {command}\n"
             f"stdout: {result.stdout}\n"
