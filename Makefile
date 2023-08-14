@@ -10,22 +10,22 @@ all: build.mk
 build.mk: makemake.py
 	python3 -m makemake --makemake --generic > $@
 
-# Report example also.
-report: | example/report
-
-# Remove built stuff.
-clean: example/clean
-	rm -rf venv/ build/ .ruff_cache/
-	rm -f build.mk makemake.dep *.pdf *.html
-
-# If we do want to build stuff:
+# If we do want to build stuff, include its builder:
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-  # Redefine the default build target "all" to build stuff from source files found here.
   -include build.mk
 endif
 
-# Include example sub-project.
--include example/Makefile
+# Manage the example sub-project also
+include example/Makefile
+all: | example/all
+tested: | example/tested
+report: | example/report
+pdf: | example/pdf
+html: | example/html
+slides: | example/slides
+clean: | example/clean
+	rm -rf venv/ build/ .ruff_cache/
+	rm -f build.mk makemake.dep *.pdf *.html
 
 # Compilation steps are still under development, so this rule applies here.
 $(_normalize_DEPS) $(_normalize_OBJS): Makefile build.mk

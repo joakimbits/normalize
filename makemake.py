@@ -127,7 +127,9 @@ ifneq ($(strip $(_{dir}_S)),)
   _{dir}_SRCS += $(_{dir}_S)
   _{dir}_LDFLAGS += -nostartfiles
   _{dir}_LDFLAGS += -no-pie
-  _{dir}_EXE += $(_{dir}){dir}
+endif
+ifneq ($(strip $(_{dir}_OBJS)),)
+  _{dir}_EXE := $(_{dir}){dir}
   _{dir}_EXE_TESTED := $(_{dir}_build){dir}.tested
 endif
 _{dir}_CPPFLAGS := -S $(_{dir}_LDFLAGS) $(_{dir}_INC_FLAGS) -MMD -MP
@@ -231,7 +233,7 @@ $(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.markdown $(_{dir})%%.dzslides: \\
   /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`" \\
-	       -V min-width=80%% -V geometry:margin=1in \\
+	       -V min-width=80%%\!important -V geometry:margin=1in \\
 	       --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 ifndef pandoc
 pandoc:=/usr/bin/pandoc
