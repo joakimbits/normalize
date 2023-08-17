@@ -554,10 +554,7 @@ if parent_module.__name__ == '__main__':
 
 
 class Test(Action):
-    """Doctest python examples in parent_module
-
-    Test also command usage examples in this argparser epilog, and exit
-    """
+    """Verify usage examples and exit"""
     def __call__(self, parser, args, values, option_string=None):
         import doctest
 
@@ -581,8 +578,7 @@ class Test(Action):
 
 
 class ShTest(Action):
-    """Test command usage examples in a file, and exit
-    """
+    """Test command usage examples in a file, and exit"""
     err = False
     def __call__(self, parser, args, values, option_string=None):
         file, = values
@@ -624,14 +620,11 @@ def add_arguments(argparser):
         f"Print generic Makefile for {module_path}, and exit"))
     argparser.add_argument('--dep', action='store', help=(
         f"Build a {module}.dep target, print its Makefile include statement, and exit"))
-    argparser.add_argument('-c', nargs=1, action=Command, help=(
-        "Program passed in as string"))
+    argparser.add_argument('-c', nargs=1, action=Command, help=Command.__doc__)
     argparser.add_argument('--timeout', type=int, default=3, help=(
         "Test timeout in seconds (3)"))
-    argparser.add_argument('--test', nargs=0, action=Test, help=(
-        "Verify examples and exit"))
-    argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=(
-        "Verify command examples in file and exit"))
+    argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
+    argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
 
 
 if __name__ == '__main__':
