@@ -42,3 +42,25 @@ _example_python := $(_example_dir)venv/bin/python
 
 ~~~
 \normalsize
+
+
+---
+
+### Standard and custom _start code
+
+\footnotesize
+~~~ {.sh}
+$ rm _start.s example && make --no-print-directory && ./example
+cc   build/main.c.s build/greeter.cpp.s -o example
+Hello from main.c!
+Hello from greeter.cpp!
+
+$ git restore _start.s && make --no-print-directory && ./example
+cc -nostartfiles -no-pie  _start.s build/main.c.s build/greeter.cpp.s -o example
+Hello from _start.s!
+Hello from main.c!
+Hello from greeter.cpp!
+
+~~~
+\normalsize
+

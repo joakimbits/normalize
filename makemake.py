@@ -117,24 +117,23 @@ _{dir}_PY_TESTED := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.tested)
 _{dir}_MD_TESTED := $(_{dir}_MD:$(_{dir})%%=$(_{dir}_build)%%.sh-test.tested)
 
 # Prepare for compilation
-_{dir}_SRCS := $(_{dir}_C) $(_{dir}_CPP)
-_{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.s)
-_{dir}_DEPS := $(_{dir}_OBJS:.s=.d)
-_{dir}_OBJS += $(_{dir}_S)
-_{dir}_INC_DIRS := $(_{dir}_dir)
-_{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
 ifneq ($(strip $(_{dir}_S)),)
-  _{dir}_SRCS += $(_{dir}_S)
   _{dir}_LDFLAGS += -nostartfiles
   _{dir}_LDFLAGS += -no-pie
 endif
+_{dir}_SRCS += $(_{dir}_C) $(_{dir}_CPP)
+_{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.s)
+_{dir}_DEPS := $(_{dir}_OBJS:.s=.d)
+_{dir}_INC_DIRS := $(_{dir}_dir)
+_{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
 ifneq ($(strip $(_{dir}_OBJS)),)
   _{dir}_EXE := $(_{dir}){dir}
   _{dir}_EXE_TESTED := $(_{dir}_build){dir}.tested
 endif
 _{dir}_CPPFLAGS := -S $(_{dir}_LDFLAGS) $(_{dir}_INC_FLAGS) -MMD -MP
 
-_{dir}_CODE := $(_{dir}_PY) _{dir}_SRCS
+_{dir}_ASMS := $(_{dir}_S) $(_{dir}_OBJS)
+_{dir}_CODE := $(_{dir}_S) $(_{dir}_SRCS) $(_{dir}_PY)
 _{dir}_BRINGUP := $(_{dir}_EXE) $(_{dir}_PY_BRINGUP)
 _{dir}_TESTED := $(_{dir}_EXE_TESTED) $(_{dir}_PY_TESTED) $(_{dir}_MD_TESTED)
 
@@ -158,7 +157,7 @@ $(_{dir}_build)%%.cpp.s: $(_{dir})%%.cpp
 	$(CXX) $(_{dir}_CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 # Link executable
-$(_{dir}){dir}: $(_{dir}_OBJS)
+$(_{dir}){dir}: $(_{dir}_ASMS)
 	$(CC) $(_{dir}_LDFLAGS) $(LDFLAGS) $^ -o $@
 
 # Test executable:
