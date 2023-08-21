@@ -50,17 +50,18 @@ _example_python := $(_example_dir)venv/bin/python
 
 \footnotesize
 ~~~ {.sh}
-$ rm _start.s example && make --no-print-directory && ./example
+$ mv example _start.s build/ && make --no-print-directory && ./example
 cc   build/main.c.s build/greeter.cpp.s -o example
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ git restore _start.s && make --no-print-directory && ./example
+$ rm example && mv build/_start.s . && make --no-print-directory && ./example
 cc -nostartfiles -no-pie  _start.s build/main.c.s build/greeter.cpp.s -o example
 Hello from _start.s!
 Hello from main.c!
 Hello from greeter.cpp!
 
+$ mv build/example .
 ~~~
 \normalsize
 
