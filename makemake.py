@@ -13,7 +13,7 @@ Makes it easy to add the following command line options to the parent module:
 --sh-test <file>: Test command line usage examples in a file and exit.
 --test: Verify python and command line usage examples in the module and exit.
 -c <string>: Execute a program string in the module and exit.
---model <mark
+--prompt <file> <openai model> <T> <rot13-encoded key>: Print a continuation and exit.
 
 
 USER MANUAL
