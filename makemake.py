@@ -709,7 +709,7 @@ class Prompt(Action):
             "messages": [{
                 "role": "user",
                 "content": prompt}],
-            "temperature": 0.7
+            "temperature": temperature
         }
         data = json.dumps(data).encode('UTF-8')
         headers = {
