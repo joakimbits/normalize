@@ -288,7 +288,7 @@ pandoc-%%-1-amd64.deb:
 	) ; fi
 /usr/bin/xelatex:
 	# Need a modern pdf generation framework: xelatex
-	sudo apt install -y texlive-xetex
+	sudo apt-get update && sudo apt install -y texlive-xetex
 /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
 	# Need a more screen-readable normal font: carlito
 	sudo apt-get install fonts-crosextra-carlito
