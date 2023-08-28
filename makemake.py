@@ -93,12 +93,10 @@ This prompt requires gpt-4 but we prototype it here gpt-3.5
 
 I want you to act as a software developer with the task to release software that
 I will describe to you below. Take a look at what I have inspected already
-after the (first) --- below. There I used the command `$ make old` to print the 
-previously released semantic version number and its project report. I then issued the 
-command  `$ make changes` which listed all commit comments and changes since that 
-previous release.  
+after the (first) --- below. There I used the command `$ make changes` which prints 
+the last released version number, the commit comments and the changes since then.  
 
-The report is organized like this:
+The project report we look at changes within is organized like this:
 
 1.  It explains the project purpose with example usage. 
 
@@ -389,9 +387,10 @@ endif
 ifneq ($(_{dir}_EXES),)
 	echo "$(_{dir}_h)## Usage" >> $@
 	echo "$(_{dir}~~~sh)" >> $@
-	for x in "$(subst $(_{dir}_DIR),,$(_{dir}_EXES))" ; do \\
+	for x in $(subst $(_{dir}_DIR),,$(_{dir}_EXES)) ; do \\
 	  echo "\\$$ ./$$x -h | $(_{dir}_h_fixup)" >> $@ && \\
-	  $(_{dir}_DIR)$$x -h > $@.tmp && $(_{dir}_h_fixup) $@.tmp >> $@ && rm $@.tmp ; \\
+	  ( cd $(_{dir}_DIR) && ./$$x -h ) > $@.tmp && \\
+	  $(_{dir}_h_fixup) $@.tmp >> $@ && rm $@.tmp ; \\
 	done
 	echo >> $@
 	echo "$(_{dir}~~~)" >> $@
@@ -442,15 +441,15 @@ $(_{dir}_BUILD)branch:
 	git branch --show-current > $@
 
 # Document changes since last release.
-$(_{dir})changes: | $(_{dir})change_comments $(_{dir})project_changes
-$(_{dir})change_comments: $(_{dir}_BUILD)change_comments.txt
+$(_{dir})changes: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm\
+ | $(_{dir})tag $(_{dir})change_comments $(_{dir})project_changes
+$(_{dir})tag: $(_{dir}_BUILD)tagged
 	cat $<
-$(_{dir}_BUILD)change_comments.txt: $(_{dir}_BUILD)tagged
-	git log --no-merges $$(cat $(_{dir}_BUILD)tagged)..HEAD $(_{dir}_DIR) > $@
-$(_{dir})project_changes: $(_{dir}_BUILD)project_changes.txt
-	cat $<
-$(_{dir}_BUILD)project_changes.txt: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm
-	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{{*}}' && \\
+$(_{dir})change_comments: $(_{dir}_BUILD)tagged
+	git --no-pager log --no-merges $$(cat $(_{dir}_BUILD)tagged)..HEAD $(_{dir}_DIR)
+$(_{dir})project_changes: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm
+	# Unified diff of project report changes:
+	@( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{{*}}' && \\
 	  parts=`ls xx**` && \\
 	  changed_parts=`grep -l -e '^-' -e '^+' xx**` && \\
 	  for part in $$parts ; do \\
@@ -466,9 +465,8 @@ $(_{dir}_BUILD)project_changes.txt: $(_{dir}_BUILD)old_report.gfm $(_{dir})repor
 	          paragraphs=`ls p**` && \\
 	          changed_paragraphs=`grep -l -e '^-' -e '^+' p**` && \\
 	          for paragraph in $$paragraphs ; do \\
-	            if `echo "$$changed_paragraphs" | fgrep -wq "$$paragraph" \\
-	            || test "$$(wc $$paragraph)" = "1"` ; then \\
-	              cat $$paragraph ; \\
+	            if `echo "$$changed_paragraphs" | fgrep -wq "$$paragraph"` ; then \\
+	              cat $$paragraph ; echo ; echo ; \\
 	            else \\
 	              echo "$$(head -1 $$paragraph) ..." ; fi ; \\
 	            done ; \\
@@ -480,7 +478,7 @@ $(_{dir}_BUILD)project_changes.txt: $(_{dir}_BUILD)old_report.gfm $(_{dir})repor
 	    else \\
 	      echo "$$(sed -n '3p' $$part) ..." ; fi ; \\
 	    done ; \\
-	  rm xx**; ) > $@
+	  rm xx**; )
 
 # Prompt for a release review.
 $(_{dir})review: $(_{dir}_BUILD)prompt
@@ -488,13 +486,12 @@ $(_{dir})review: $(_{dir}_BUILD)prompt
 $(_{dir}_BUILD)prompt: $(_{dir}_BUILD)context
 	python3 -m makemake -c 'print(REVIEW)' > $@
 	cat $< >> $@
-$(_{dir}_BUILD)context: $(_{dir}_BUILD)tagged $(_{dir}_BUILD)old_report.gfm
-	$(MAKE) $(_{dir})changes
-	( echo '$$ $(MAKE) $(_{dir})changes' && \\
-	  $(MAKE) $(_{dir})changes --no-print-directory ) >> $@
+$(_{dir}_BUILD)context: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm
+	echo '$$ $(MAKE) $(_{dir})changes' > $@
+	$(MAKE) $(_{dir})changes --no-print-directory >> $@
 	echo -n '$$ ' >> $@
 
-# Prompt for a release review.
+# Use GPT for a release review.
 $(_{dir})audit: $(_{dir}_BUILD)prompt
 	python3 -m makemake --prompt $< $(_{dir}_MODEL) $(_{dir}_TEMPERATURE)\
  $(_{dir}_BEARER_rot13)
@@ -776,7 +773,7 @@ class Prompt(Action):
             "messages": [{
                 "role": "user",
                 "content": prompt}],
-            "temperature": temperature
+            "temperature": float(temperature)
         }
         data = json.dumps(data).encode('UTF-8')
         headers = {
