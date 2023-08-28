@@ -266,8 +266,8 @@ $(_{dir})b: $(_{dir}_BRINGUP)
 $(_{dir})report: $(_{dir}_TESTED)
 	@$(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; )
 
-# Make a standalone html, pdf, markdown or dzslides document.
-$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.markdown $(_{dir})%%.dzslides: \\
+# Make a standalone html, pdf, gfm or dzslides document.
+$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.gfm $(_{dir})%%.dzslides: \\
   $(_{dir}_build)%%.md | \\
   /usr/bin/pandoc /usr/bin/xelatex \\
   /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
@@ -345,7 +345,7 @@ $(_{dir})slides: $(_{dir})slides.html
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<))"
 $(_{dir})slides.html: $(_{dir})report.dzslides
 	mv $< $@
-$(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.markdown \\
+$(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.gfm \\
   $(_{dir})report.dzslides: $(_{dir}_MD) $(_{dir}_report)
 _{dir}_file = $(foreach _,$(_{dir}_$1),[\\`$_\\`]($_))
 _{dir}_exe = $(foreach _,$(_{dir}_$1),[\\`./$_\\`]($_))
@@ -404,14 +404,14 @@ $(_{dir}_build)report-details.md:
 endif
 
 # Document old release.
-$(_{dir})old: $(_{dir}_build)tagged $(_{dir}_build)old_report.markdown
+$(_{dir})old: $(_{dir}_build)tagged $(_{dir}_build)old_report.gfm
 	cat $<  # Old tag
 	cat -n $(word 2,$^)  # Old project report
-$(_{dir}_build)old_report.markdown: $(_{dir}_build)tagged $(_{dir}_build)branch
+$(_{dir}_build)old_report.gfm: $(_{dir}_build)tagged $(_{dir}_build)branch
 	git checkout --detach $$(cat $<)
 	rm -rf $(_{dir})venv
-	$(MAKE) $(_{dir})markdown --no-print-directory
-	mv report.markdown $@
+	$(MAKE) $(_{dir})gfm --no-print-directory
+	mv report.gfm $@
 	git checkout $$(cat $(word 2,$^))
 	rm -rf $(_{dir})venv
 	rm -f $(_{dir}_build)*.bringup $(_{dir}_EXE) $(_{dir}_OBJS)
@@ -421,14 +421,14 @@ $(_{dir}_build)branch:
 	git branch --show-current > $@
 
 # Document changes since last release.
-$(_{dir})changes: $(_{dir}_build)tagged $(_{dir}_build)old_report.markdown \\
-  $(_{dir})report.markdown
+$(_{dir})changes: $(_{dir}_build)tagged $(_{dir}_build)old_report.gfm \\
+  $(_{dir})report.gfm
 	git log --no-merges $$(cat $<)..HEAD . | sed 's/^/    /'
 	diff $(word 2,$^) $(word 3,$^) | sed 's/^/    /'
 
 $(_{dir})review: $(_{dir}_build)prompt
 	@cat $<
-$(_{dir}_build)prompt: $(_{dir}_build)tagged $(_{dir}_build)old_report.markdown
+$(_{dir}_build)prompt: $(_{dir}_build)tagged $(_{dir}_build)old_report.gfm
 	$(MAKE) $(_{dir})changes
 	python3 -m makemake -c 'print(REVIEW)' > $@
 	( echo '$$ $(MAKE) $(_{dir})old' && \\
