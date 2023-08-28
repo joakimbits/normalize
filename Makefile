@@ -23,9 +23,10 @@ report: | example/report
 pdf: | example/pdf
 html: | example/html
 slides: | example/slides
+project_changes: | example/project_changes
 clean: | example/clean
 	rm -rf venv/ build/ .ruff_cache/
-	rm -f build.mk makemake.dep *.pdf *.html
+	rm -f build.mk makemake.dep *.pdf *.html *.gfm
 
 # Compilation steps are still under development, so this rule applies here.
 $(_normalize_DEPS) $(_normalize_OBJS): Makefile build.mk

@@ -2,7 +2,8 @@
 # venv: Install a python environment.
 # tested: Test everything.
 # report: Print a test summary.
-# pdf, html, slides: Print a project report.
+# gfm pdf html slides: Print a project report.
+# old changes review audit: Compare with last release.
 # clean: Remove everything built here.
 
 # Figure out how to reach here from the current working directory.
@@ -27,7 +28,7 @@ $(_example)makemake.py:
 $(_example)clean:
 	rm -rf $(_example)build/ $(_example)venv/ $(_example).ruff_cache/
 	rm -f $(_example)makemake.py $(_example)build.mk
-	rm -f $(_example)example $(_example)*.pdf $(_example)*.html
+	rm -f $(_example)example $(_example)*.pdf $(_example)*.html $(_example)*.gfm
 
 # If we do want to build stuff:
 ifeq ($(filter $(_example)clean clean,$(MAKECMDGOALS)),)

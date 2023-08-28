@@ -92,7 +92,7 @@ REVIEW = """
 This prompt requires gpt-4 but we prototype it here gpt-3.5
 
 I want you to act as a software developer with the task to release software that
-I will describe to you below. Take e look at what I have inspected already
+I will describe to you below. Take a look at what I have inspected already
 after the (first) --- below. There I used the command `$ make old` to print the 
 previously released semantic version number and its project report. I then issued the 
 command  `$ make changes` which listed all commit comments and changes since that 
@@ -102,7 +102,7 @@ The report is organized like this:
 
 1.  It explains the project purpose with example usage. 
 
-2.  It has a separate section listing each source code, installing python code, 
+2.  It has separate sections for listing each source code, installing python code, 
     test results for each source code, and finally test results for the complete 
     integrated project.
 
@@ -120,125 +120,146 @@ I will need to wait for gpt-4. Thank you for your service.
 """
 
 MAKEFILE_FROM_BUILD_DIR = f"""# $ {" ".join(sys.argv)}
-ifeq ($(_{dir}_dir),) 
-
-# Change to _{dir}_FORMAT=github within a github workflow
-_{dir}_FORMAT := text
+ifeq ($(_{dir}_DIR),) 
 
 # A large-context openai model suitable for code review
 _{dir}_MODEL := gpt-3.5-turbo-16k
 
-# A rot13 encoded openai Bearer key
-_{dir}_BEARER_rot13 := fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
-
 # A temperature for the openai continuation.
 _{dir}_TEMPERATURE = 0.7
 
+# A rot13 encoded openai Bearer key
+_{dir}_BEARER_rot13 := fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
+
+# Change to _{dir}_FORMAT=github within a github workflow
+_{dir}_FORMAT := text
+
 # Figure out where to find and build files
-makefile_abspath := $(abspath $(lastword $(MAKEFILE_LIST)))
-_{dir}_abspath := $(dir $(makefile_abspath))
-_{dir} := $(subst $(PWD)/,,$(_{dir}_abspath))
-__{dir}_build := %s
-_{dir}_build := $(subst $(PWD)/,,$(_{dir}_abspath)$(__{dir}_build))
+_{dir}_THIS_MAKEFILE_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+_{dir}_ABSPATH := $(dir $(_{dir}_THIS_MAKEFILE_ABSPATH))
+_{dir} := $(subst $(PWD)/,,$(_{dir}_ABSPATH))
+__{dir}_BUILD := %s
+_{dir}_BUILD := $(subst $(PWD)/,,$(_{dir}_ABSPATH)$(__{dir}_BUILD))
 ifeq ($(_{dir}),)
-  _{dir}_dir := ./
+  _{dir}_DIR := ./
 else
-  _{dir}_dir := $(_{dir})
+  _{dir}_DIR := $(_{dir})
 endif
 
 # Find all source files
-_{dir}_MD := $(wildcard $(_{dir})*.md)
 _{dir}_S := $(wildcard $(_{dir})*.s)
 _{dir}_C := $(wildcard $(_{dir})*.c)
 _{dir}_CPP := $(wildcard $(_{dir})*.cpp)
-_{dir}_PY := $(shell cd $(_{dir}_dir) && find . -maxdepth 1 -type f -name '*.py')
+_{dir}_PY := $(shell cd $(_{dir}_DIR) && find . -maxdepth 1 -type f -name '*.py')
 _{dir}_PY := $(subst ./,$(_{dir}),$(_{dir}_PY))
-_{dir}_PY_BRINGUP := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.bringup)
-_{dir}_PY_TESTED := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.tested)
-_{dir}_MD_TESTED := $(_{dir}_MD:$(_{dir})%%=$(_{dir}_build)%%.sh-test.tested)
+_{dir}_MD := $(wildcard $(_{dir})*.md)
+
+# List all installation and test targets
+_{dir}_SRCS := $(_{dir}_S)
+_{dir}_CXX := $(_{dir}_C)
+_{dir}_CXX += $(_{dir}_CPP)
+_{dir}_SRCS += $(_{dir}_CXX)
+_{dir}_CODE := $(_{dir}_SRCS)
+_{dir}_CODE += $(_{dir}_PY)
+ifneq ($(strip $(_{dir}_SRCS)),)
+  _{dir}_EXE := $(_{dir}){dir}
+  _{dir}_EXE_TESTED := $(_{dir}_BUILD){dir}.tested
+endif
+_{dir}_BRINGUP := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_BUILD)%%.bringup)
+_{dir}_TESTED := $(_{dir}_EXE_TESTED)
+_{dir}_TESTED += $(_{dir}_PY:$(_{dir})%%=$(_{dir}_BUILD)%%.tested)
+_{dir}_TESTED += $(_{dir}_MD:$(_{dir})%%=$(_{dir}_BUILD)%%.sh-test.tested)
 
 # Prepare for compilation
+_{dir}_INC_DIRS := $(_{dir}_DIR)
+_{dir}_LDFLAGS := $(LDFLAGS)
 ifneq ($(strip $(_{dir}_S)),)
-  _{dir}_LDFLAGS += -nostartfiles
-  _{dir}_LDFLAGS += -no-pie
+  _{dir}_LDFLAGS += -nostartfiles -no-pie
 endif
-_{dir}_SRCS += $(_{dir}_C) $(_{dir}_CPP)
-_{dir}_OBJS := $(_{dir}_SRCS:$(_{dir})%%=$(_{dir}_build)%%.s)
-_{dir}_DEPS := $(_{dir}_OBJS:.s=.d)
-_{dir}_INC_DIRS := $(_{dir}_dir)
-_{dir}_INC_FLAGS := $(addprefix -I,$(_{dir}_INC_DIRS))
-ifneq ($(strip $(_{dir}_OBJS)),)
-  _{dir}_EXE := $(_{dir}){dir}
-  _{dir}_EXE_TESTED := $(_{dir}_build){dir}.tested
-endif
-_{dir}_CPPFLAGS := -S $(_{dir}_LDFLAGS) $(_{dir}_INC_FLAGS) -MMD -MP
-
-_{dir}_ASMS := $(_{dir}_S) $(_{dir}_OBJS)
-_{dir}_CODE := $(_{dir}_S) $(_{dir}_SRCS) $(_{dir}_PY)
-_{dir}_BRINGUP := $(_{dir}_EXE) $(_{dir}_PY_BRINGUP)
-_{dir}_TESTED := $(_{dir}_EXE_TESTED) $(_{dir}_PY_TESTED) $(_{dir}_MD_TESTED)
+_{dir}_CXXFLAGS := $(_{dir}_LDFLAGS)
+_{dir}_CXXFLAGS += -S $(addprefix -I,$(_{dir}_INC_DIRS)) -MMD -MP
+_{dir}_CFLAGS := $(_{dir}_CXXFLAGS)
+_{dir}_CXXFLAGS += $(CXXFLAGS)
+_{dir}_CFLAGS += $(CFLAGS)
+_{dir}_COBJS := $(_{dir}_CXX:$(_{dir})%%=$(_{dir}_BUILD)%%.s)
+_{dir}_DEPS := $(_{dir}_COBJS:.s=.d)
+_{dir}_OBJS := $(_{dir}_S)
+_{dir}_OBJS += $(_{dir}_COBJS)
+_{dir}_EXES := $(_{dir}_EXE)
+_{dir}_EXES += $(_{dir}_PY)
 
 # Prepare for bringup
-_{dir}_python := $(_{dir}_dir)venv/bin/python
-_{dir}_DEPS += $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.mk)
+_{dir}_PYTHON := $(_{dir}_DIR)venv/bin/python
+_{dir}_PY_MK := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_BUILD)%%.mk)
+_{dir}_DEPS += $(_{dir}_PY_MK)
+
+# Prepare for reporting
+_{dir}_LOGIC := $(_{dir})Makefile
+_{dir}_LOGIC += $(_{dir}_CODE)
+_{dir}_RESULT := $(_{dir}_PY_MK)
+_{dir}_RESULT += $(_{dir}_BRINGUP)
+_{dir}_RESULT += $(_{dir}_TESTED)
+_{dir}_REPORT := $(_{dir}_BUILD)report-details.md
+_{dir}_REPORT += $(_{dir}_LOGIC:$(_{dir})%%=$(_{dir}_BUILD)%%.md)
+_{dir}_REPORT += $(_{dir}_RESULT:%%=%%.md)
 
 # Default rule
 .DELETE_ON_ERROR:
 $(_{dir})all: $(_{dir})bringup
 
-$(_{dir})bringup: $(_{dir}_BRINGUP)
+$(_{dir})bringup: $(_{dir}_EXE) $(_{dir}_BRINGUP)
 $(_{dir})tested: $(_{dir}_TESTED)
 
-# Compile C
-$(_{dir}_build)%%.c.s: $(_{dir})%%.c
-	$(CXX) $(_{dir}_CPPFLAGS) $(CFLAGS) -c $< -o $@
+# build/*.c.s: Compile C
+$(_{dir}_BUILD)%%.c.s: $(_{dir})%%.c
+	$(CXX) $(_{dir}_CFLAGS) -c $< -o $@
 
-# Compile C++
-$(_{dir}_build)%%.cpp.s: $(_{dir})%%.cpp
-	$(CXX) $(_{dir}_CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+# build/*.cpp.s: Compile C++
+$(_{dir}_BUILD)%%.cpp.s: $(_{dir})%%.cpp
+	$(CXX) $(_{dir}_CXXFLAGS) -c $< -o $@
 
 # Link executable
-$(_{dir}){dir}: $(_{dir}_ASMS)
-	$(CC) $(_{dir}_LDFLAGS) $(LDFLAGS) $^ -o $@
+$(_{dir}){dir}: $(_{dir}_OBJS)
+	$(CC) $(_{dir}_LDFLAGS) $^ -o $@
 
 # Test executable:
-$(_{dir}_build){dir}.tested: $(_{dir}){dir}
+$(_{dir}_BUILD){dir}.tested: $(_{dir}){dir}
 	./$< > $@ || (cat $@ && false)
 
 # Check Python 3.9 syntax
-$(_{dir})syntax: $(_{dir}_build)syntax
-$(_{dir}_build)syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
-	$(_{dir}_python) -m ruff \\
+$(_{dir})syntax: $(_{dir}_BUILD)syntax
+$(_{dir}_BUILD)syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
+	$(_{dir}_PYTHON) -m ruff \\
 	    --format=$(_{dir}_FORMAT) --select=E9,F63,F7,F82 \\
-	    --target-version=py39 $(_{dir}_dir) > $@ || (cat $@ && false)
-$(_{dir})venv/bin/ruff: | $(_{dir}_python)
-	$(_{dir}_python) -m pip install ruff
-$(_{dir})venv $(_{dir}_python):
-	python3 -m venv $(_{dir})venv && $(_{dir}_python) -m pip install --upgrade pip
+	    --target-version=py39 $(_{dir}_DIR) > $@ || (cat $@ && false)
+$(_{dir})venv/bin/ruff: | $(_{dir}_PYTHON)
+	$(_{dir}_PYTHON) -m pip install ruff
+$(_{dir})venv $(_{dir}_PYTHON):
+	python3 -m venv $(_{dir})venv && $(_{dir}_PYTHON) -m pip install --upgrade pip
 
 # Check Python 3.9 style
-$(_{dir})style: $(_{dir}_build)style
-$(_{dir}_build)style: $(_{dir}_build)syntax
-	$(_{dir}_python) -m ruff --fix \\
-	  --format=$(_{dir}_FORMAT) --target-version=py39 $(_{dir}_dir) > $@ \\
+$(_{dir})style: $(_{dir}_BUILD)style
+$(_{dir}_BUILD)style: $(_{dir}_BUILD)syntax
+	$(_{dir}_PYTHON) -m ruff --fix \\
+	  --format=$(_{dir}_FORMAT) --target-version=py39 $(_{dir}_DIR) > $@ \\
 	|| (cat $@ && false)
 
-# Build a recipy for $(_{dir}_build)%%.py.bringup
-$(_{dir}_build)%%.py.mk: $(_{dir})%%.py
-	cd $(_{dir}_dir) && python3 $*.py --generic --dep $(__{dir}_build)$*.py.mk
+# Build a recipy for $(_{dir}_BUILD)%%.py.bringup
+$(_{dir}_BUILD)%%.py.mk: $(_{dir})%%.py
+	cd $(_{dir}_DIR) && python3 $*.py --generic --dep $(__{dir}_BUILD)$*.py.mk
 
 # Check Python and command line usage examples in .py files
-$(_{dir}_build)%%.py.tested: $(_{dir})%%.py $(_{dir}_build)%%.py.mk \\
-  $(_{dir}_build)style $(_{dir}_build)%%.py.bringup $(_{dir}_EXE_TESTED)
-	$(_{dir}_python) $< --test > $@ || (cat $@ && false)
+$(_{dir}_BUILD)%%.py.tested: $(_{dir})%%.py $(_{dir}_BUILD)%%.py.mk \\
+  $(_{dir}_BUILD)style $(_{dir}_BUILD)%%.py.bringup $(_{dir}_EXE_TESTED)
+	$(_{dir}_PYTHON) $< --test > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
-$(_{dir}_build)%%.sh-test.tested: $(_{dir}_build)%%.sh-test $(_{dir}_PY_TESTED) | \\
+$(_{dir}_BUILD)%%.sh-test.tested: $(_{dir}_BUILD)%%.sh-test $(_{dir}_PY_TESTED) | \\
   $(_{dir})makemake.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
-	( cd $(_{dir}_dir) && ./makemake.py --timeout 60 --sh-test \
-	    $(__{dir}_build)$*.sh-test ) > $$tmp && mv $$tmp $@
-$(_{dir}_build)%%.md.sh-test: $(_{dir})%%.md | /usr/bin/pandoc /usr/bin/jq
+	( cd $(_{dir}_DIR) && ./makemake.py --timeout 60 --sh-test \
+	    $(__{dir}_BUILD)$*.sh-test ) > $$tmp && mv $$tmp $@
+$(_{dir}_BUILD)%%.md.sh-test: $(_{dir})%%.md | /usr/bin/pandoc /usr/bin/jq
 	pandoc -i $< -t json --preserve-tabs | \
 	jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | \
 select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && \\
@@ -268,7 +289,7 @@ $(_{dir})report: $(_{dir}_TESTED)
 
 # Make a standalone html, pdf, gfm or dzslides document.
 $(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.gfm $(_{dir})%%.dzslides: \\
-  $(_{dir}_build)%%.md | \\
+  $(_{dir}_BUILD)%%.md | \\
   /usr/bin/pandoc /usr/bin/xelatex \\
   /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
   /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
@@ -311,34 +332,28 @@ _{dir}_h :=\\n---\\n\\n\#
 _{dir}~~~. =\\\\\\footnotesize\\n~~~ {{$1}}
 _{dir}~~~sh :=$(call _{dir}~~~.,.sh)
 _{dir}~~~ :=~~~\\n\\\\\\normalsize\\n
-$(_{dir}_build)Makefile.md: $(_{dir})Makefile
-	( echo "$(_{dir}_h)## [$<]($<)" && \\
+$(_{dir}_BUILD)Makefile.md: $(_{dir})Makefile
+	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
 	  echo "$(call _{dir}~~~.,.mk)" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
-$(_{dir}_build)%%.md: $(_{dir})%%
-	( echo "$(_{dir}_h)## [$<]($<)" && \\
-	  echo "$(call _{dir}~~~.,$(suffix $<) .numberLines)" && \\
-	  cat $< && echo "$(_{dir}~~~)" ) >$@
-$(_{dir}_build)%%.md: $(_{dir}_build)%%
-	( echo "$(_{dir}_h)## [$<]($<)" && \\
+$(_{dir}_BUILD)%%.md: $(_{dir})%%
+	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
 	  echo "$(call _{dir}~~~.,$(suffix $<))" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
-$(_{dir}_build)%%.bringup.md: $(_{dir}_build)%%.bringup
-	( echo "$(_{dir}_h)## [$<]($<)" && \\
+$(_{dir}_BUILD)%%.md: $(_{dir}_BUILD)%%
+	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
+	  echo "$(call _{dir}~~~.,$(suffix $<))" && \\
+	  cat $< && echo "$(_{dir}~~~)" ) >$@
+$(_{dir}_BUILD)%%.bringup.md: $(_{dir}_BUILD)%%.bringup
+	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
 	  echo "$(_{dir}~~~sh)" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
-$(_{dir}_build)%%.tested.md: $(_{dir}_build)%%.tested
-	( echo "$(_{dir}_h)## [$<]($<)" && \\
+$(_{dir}_BUILD)%%.tested.md: $(_{dir}_BUILD)%%.tested
+	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
 	  echo "$(_{dir}~~~sh)" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
 
 # Report the project.
-_{dir}/* := $(_{dir})Makefile $(_{dir}_S) $(_{dir}_SRCS) $(_{dir}_PY)
-_{dir}_build/* := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_build)%%.mk)
-_{dir}_build/* += $(_{dir}_PY_BRINGUP) $(_{dir}_TESTED)
-_{dir}_report := $(_{dir}_build)report-details.md
-_{dir}_report += $(_{dir}/*:$(_{dir})%%=$(_{dir}_build)%%.md)
-_{dir}_report += $(_{dir}_build/*:%%=%%.md)
 $(_{dir})%%: $(_{dir})report.%%
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<))"
 $(_{dir})slides: $(_{dir})slides.html
@@ -346,37 +361,39 @@ $(_{dir})slides: $(_{dir})slides.html
 $(_{dir})slides.html: $(_{dir})report.dzslides
 	mv $< $@
 $(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.gfm \\
-  $(_{dir})report.dzslides: $(_{dir}_MD) $(_{dir}_report)
+  $(_{dir})report.dzslides: $(_{dir}_MD) $(_{dir}_REPORT)
 _{dir}_file = $(foreach _,$(_{dir}_$1),[\\`$_\\`]($_))
 _{dir}_exe = $(foreach _,$(_{dir}_$1),[\\`./$_\\`]($_))
 _{dir}_h_fixup :=sed -E '/^$$|[.]{{3}}/d'
-$(_{dir}_build)report.md: $(_{dir}_TESTED)
+$(_{dir}_BUILD)report.md: $(_{dir}_TESTED)
 	echo "A build-here include-from-anywhere project \
 based on [makemake](https://github.com/joakimbits/normalize)." > $@
-	echo "\\n- \\`make bringup tested report pdf html slides\\`" >> $@
+	echo "\\n- \\`make report pdf html slides review audit\\`" >> $@
 ifneq ($(strip $(_{dir}_EXE)),)
-	echo "- \\`./{dir}\\`: $(call _{dir}_file,SRCS)" >> $@
+	echo "- \\`./{dir}\\`: $(subst $(_{dir}),,$(call _{dir}_file,SRCS))" >> $@
 endif
 ifneq ($(strip $(_{dir}_PY)),)
-	echo "- $(call _{dir}_exe,PY)" >> $@
+	echo "- $(subst $(_{dir}),,$(call _{dir}_exe,PY))" >> $@
 endif
 	echo "$(_{dir}_h)## Installation" >> $@
 	echo "$(_{dir}~~~sh)" >> $@
 	echo "\\$$ make" >> $@
 	echo "$(_{dir}~~~)" >> $@
-ifneq ($(strip $(_{dir}_SRCS)),)
+ifneq ($(strip $(_{dir}_EXE)),)
 	echo "- Installs \\`./{dir}\\`." >> $@
 endif
 ifneq ($(strip $(_{dir}_PY)),)
 	echo "- Installs \\`./venv\\`." >> $@
-	echo "- Installs $(call _{dir}_exe,PY)." >> $@
+	echo "- Installs $(subst $(_{dir}),,$(call _{dir}_exe,PY))." >> $@
 endif
-ifneq ($(strip $(_{dir}_CODE)),)
+ifneq ($(_{dir}_EXES),)
 	echo "$(_{dir}_h)## Usage" >> $@
 	echo "$(_{dir}~~~sh)" >> $@
-	$(foreach x,$(_{dir}_EXE) $(_{dir}_PY),\
- ( echo "\\$$ ./$x -h | $(_{dir}_h_fixup)" &&\
- ./$x -h | $(_{dir}_h_fixup) && echo ) >> $@ ;)
+	for x in "$(subst $(_{dir}_DIR),,$(_{dir}_EXES))" ; do \\
+	  echo "\\$$ ./$$x -h | $(_{dir}_h_fixup)" >> $@ && \\
+	  $(_{dir}_DIR)$$x -h > $@.tmp && $(_{dir}_h_fixup) $@.tmp >> $@ && rm $@.tmp ; \\
+	done
+	echo >> $@
 	echo "$(_{dir}~~~)" >> $@
 	echo "$(_{dir}_h)## Test" >> $@
 	echo "$(_{dir}~~~sh)" >> $@
@@ -387,63 +404,104 @@ ifneq ($(strip $(_{dir}_EXE)),)
 	echo "- Tests \\`./{dir}\\`." >> $@
 endif
 ifneq ($(strip $(_{dir}_PY)),)
-	echo "- Verifies style and doctests in $(call _{dir}_file,PY)." >> $@
+	echo "- Verifies style and doctests in\
+ $(subst $(_{dir}_DIR),,$(call _{dir}_file,PY))." >> $@
 endif
 ifneq ($(strip $(_{dir}_MD)),)
-	echo "- Verifies doctests in $(call _{dir}_file,MD)." >> $@
+	echo "- Verifies doctests in $(subst $(_{dir}_DIR),,$(call _{dir}_file,MD))." >> $@
 endif
 ifneq ($(strip $(_{dir}_CODE)),)
 	echo "$(_{dir}_h)## Result" >> $@
 	echo "$(_{dir}~~~sh)" >> $@
 	echo "\\$$ make report" >> $@
-	$(MAKE) report --no-print-directory >> $@
+	( cd $(_{dir}_DIR) && $(MAKE) report --no-print-directory ) >> $@
 	echo "$(_{dir}~~~)" >> $@
 	echo "\\n---\\n" >> $@
-$(_{dir}_build)report-details.md:
+$(_{dir}_BUILD)report-details.md:
 	echo "$(_{dir}_h)# Source code, installation and test result" >> $@
 endif
 
-# Document old release.
-$(_{dir})old: $(_{dir}_build)tagged $(_{dir}_build)old_report.gfm
-	cat $<  # Old tag
-	cat -n $(word 2,$^)  # Old project report
-$(_{dir}_build)old_report.gfm: $(_{dir}_build)tagged $(_{dir}_build)branch
+# Document last release.
+$(_{dir})old: $(_{dir}_BUILD)tagged $(_{dir}_BUILD)old_report.gfm
+	cat $<
+	cat -n $(word 2,$^)
+$(_{dir}_BUILD)old_report.gfm: $(_{dir}_BUILD)tagged $(_{dir}_BUILD)branch
+	echo `mktemp -d`/new > $@.tmpdir
+	mkdir -p `cat $@.tmpdir`
+	cp -a $(_{dir}_DIR)* `cat $@.tmpdir`
 	git checkout --detach $$(cat $<)
 	rm -rf $(_{dir})venv
-	$(MAKE) $(_{dir})gfm --no-print-directory
-	mv report.gfm $@
+	$(MAKE) $(_{dir})report.gfm --no-print-directory
+	mv $(_{dir})report.gfm `cat $@.tmpdir`/$(__{dir}_BUILD)old_report.gfm
 	git checkout $$(cat $(word 2,$^))
-	rm -rf $(_{dir})venv
-	rm -f $(_{dir}_build)*.bringup $(_{dir}_EXE) $(_{dir}_OBJS)
-$(_{dir}_build)tagged:
+	new=`cat $@.tmpdir` && rm -r $(_{dir}_DIR)* && mv $$new/* $(_{dir}_DIR)
+	rm -rf `cat $@.tmpdir`
+$(_{dir}_BUILD)tagged:
 	git describe --tags --abbrev=0 > $@
-$(_{dir}_build)branch:
+$(_{dir}_BUILD)branch:
 	git branch --show-current > $@
 
 # Document changes since last release.
-$(_{dir})changes: $(_{dir}_build)tagged $(_{dir}_build)old_report.gfm \\
-  $(_{dir})report.gfm
-	git log --no-merges $$(cat $<)..HEAD . | sed 's/^/    /'
-	diff $(word 2,$^) $(word 3,$^) | sed 's/^/    /'
+$(_{dir})changes: | $(_{dir})change_comments $(_{dir})project_changes
+$(_{dir})change_comments: $(_{dir}_BUILD)change_comments.txt
+	cat $<
+$(_{dir}_BUILD)change_comments.txt: $(_{dir}_BUILD)tagged
+	git log --no-merges $$(cat $(_{dir}_BUILD)tagged)..HEAD $(_{dir}_DIR) > $@
+$(_{dir})project_changes: $(_{dir}_BUILD)project_changes.txt
+	cat $<
+$(_{dir}_BUILD)project_changes.txt: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm
+	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{{*}}' && \\
+	  parts=`ls xx**` && \\
+	  changed_parts=`grep -l -e '^-' -e '^+' xx**` && \\
+	  for part in $$parts ; do \\
+	    if `echo "$$changed_parts" | fgrep -wq "$$part" \\
+	    || test "$$(wc $$part)" = "1"` ; then \\
+	      python3 -m makemake --split $$part '\\n \\n \\n' 's%%02d' && \\
+	      sections=`ls s**` && \\
+	      changed_sections=`grep -l -e '^-' -e '^+' s**` && \\
+	      for section in $$sections ; do \\
+	        if `echo "$$changed_sections" | fgrep -wq "$$section" \\
+	        || test "$$(wc $$section)" = "1"` ; then \\
+	          python3 -m makemake --split $$section '\\n \\n' 'p%%02d' && \\
+	          paragraphs=`ls p**` && \\
+	          changed_paragraphs=`grep -l -e '^-' -e '^+' p**` && \\
+	          for paragraph in $$paragraphs ; do \\
+	            if `echo "$$changed_paragraphs" | fgrep -wq "$$paragraph" \\
+	            || test "$$(wc $$paragraph)" = "1"` ; then \\
+	              cat $$paragraph ; \\
+	            else \\
+	              echo "$$(head -1 $$paragraph) ..." ; fi ; \\
+	            done ; \\
+	          rm p** ; \\
+	        else \\
+	          echo "$$(head -1 $$section) ..." ; fi ; \\
+	        done ; \\
+	      rm s** ; \\
+	    else \\
+	      echo "$$(sed -n '3p' $$part) ..." ; fi ; \\
+	    done ; \\
+	  rm xx**; ) > $@
 
-$(_{dir})review: $(_{dir}_build)prompt
+# Prompt for a release review.
+$(_{dir})review: $(_{dir}_BUILD)prompt
 	@cat $<
-$(_{dir}_build)prompt: $(_{dir}_build)tagged $(_{dir}_build)old_report.gfm
-	$(MAKE) $(_{dir})changes
+$(_{dir}_BUILD)prompt: $(_{dir}_BUILD)context
 	python3 -m makemake -c 'print(REVIEW)' > $@
-	( echo '$$ $(MAKE) $(_{dir})old' && \\
-	  $(MAKE) $(_{dir})old --no-print-directory ) >> $@
+	cat $< >> $@
+$(_{dir}_BUILD)context: $(_{dir}_BUILD)tagged $(_{dir}_BUILD)old_report.gfm
+	$(MAKE) $(_{dir})changes
 	( echo '$$ $(MAKE) $(_{dir})changes' && \\
 	  $(MAKE) $(_{dir})changes --no-print-directory ) >> $@
 	echo -n '$$ ' >> $@
 
-$(_{dir})audit: $(_{dir}_build)prompt
+# Prompt for a release review.
+$(_{dir})audit: $(_{dir}_BUILD)prompt
 	python3 -m makemake --prompt $< $(_{dir}_MODEL) $(_{dir}_TEMPERATURE)\
  $(_{dir}_BEARER_rot13)
 
 # Include the autogenerated dependencies
 -include $(_{dir}_DEPS)
-endif  # _{dir}_dir
+endif  # _{dir}_DIR
 """  # noqa: E101
 
 COMMENT_GROUP_PATTERN = re.compile("(\s*#.*)?$")
@@ -551,9 +609,9 @@ if parent_module.__name__ == '__main__':
             pattern = '%'
             source = '$<'
             stem = '$*'
-            python = f'$(_{dir}_python)'
+            python = f'$(_{dir}_PYTHON)'
             src_dir = f'$(_{dir})'
-            build_dir = f'$(_{dir}_build)'
+            build_dir = f'$(_{dir}_BUILD)'
             build_dir_var_value = f"{src_dir}{dep_dir}"
             generic = " --generic"
         else:
@@ -566,7 +624,7 @@ if parent_module.__name__ == '__main__':
             generic = ""
 
         if generic_dependencies:
-            embed = f"( cd $(_{dir}_dir) && %s"
+            embed = f"( cd $(_{dir}_DIR) && %s"
             end = " )"
             rules = []  # The generic rules are already printed
         else:
@@ -605,7 +663,7 @@ if parent_module.__name__ == '__main__':
         if generic_dependencies or dep_path:
             bringup_rule += f" {build_dir}{dep_filename}"
             if generic_dependencies:
-                bringup_rule += f" $(_{dir}_python)"
+                bringup_rule += f" $(_{dir}_PYTHON)"
         else:
             commands = [f"mkdir {build_dir}" + (" &&" if commands else "")] + commands
 
@@ -693,6 +751,15 @@ class Command(Action):
         exit(0)
 
 
+class Split(Action):
+    """Split FILE by SEPARATOR into files with PATTERN %% 0, 1 ..., and exit"""
+    def __call__(self, parser, args, values, option_string=None):
+        file, escaped_separator, pattern = values
+        separator = bytes(escaped_separator, "utf-8").decode("unicode_escape")
+        for i, s in enumerate(open(file).read().split(separator)):
+            open(pattern % i, 'w').write(s)
+
+
 class Prompt(Action):
     """Print an openai continuation from a promt file, model, temperature and bearer
     rot13 key, and exit"""
@@ -741,6 +808,7 @@ def add_arguments(argparser):
         "Test timeout in seconds (3)"))
     argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
     argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
+    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)
     argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__)
 
 
