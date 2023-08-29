@@ -783,8 +783,8 @@ class Prompt(Action):
         }
         url = 'https://api.openai.com/v1/chat/completions'
         r = requests.post(url, data=data, headers=headers)
-        status = r.status_code, r.reason
-        assert status == (200, 'OK'), status
+        status = r.status_code, r.reason, r.text
+        assert status[:2] == (200, 'OK'), status
         c = json.loads(r.content)
         u = c['usage']
         print(c['model'], c['object'], c['id'],
