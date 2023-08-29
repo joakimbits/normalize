@@ -144,6 +144,22 @@ else
   _{dir}_DIR := $(_{dir})
 endif
 
+# Figure out where we are in a git
+_{dir}_GIT_DIR := $(shell realpath --relative-to=$$(dirname\
+ `git rev-parse --git-common-dir`) $(_{dir}_DIR) )/
+_{dir}_GIT := $(_{dir}_GIT_DIR:%%./=%%)
+_{dir}_TAG := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
+ifeq ($(filter v%%,$(_{dir}_TAG)),)
+  _{dir}_TAGLINE := $(shell git branch --list $(_{dir}_BRANCH) -v)
+else
+  _{dir}_TAGLINE := $(word 2,$(shell git tag --list $(_{dir}_TAG) -n1))
+endif
+_{dir}_BRANCH := $(shell git branch --show-current)
+_{dir}_STATUS := $(shell echo `git status -s | grep '^ M ' | awk '{{ print $$2 }}'`)
+_{dir}_STATUS := $(strip $(foreach f,$(filter $(_{dir})%%,$(_{dir}_STATUS:./%%=%%)),\
+ $(if $(findstring /,$(f:$(_{dir})%%=%%)),,$f)))
+_{dir}_STATUS += $(shell git branch --list $(_{dir}_BRANCH) -v)
+
 # Find all source files
 _{dir}_S := $(wildcard $(_{dir})*.s)
 _{dir}_C := $(wildcard $(_{dir})*.c)
@@ -166,6 +182,7 @@ endif
 _{dir}_BRINGUP := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_BUILD)%%.bringup)
 _{dir}_TESTED := $(_{dir}_EXE_TESTED)
 _{dir}_TESTED += $(_{dir}_PY:$(_{dir})%%=$(_{dir}_BUILD)%%.tested)
+_{dir}_PRETESTED := $(_{dir}_TESTED)
 _{dir}_TESTED += $(_{dir}_MD:$(_{dir})%%=$(_{dir}_BUILD)%%.sh-test.tested)
 
 # Prepare for compilation
@@ -233,7 +250,8 @@ $(_{dir}_BUILD)syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
 $(_{dir})venv/bin/ruff: | $(_{dir}_PYTHON)
 	$(_{dir}_PYTHON) -m pip install ruff
 $(_{dir})venv $(_{dir}_PYTHON):
-	python3 -m venv $(_{dir})venv && $(_{dir}_PYTHON) -m pip install --upgrade pip
+	( cd $(_{dir}_DIR) && python3 -m venv venv )
+	$(_{dir}_PYTHON) -m pip install --upgrade pip
 
 # Check Python 3.9 style
 $(_{dir})style: $(_{dir}_BUILD)style
@@ -252,7 +270,7 @@ $(_{dir}_BUILD)%%.py.tested: $(_{dir})%%.py $(_{dir}_BUILD)%%.py.mk \\
 	$(_{dir}_PYTHON) $< --test > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
-$(_{dir}_BUILD)%%.sh-test.tested: $(_{dir}_BUILD)%%.sh-test $(_{dir}_PY_TESTED) | \\
+$(_{dir}_BUILD)%%.sh-test.tested: $(_{dir}_BUILD)%%.sh-test $(_{dir}_PRETESTED) | \\
   $(_{dir})makemake.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $(_{dir}_DIR) && ./makemake.py --timeout 60 --sh-test \
@@ -353,9 +371,9 @@ $(_{dir}_BUILD)%%.tested.md: $(_{dir}_BUILD)%%.tested
 
 # Report the project.
 $(_{dir})%%: $(_{dir})report.%%
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<))"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_STATUS)"
 $(_{dir})slides: $(_{dir})slides.html
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<))"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_STATUS)"
 $(_{dir})slides.html: $(_{dir})report.dzslides
 	mv $< $@
 $(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.gfm \\
@@ -363,7 +381,7 @@ $(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.gfm \\
 _{dir}_file = $(foreach _,$(_{dir}_$1),[\\`$_\\`]($_))
 _{dir}_exe = $(foreach _,$(_{dir}_$1),[\\`./$_\\`]($_))
 _{dir}_h_fixup :=sed -E '/^$$|[.]{{3}}/d'
-$(_{dir}_BUILD)report.md: $(_{dir}_TESTED)
+$(_{dir}_BUILD)report.md: $(_{dir}_TESTED) | $(_{dir}_EXES)
 	echo "A build-here include-from-anywhere project \
 based on [makemake](https://github.com/joakimbits/normalize)." > $@
 	echo "\\n- \\`make report pdf html slides review audit\\`" >> $@
@@ -421,33 +439,21 @@ $(_{dir}_BUILD)report-details.md:
 endif
 
 # Document last release.
-$(_{dir})old: $(_{dir}_BUILD)tagged $(_{dir}_BUILD)old_report.gfm
-	cat $<
-	cat -n $(word 2,$^)
-$(_{dir}_BUILD)old_report.gfm: $(_{dir}_BUILD)tagged $(_{dir}_BUILD)branch
-	echo `mktemp -d`/new > $@.tmpdir
-	mkdir -p `cat $@.tmpdir`
-	cp -a $(_{dir}_DIR)* `cat $@.tmpdir`
-	git checkout --detach $$(cat $<)
-	rm -rf $(_{dir})venv
-	$(MAKE) $(_{dir})report.gfm --no-print-directory
-	mv $(_{dir})report.gfm `cat $@.tmpdir`/$(__{dir}_BUILD)old_report.gfm
-	git checkout $$(cat $(word 2,$^))
-	new=`cat $@.tmpdir` && rm -r $(_{dir}_DIR)* && mv $$new/* $(_{dir}_DIR)
-	rm -rf `cat $@.tmpdir`
-$(_{dir}_BUILD)tagged:
-	git describe --tags --abbrev=0 > $@
-$(_{dir}_BUILD)branch:
-	git branch --show-current > $@
+_{dir}_OLD_WORKTREE := $(_{dir}_BUILD)$(_{dir}_TAG)/
+_{dir}_OLD := $(_{dir}_OLD_WORKTREE)$(_{dir}_GIT)
+$(_{dir})old: $(_{dir}_OLD)report.gfm
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_TAGLINE)"
+$(_{dir}_OLD)report.gfm:
+	rm -rf $(_{dir}_OLD_WORKTREE)
+	git worktree add -d $(_{dir}_OLD_WORKTREE) $(_{dir}_TAG)
+	( cd $(_{dir}_OLD) && $(MAKE) report.gfm --no-print-directory )
 
 # Document changes since last release.
-$(_{dir})changes: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm\
- | $(_{dir})tag $(_{dir})change_comments $(_{dir})project_changes
-$(_{dir})tag: $(_{dir}_BUILD)tagged
-	cat $<
-$(_{dir})change_comments: $(_{dir}_BUILD)tagged
-	git --no-pager log --no-merges $$(cat $(_{dir}_BUILD)tagged)..HEAD $(_{dir}_DIR)
-$(_{dir})project_changes: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm
+$(_{dir})changes: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm\
+ | $(_{dir})change_comments $(_{dir})project_changes
+$(_{dir})change_comments:
+	git --no-pager log --no-merges $(_{dir}_TAG)..HEAD $(_{dir}_DIR)
+$(_{dir})project_changes: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
 	# Unified diff of project report changes:
 	@( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{{*}}' && \\
 	  parts=`ls xx**` && \\
@@ -482,11 +488,11 @@ $(_{dir})project_changes: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm
 
 # Prompt for a release review.
 $(_{dir})review: $(_{dir}_BUILD)prompt
-	@cat $<
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_TAG) $(_{dir}_BRANCH)"
 $(_{dir}_BUILD)prompt: $(_{dir}_BUILD)context
 	python3 -m makemake -c 'print(REVIEW)' > $@
 	cat $< >> $@
-$(_{dir}_BUILD)context: $(_{dir}_BUILD)old_report.gfm $(_{dir})report.gfm
+$(_{dir}_BUILD)context: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
 	echo '$$ $(MAKE) $(_{dir})changes' > $@
 	$(MAKE) $(_{dir})changes --no-print-directory >> $@
 	echo -n '$$ ' >> $@
