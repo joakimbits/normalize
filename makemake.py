@@ -273,7 +273,7 @@ $(_{dir}_BUILD)%%.py.tested: $(_{dir})%%.py $(_{dir}_BUILD)%%.py.mk \\
 $(_{dir}_BUILD)%%.sh-test.tested: $(_{dir}_BUILD)%%.sh-test $(_{dir}_PRETESTED) | \\
   $(_{dir})makemake.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
-	( cd $(_{dir}_DIR) && ./makemake.py --timeout 60 --sh-test \
+	( cd $(_{dir}_DIR) && python3 -m makemake --timeout 60 --sh-test \
 	    $(__{dir}_BUILD)$*.sh-test ) > $$tmp && mv $$tmp $@
 $(_{dir}_BUILD)%%.md.sh-test: $(_{dir})%%.md | /usr/bin/pandoc /usr/bin/jq
 	pandoc -i $< -t json --preserve-tabs | \
