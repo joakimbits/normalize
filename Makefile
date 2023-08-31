@@ -15,14 +15,17 @@ ifeq ($(filter clean,$(MAKECMDGOALS)),)
   -include build.mk
 endif
 
-# Manage the example sub-project also
+# Manage the example sub-project also.
 include example/Makefile
 all: | example/all
 tested: | example/tested
 report: | example/report
+gfm: | example/gfm
 pdf: | example/pdf
 html: | example/html
 slides: | example/slides
+old: | example/old
+new: gfm
 project_changes: | example/project_changes
 clean: | example/clean
 	rm -rf venv/ build/ .ruff_cache/
