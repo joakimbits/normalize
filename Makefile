@@ -26,7 +26,7 @@ html: | example/html
 slides: | example/slides
 old: | example/old
 new: gfm
-project_changes: | example/project_changes
+project_changes: example/project_changes
 clean: | example/clean
 	rm -rf venv/ build/ .ruff_cache/
 	rm -f build.mk makemake.dep *.pdf *.html *.gfm

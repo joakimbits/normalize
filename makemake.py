@@ -144,23 +144,47 @@ else
   _{dir}_DIR := $(_{dir})
 endif
 
+# Find all source files
+_{dir}_SOURCE :=
+_{dir}_S := $(wildcard $(_{dir})*.s)
+_{dir}_SOURCE += $(_{dir}_S)
+_{dir}_C := $(wildcard $(_{dir})*.c)
+_{dir}_SOURCE += $(_{dir}_C)
+_{dir}_CPP := $(wildcard $(_{dir})*.cpp)
+_{dir}_SOURCE += $(_{dir}_CPP)
+_{dir}_PY := $(shell cd $(_{dir}_DIR) && find . -maxdepth 1 -type f -name '*.py')
+_{dir}_PY := $(subst ./,$(_{dir}),$(_{dir}_PY))
+_{dir}_SOURCE += $(_{dir}_PY)
+_{dir}_MD := $(wildcard $(_{dir})*.md)
+_{dir}_SOURCE += $(_{dir}_MD)
+
 # Find our git status
-_{dir}_TAG := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
-ifeq ($(filter v%%,$(_{dir}_TAG)),)
-  _{dir}_TAGLINE := $(shell git branch --list $(_{dir}_BRANCH) -v)
-else
-  _{dir}_TAGLINE := $(strip $(shell git tag --list $(_{dir}_TAG) -n1))
-endif
 _{dir}_BRANCH := $(shell git branch --show-current)
-_{dir}_ALL_FILES := $(shell echo `git status -s | grep '^ M ' | awk '{{ print $$2 }}'`)
-_{dir}_ALL_FILES := $(_{dir}_ALL_FILES:./%%=%%)
-_{dir}_FILES := $(strip $(foreach f,$(filter $(_{dir})%%,$(_{dir}_ALL_FILES)),\
- $(if $(findstring /,$(f:$(_{dir})%%=%%)),,$f)))
-_{dir}_INFO := $(shell git branch --list $(_{dir}_BRANCH) -v)
-_{dir}_ALL_STATUS := $(_{dir}_ALL_FILES)
-_{dir}_ALL_STATUS += $(_{dir}_INFO)
-_{dir}_STATUS := $(_{dir}_FILES)
-_{dir}_STATUS += $(_{dir}_INFO)
+_{dir}_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
+_{dir}_KNOWN := $(addprefix $(_{dir}),$(shell cd $(_{dir}_DIR) &&\
+ git ls-files . ':!:*/*'))
+_{dir}_ADD := $(filter-out $(_{dir}_GIT_LOCALS),$(_{dir}_SOURCE))
+_{dir}_MODIFIED := $(shell cd $(_{dir}_DIR) && echo `git status -s . | grep '^ M ' |\
+ awk '{{ print $(_{dir})$$2 }}'`)
+_{dir}_REMOVE := $(filter-out $(_{dir}_SOURCE),$(_{dir}_GIT_LOCALS))
+
+# Create status lines
+ifeq ($NO_COLOR,)
+  NO_COLOR := \\e[0m
+  RED := \\e[1;41m
+  GREEN := \\e[1;42m
+  YELLOW := \\e[1;43m
+  BLUE := \\e[1;44m
+endif
+_{dir}_BRANCH_INFO := $(if $(_{dir}_ADD),$(RED)$(_{dir}_ADD))
+_{dir}_BRANCH_INFO += $(if $(_{dir}_MODIFIED),$(BLUE)$(_{dir}_MODIFIED))
+_{dir}_BRANCH_INFO += $(if $(_{dir}_REMOVE),$(YELLOW)$(_{dir}_REMOVE))
+_{dir}_BRANCH_INFO += $(NO_COLOR)$(shell git branch --list $(_{dir}_BRANCH) -v)
+ifeq ($(filter v%%,$(_{dir}_BASELINE)),)
+  _{dir}_BASELINE_INFO := $(shell git branch --list $(_{dir}_BASELINE) -v)
+else
+  _{dir}_BASELINE_INFO := $(strip $(shell git tag --list $(_{dir}_BASELINE) -n1))
+endif
 
 # Figure out where to checkout an old worktree
 _{dir}_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
@@ -171,14 +195,6 @@ _{dir}_HERE_DIR := $(shell realpath --relative-to=$$(dirname\
 _{dir}_HERE := $(_{dir}_HERE_DIR:%%./=%%)
 _{dir}_OLD_WORKTREE := $(_{dir}_HOME)$(__{dir}_BUILD)$(_{dir}_TAG)/$(_{dir}_NAME)/
 _{dir}_OLD := $(_{dir}_OLD_WORKTREE)$(_{dir}_HERE)
-
-# Find all source files
-_{dir}_S := $(wildcard $(_{dir})*.s)
-_{dir}_C := $(wildcard $(_{dir})*.c)
-_{dir}_CPP := $(wildcard $(_{dir})*.cpp)
-_{dir}_PY := $(shell cd $(_{dir}_DIR) && find . -maxdepth 1 -type f -name '*.py')
-_{dir}_PY := $(subst ./,$(_{dir}),$(_{dir}_PY))
-_{dir}_MD := $(wildcard $(_{dir})*.md)
 
 # List all installation and test targets
 _{dir}_SRCS := $(_{dir}_S)
@@ -275,7 +291,7 @@ $(_{dir}_BUILD)style: $(_{dir}_BUILD)syntax
 # Build a recipy for $(_{dir}_BUILD)%%.py.bringup
 $(_{dir}_BUILD)%%.py.mk: $(_{dir})%%.py
 	cd $(_{dir}_DIR) && python3 $*.py --generic --dep $@ ;
-	if [ ! -f $@ ] ; then echo "$(_{dir}_BUILD)$*.py.bringup: ; touch $$@" > $@ ; fi
+	if [ ! -f $@ ] ; then echo "$$(_{dir}_BUILD)$*.py.bringup: ; touch $$@" > $@ ; fi
 
 # Check Python and command line usage examples in .py files
 $(_{dir}_BUILD)%%.py.tested: $(_{dir})%%.py $(_{dir}_BUILD)%%.py.mk \\
@@ -384,9 +400,9 @@ $(_{dir}_BUILD)%%.tested.md: $(_{dir}_BUILD)%%.tested
 
 # Report the project.
 $(_{dir})%%: $(_{dir})report.%%
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_STATUS)"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BRANCH_STATUS)"
 $(_{dir})slides: $(_{dir})slides.html
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_STATUS)"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BRANCH_STATUS)"
 $(_{dir})slides.html: $(_{dir})report.dzslides
 	mv $< $@
 $(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.gfm \\
@@ -460,7 +476,7 @@ endif
 
 # Document last release.
 $(_{dir})old: $(_{dir}_OLD)report.gfm
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_TAGLINE)"
+	echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BASELINE_INFO)"
 $(_{dir}_OLD)report.gfm: $(_OLD_WORKTREE)
 	( cd $(_{dir}_OLD) && $(MAKE) report.gfm --no-print-directory )
 
@@ -500,17 +516,19 @@ $(_{dir})project_changes: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
 	    else \\
 	      echo "$$(sed -n '3p' $$part) ..." ; fi ; \\
 	    done ; \\
-	  rm xx**; )
+	  rm xx**; ) > $@
 
 # Prompt for a release review.
 $(_{dir})review: $(_{dir}_BUILD)prompt
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_TAG) -->\
- $(_{dir}_ALL_STATUS)"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BASELINE_STATUS) -->\
+ $(_{dir}_BRANCH_STATUS)"
 $(_{dir}_BUILD)prompt: $(_{dir}_BUILD)context
 	python3 -m makemake -c 'print(REVIEW)' > $@
 	cat $< >> $@
 $(_{dir}_BUILD)context: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
 	echo '$$ $(MAKE) $(_{dir})changes' > $@
+	$(MAKE) $(_{dir})changes --no-print-directory >> $@
+	echo '$$ cat $(_{dir}_build)changes' > $@
 	$(MAKE) $(_{dir})changes --no-print-directory >> $@
 	echo -n '$$ ' >> $@
 
