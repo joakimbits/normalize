@@ -93,7 +93,7 @@ This prompt requires gpt-4 but we prototype it here gpt-3.5
 
 I want you to act as a software developer with the task to release software that
 I will describe to you below. Take a look at what I have inspected already
-after the (first) --- below. There I used the command `$ make changes` which prints 
+after the (first) --- below. There I used the command `$ make review` which prints 
 the last released version number, the commit comments and the changes since then.  
 
 The project report we look at changes within is organized like this:
@@ -144,23 +144,35 @@ else
   _{dir}_DIR := $(_{dir})
 endif
 
+# Find all source files
+_{dir}_SOURCE :=
+_{dir}_MAKEFILE := $(wildcard $(_{dir})Makefile)
+_{dir}_SOURCE += $(_{dir}_MAKEFILE)
+_{dir}_S := $(wildcard $(_{dir})*.s)
+_{dir}_SOURCE += $(_{dir}_S)
+_{dir}_C := $(wildcard $(_{dir})*.c)
+_{dir}_SOURCE += $(_{dir}_C)
+_{dir}_H := $(wildcard $(_{dir})*.h)
+_{dir}_SOURCE += $(_{dir}_H)
+_{dir}_CPP := $(wildcard $(_{dir})*.cpp)
+_{dir}_SOURCE += $(_{dir}_CPP)
+_{dir}_HPP := $(wildcard $(_{dir})*.hpp)
+_{dir}_SOURCE += $(_{dir}_HPP)
+_{dir}_PY := $(shell cd $(_{dir}_DIR) && find . -maxdepth 1 -type f -name '*.py')
+_{dir}_PY := $(subst ./,$(_{dir}),$(_{dir}_PY))
+_{dir}_SOURCE += $(_{dir}_PY)
+_{dir}_MD := $(wildcard $(_{dir})*.md)
+_{dir}_SOURCE += $(_{dir}_MD)
+
 # Find our git status
-_{dir}_TAG := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
-ifeq ($(filter v%%,$(_{dir}_TAG)),)
-  _{dir}_TAGLINE := $(shell git branch --list $(_{dir}_BRANCH) -v)
-else
-  _{dir}_TAGLINE := $(strip $(shell git tag --list $(_{dir}_TAG) -n1))
-endif
 _{dir}_BRANCH := $(shell git branch --show-current)
-_{dir}_ALL_FILES := $(shell echo `git status -s | grep '^ M ' | awk '{{ print $$2 }}'`)
-_{dir}_ALL_FILES := $(_{dir}_ALL_FILES:./%%=%%)
-_{dir}_FILES := $(strip $(foreach f,$(filter $(_{dir})%%,$(_{dir}_ALL_FILES)),\
- $(if $(findstring /,$(f:$(_{dir})%%=%%)),,$f)))
-_{dir}_INFO := $(shell git branch --list $(_{dir}_BRANCH) -v)
-_{dir}_ALL_STATUS := $(_{dir}_ALL_FILES)
-_{dir}_ALL_STATUS += $(_{dir}_INFO)
-_{dir}_STATUS := $(_{dir}_FILES)
-_{dir}_STATUS += $(_{dir}_INFO)
+_{dir}_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
+_{dir}_KNOWN := $(addprefix $(_{dir}),$(shell cd $(_{dir}_DIR) &&\
+ git ls-files . ':!:*/*'))
+_{dir}_ADD := $(filter-out $(_{dir}_KNOWN),$(_{dir}_SOURCE))
+_{dir}_MODIFIED := $(shell cd $(_{dir}_DIR) && echo `git status -s . | grep '^ M ' |\
+ awk '{{ print $(_{dir})$$2 }}'`)
+_{dir}_REMOVE := $(filter-out $(_{dir}_SOURCE),$(_{dir}_KNOWN))
 
 # Figure out where to checkout an old worktree
 _{dir}_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
@@ -169,17 +181,29 @@ _{dir}_NAME := $(notdir $(abspath $(_{dir}_HOME_DIR)))
 _{dir}_HERE_DIR := $(shell realpath --relative-to=$$(dirname\
  `git rev-parse --git-common-dir`) $(_{dir}_DIR) )/
 _{dir}_HERE := $(_{dir}_HERE_DIR:%%./=%%)
-_{dir}_OLD_WORKTREE := $(_{dir}_HOME)$(__{dir}_BUILD)$(_{dir}_TAG)/$(_{dir}_NAME)/
+_{dir}_OLD_WORKTREE := $(_{dir}_HOME)$(__{dir}_BUILD)$(_{dir}_BASELINE)/$(_{dir}_NAME)/
 _{dir}_OLD := $(_{dir}_OLD_WORKTREE)$(_{dir}_HERE)
 
-# Find all source files
-_{dir}_S := $(wildcard $(_{dir})*.s)
-_{dir}_C := $(wildcard $(_{dir})*.c)
-_{dir}_CPP := $(wildcard $(_{dir})*.cpp)
-_{dir}_PY := $(shell cd $(_{dir}_DIR) && find . -maxdepth 1 -type f -name '*.py')
-_{dir}_PY := $(subst ./,$(_{dir}),$(_{dir}_PY))
-_{dir}_MD := $(wildcard $(_{dir})*.md)
-
+# Create status lines
+ifeq ($(NORMAL),)
+  NORMAL := `tput sgr0`
+  RED := `tput setaf 1`
+  GREEN := `tput setaf 2`
+  YELLOW := `tput setaf 3`
+  BLUE := `tput setaf 4`
+  REVERSED := `tput rev`
+endif
+_{dir}_BRANCH_STATUS := $(if $(_{dir}_ADD),$(RED)$(_{dir}_ADD)$(NORMAL))
+_{dir}_BRANCH_STATUS += $(if $(_{dir}_MODIFIED),$(BLUE)$(_{dir}_MODIFIED)$(NORMAL))
+_{dir}_BRANCH_STATUS += $(if $(_{dir}_REMOVE),$(REVERSED)$(_{dir}_REMOVE)$(NORMAL))
+_{dir}_BRANCH_STATUS += $(shell git log -1 --oneline $(_{dir}_DIR))
+ifeq ($(filter v%%,$(_{dir}_BASELINE)),)
+  _{dir}_BASELINE_INFO := $(shell git show --oneline -s $(_{dir}_BASELINE))
+else
+  _{dir}_BASELINE_INFO := $(strip $(shell git tag --list $(_{dir}_BASELINE) -n1))
+endif
+_{dir}_CHANGES := $(_{dir}_BASELINE_INFO) --> $(_{dir}_BRANCH_STATUS)
+ 
 # List all installation and test targets
 _{dir}_SRCS := $(_{dir}_S)
 _{dir}_CXX := $(_{dir}_C)
@@ -221,7 +245,7 @@ _{dir}_PY_MK := $(_{dir}_PY:$(_{dir})%%=$(_{dir}_BUILD)%%.mk)
 _{dir}_DEPS += $(_{dir}_PY_MK)
 
 # Prepare for reporting
-_{dir}_LOGIC := $(_{dir})Makefile
+_{dir}_LOGIC := $(_{dir}_MAKEFILE)
 _{dir}_LOGIC += $(_{dir}_CODE)
 _{dir}_RESULT := $(_{dir}_PY_MK)
 _{dir}_RESULT += $(_{dir}_BRINGUP)
@@ -295,10 +319,8 @@ $(_{dir}_BUILD)%%.md.sh-test: $(_{dir})%%.md | /usr/bin/pandoc /usr/bin/jq
 select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && \\
 	truncate -s -1 $@
 
-.PHONY: $(_{dir})s $(_{dir})a $(_{dir})d $(_{dir})b $(_{dir})report
-
 # Document all source codes:
-$(_{dir})s: $(_{dir}_S) $(_{dir}_SRCS)
+$(_{dir})s: $(_{dir}_SOURCE)
 	@$(foreach s,$^,echo "___ $(s): ____" && cat $(s) ; )
 
 # Document all assembly codes linked into $(_{dir}){dir}.
@@ -385,9 +407,9 @@ $(_{dir}_BUILD)%%.tested.md: $(_{dir}_BUILD)%%.tested
 
 # Report the project.
 $(_{dir})%%: $(_{dir})report.%%
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_STATUS)"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BRANCH_STATUS)"
 $(_{dir})slides: $(_{dir})slides.html
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_STATUS)"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BRANCH_STATUS)"
 $(_{dir})slides.html: $(_{dir})report.dzslides
 	mv $< $@
 $(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.gfm \\
@@ -461,18 +483,34 @@ endif
 
 # Document last release.
 $(_{dir})old: $(_{dir}_OLD)report.gfm
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_TAGLINE)"
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BASELINE_INFO)"
 $(_{dir}_OLD)report.gfm: $(_OLD_WORKTREE)
 	( cd $(_{dir}_OLD) && $(MAKE) report.gfm --no-print-directory )
 
-# Document changes since last release.
-$(_{dir})changes: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm\
- | $(_{dir})change_comments $(_{dir})project_changes
-$(_{dir})change_comments:
-	git --no-pager log --no-merges $(_{dir}_TAG)..HEAD $(_{dir}_DIR)
-$(_{dir})project_changes: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
-	# Unified diff of project report changes:
-	@( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{{*}}' && \\
+# Use GPT for a release review.
+$(_{dir})%%: $(_{dir}_BUILD)%%.diff
+	cat $<
+	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_CHANGES)"
+$(_{dir}_BUILD)audit.diff: $(_{dir}_BUILD)prompt.diff | $(_{dir}_PYTHON)
+	cat $< > $@
+	$(_{dir}_PYTHON) -m makemake --prompt $< $(_{dir}_MODEL) $(_{dir}_TEMPERATURE)\
+ $(_{dir}_BEARER_rot13) >> $@
+$(_{dir}_BUILD)prompt.diff: $(_{dir}_BUILD)review.diff
+	python3 -m makemake -c 'print(REVIEW)' > $@
+	echo "$$ $(MAKE) $(_{dir})review" >> $@
+	cat $^ >> $@
+	echo -n "$$ " >> $@
+$(_{dir}_BUILD)review.diff: $(_{dir}_BUILD)files.diff $(_{dir}_BUILD)comments.diff\
+  $(_{dir}_BUILD)report.diff
+	cat $^ > $@
+$(_{dir}_BUILD)files.diff:
+	echo "# $(_{dir}_CHANGES)" > $@
+$(_{dir}_BUILD)comments.diff:
+	echo "git --no-pager log --no-merges $(_{dir}_BASELINE)..HEAD $(_{dir}_DIR)" > $@
+	git --no-pager log --no-merges $(_{dir}_BASELINE)..HEAD $(_{dir}_DIR) >> $@
+$(_{dir}_BUILD)report.diff: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
+	echo "diff -u -U 100000 $< $(word 2,$^) | fold-unchanged" > $@
+	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{{*}}' && \\
 	  parts=`ls xx**` && \\
 	  changed_parts=`grep -l -e '^-' -e '^+' xx**` && \\
 	  for part in $$parts ; do \\
@@ -501,24 +539,7 @@ $(_{dir})project_changes: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
 	    else \\
 	      echo "$$(sed -n '3p' $$part) ..." ; fi ; \\
 	    done ; \\
-	  rm xx**; )
-
-# Prompt for a release review.
-$(_{dir})review: $(_{dir}_BUILD)prompt
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_TAG) -->\
- $(_{dir}_ALL_STATUS)"
-$(_{dir}_BUILD)prompt: $(_{dir}_BUILD)context
-	python3 -m makemake -c 'print(REVIEW)' > $@
-	cat $< >> $@
-$(_{dir}_BUILD)context: $(_{dir}_OLD)report.gfm $(_{dir})report.gfm
-	echo '$$ $(MAKE) $(_{dir})changes' > $@
-	$(MAKE) $(_{dir})changes --no-print-directory >> $@
-	echo -n '$$ ' >> $@
-
-# Use GPT for a release review.
-$(_{dir})audit: $(_{dir}_BUILD)prompt | $(_{dir}_PYTHON)
-	$(_{dir}_PYTHON) -m makemake --prompt $< $(_{dir}_MODEL) $(_{dir}_TEMPERATURE)\
- $(_{dir}_BEARER_rot13)
+	  rm xx**; ) >> $@
 
 # Include the autogenerated dependencies
 -include $(_{dir}_DEPS)

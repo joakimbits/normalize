@@ -19,14 +19,14 @@ endif
 include example/Makefile
 all: | example/all
 tested: | example/tested
-report: | example/report
+report: $(_example_TESTED)
 gfm: | example/gfm
 pdf: | example/pdf
 html: | example/html
 slides: | example/slides
 old: | example/old
 new: gfm
-project_changes: | example/project_changes
+build/review.diff: example/build/review.diff
 clean: | example/clean
 	rm -rf venv/ build/ .ruff_cache/
 	rm -f build.mk makemake.dep *.pdf *.html *.gfm
