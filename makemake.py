@@ -196,13 +196,18 @@ endif
 _{dir}_BRANCH_STATUS := $(if $(_{dir}_ADD),$(RED)$(_{dir}_ADD)$(NORMAL))
 _{dir}_BRANCH_STATUS += $(if $(_{dir}_MODIFIED),$(BLUE)$(_{dir}_MODIFIED)$(NORMAL))
 _{dir}_BRANCH_STATUS += $(if $(_{dir}_REMOVE),$(REVERSED)$(_{dir}_REMOVE)$(NORMAL))
-_{dir}_BRANCH_STATUS += $(shell git log -1 --oneline $(_{dir}_DIR))
+_{dir}_COMMIT_INFO := $(shell git log -1 --oneline $(_{dir}_DIR))
+_{dir}_BRANCH_STATUS += $(_{dir}_COMMIT_INFO)
 ifeq ($(filter v%%,$(_{dir}_BASELINE)),)
   _{dir}_BASELINE_INFO := $(shell git show --oneline -s $(_{dir}_BASELINE))
 else
   _{dir}_BASELINE_INFO := $(strip $(shell git tag --list $(_{dir}_BASELINE) -n1))
 endif
 _{dir}_CHANGES := $(_{dir}_BASELINE_INFO) --> $(_{dir}_BRANCH_STATUS)
+_{dir}_CHANGES_AUDIT := $(_{dir}_BASELINE_INFO) -->
+_{dir}_CHANGES_AUDIT += $(_{dir}_ADD)
+_{dir}_CHANGES_AUDIT += $(_{dir}_MODIFIED)
+_{dir}_CHANGES_AUDIT += $(_{dir}_COMMIT_INFO)
  
 # List all installation and test targets
 _{dir}_SRCS := $(_{dir}_S)
@@ -504,7 +509,7 @@ $(_{dir}_BUILD)review.diff: $(_{dir}_BUILD)files.diff $(_{dir}_BUILD)comments.di
   $(_{dir}_BUILD)report.diff
 	cat $^ > $@
 $(_{dir}_BUILD)files.diff:
-	echo "# $(_{dir}_CHANGES)" > $@
+	echo "# $(_{dir}_CHANGES_AUDIT)" > $@
 $(_{dir}_BUILD)comments.diff:
 	echo "git --no-pager log --no-merges $(_{dir}_BASELINE)..HEAD $(_{dir}_DIR)" > $@
 	git --no-pager log --no-merges $(_{dir}_BASELINE)..HEAD $(_{dir}_DIR) >> $@
