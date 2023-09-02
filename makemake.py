@@ -274,8 +274,8 @@ $(_{dir}_BUILD)style: $(_{dir}_BUILD)syntax
 
 # Build a recipy for $(_{dir}_BUILD)%%.py.bringup
 $(_{dir}_BUILD)%%.py.mk: $(_{dir})%%.py
-	cd $(_{dir}_DIR) && python3 $*.py --generic --dep $@ ;
-	if [ ! -f $@ ]; then echo "\\$$(_{dir}_BUILD)\\$$*.py.bringup:; touch \\$$@" >$@; fi
+	( cd $(_{dir}_DIR) && python3 $*.py --generic --dep $(__{dir}_BUILD)$*.py.mk ) ; \\
+	if [ ! -f $@ ]; then echo "\\$$(_{dir}_BUILD)$*.py.bringup:; touch \\$$@" >$@; fi
 
 # Check Python and command line usage examples in .py files
 $(_{dir}_BUILD)%%.py.tested: $(_{dir})%%.py $(_{dir}_BUILD)%%.py.mk \\
