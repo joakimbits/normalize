@@ -19,7 +19,7 @@ endif
 include example/Makefile
 all: | example/all
 tested: | example/tested
-report: $(_example_TESTED)
+build/report.txt: $(_example_TESTED)
 gfm: | example/gfm
 pdf: | example/pdf
 html: | example/html

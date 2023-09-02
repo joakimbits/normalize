@@ -341,12 +341,16 @@ $(_{dir})b: $(_{dir}_BRINGUP)
 	@$(foreach b,$^,echo "___ $(b) ____" && cat $(b) ; )
 
 # Document all test results.
-$(_{dir})report: $(_{dir}_TESTED)
-	@$(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; )
+$(_{dir})report: $(_{dir}_BUILD)report.txt
+	@cat $<
+$(_{dir}_BUILD)report.txt: $(_{dir}_TESTED)
+	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a standalone html, pdf, gfm or dzslides document.
-$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.gfm $(_{dir})%%.dzslides: \\
-  $(_{dir}_BUILD)%%.md | \\
+$(_{dir})%%.gfm: $(_{dir}_BUILD)%%.md
+	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
+	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`"
+$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md | \\
   /usr/bin/pandoc /usr/bin/xelatex \\
   /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
   /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
@@ -422,7 +426,7 @@ $(_{dir})report.html $(_{dir})report.pdf $(_{dir})report.gfm \\
 _{dir}_file = $(foreach _,$(_{dir}_$1),[\\`$_\\`]($_))
 _{dir}_exe = $(foreach _,$(_{dir}_$1),[\\`./$_\\`]($_))
 _{dir}_h_fixup :=sed -E '/^$$|[.]{{3}}/d'
-$(_{dir}_BUILD)report.md: $(_{dir}_TESTED) | $(_{dir}_EXES)
+$(_{dir}_BUILD)report.md: $(_{dir}_BUILD)report.txt
 	echo "A build-here include-from-anywhere project \
 based on [makemake](https://github.com/joakimbits/normalize)." > $@
 	echo "\\n- \\`make report pdf html slides review audit\\`" >> $@

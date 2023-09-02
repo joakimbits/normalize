@@ -29,12 +29,17 @@ jobs:
       - run: ( cd example && ./test.py )
       - run: make example/tested
       - run: make example/report
-      - run: make example/html
+      - run: make example/gfm
       - run: make report
-      - run: make pdf
       - run: make clean && make report
       - run: make old  # Building last release
       - run: make old  # Just printing last release
+      - run: make new
+      - run: make new
       - run: make review
+      - run: make review
+      - run: make prompt
+      - run: make prompt
+      - run: make audit
       - run: make audit
       - run: echo "🍏 This job's status is ${{ job.status }}."
