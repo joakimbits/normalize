@@ -37,5 +37,5 @@ jobs:
       - run: make old  # Just printing last release
       - run: make changes
       - run: make review
-      - run: -make audit
+      - run: make audit
       - run: echo "🍏 This job's status is ${{ job.status }}."
