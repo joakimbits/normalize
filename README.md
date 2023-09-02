@@ -34,7 +34,7 @@ build/makemake.py.tested: makemake.py build/makemake.py.bringup
 build/makemake.py.bringup: makemake.py
 	mkdir build/ && \
 	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@ && \
-	python3 -m pip install pip >> $@ && \
+	python3 -m pip install requests >> $@ && \
 	chmod +x $< >> $@
 
 ```

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!./venv/bin/python3
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
@@ -69,7 +69,7 @@ Usage:
 
 Dependencies:
 $ python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version'
-pip  # Fake module dependency
+requests  # Needed for the --prompt option
 """
 
 import sys
@@ -846,7 +846,7 @@ $ cat makemake.dep
 makemake.py.bringup: makemake.py makemake.dep
 	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@"""
                """ && \\
-	python3 -m pip install pip >> $@ && \\
+	python3 -m pip install requests >> $@ && \\
 	chmod +x $< >> $@
 
 $ python3 makemake.py --dep makemake.dep --makemake
