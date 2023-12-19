@@ -77,7 +77,6 @@ import os
 import re
 from argparse import Action
 
-
 parent_module = sys.modules['.'.join(__name__.split('.')[:-1]) or '__main__']
 dir = os.path.split(os.getcwd())[1]
 module_path = sys.argv[0]
@@ -128,9 +127,6 @@ _{dir}_TEMPERATURE = 0.7
 
 # A rot13 encoded openai Bearer key
 _{dir}_BEARER_rot13 := fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
-
-# Change to _{dir}_FORMAT=github within a github workflow
-_{dir}_FORMAT := text
 
 # Figure out where to find and build files
 _{dir}_THIS_MAKEFILE_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -208,7 +204,7 @@ _{dir}_CHANGES_AUDIT := $(_{dir}_BASELINE_INFO) -->
 _{dir}_CHANGES_AUDIT += $(_{dir}_ADD)
 _{dir}_CHANGES_AUDIT += $(_{dir}_MODIFIED)
 _{dir}_CHANGES_AUDIT += $(_{dir}_COMMIT_INFO)
- 
+
 # List all installation and test targets
 _{dir}_SRCS := $(_{dir}_S)
 _{dir}_CXX := $(_{dir}_C)
@@ -286,7 +282,7 @@ $(_{dir}_BUILD){dir}.tested: $(_{dir}){dir}
 $(_{dir})syntax: $(_{dir}_BUILD)syntax
 $(_{dir}_BUILD)syntax: $(_{dir}_PY) | $(_{dir})venv/bin/ruff
 	$(_{dir}_PYTHON) -m ruff \\
-	    --format=$(_{dir}_FORMAT) --select=E9,F63,F7,F82 \\
+	    --select=E9,F63,F7,F82 \\
 	    --target-version=py39 $(_{dir}_DIR) > $@ || (cat $@ && false)
 $(_{dir})venv/bin/ruff: | $(_{dir}_PYTHON)
 	$(_{dir}_PYTHON) -m pip install ruff
@@ -298,8 +294,7 @@ $(_{dir})venv $(_{dir}_PYTHON):
 # Check Python 3.9 style
 $(_{dir})style: $(_{dir}_BUILD)style
 $(_{dir}_BUILD)style: $(_{dir}_BUILD)syntax
-	$(_{dir}_PYTHON) -m ruff --fix \\
-	  --format=$(_{dir}_FORMAT) --target-version=py39 $(_{dir}_DIR) > $@ \\
+	$(_{dir}_PYTHON) -m ruff --fix --target-version=py39 $(_{dir}_DIR) > $@ \\
 	|| (cat $@ && false)
 
 # Build a recipy for $(_{dir}_BUILD)%%.py.bringup
@@ -688,7 +683,7 @@ if parent_module.__name__ == '__main__':
                 rules += [
                     ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
                       f" {dep_file} {build_dir}{pattern}.py.bringup"),
-                    [f"{python} {source} --test > $@"]),
+                     [f"{python} {source} --test > $@"]),
                     (f"{dep_file}: {src_dir}{pattern}.py",
                      [f"{python} {source} --dep $@{generic}"])]
             else:
@@ -744,6 +739,7 @@ if parent_module.__name__ == '__main__':
 
 class Test(Action):
     """Verify usage examples and exit"""
+
     def __call__(self, parser, args, values, option_string=None):
         import doctest
 
@@ -769,6 +765,7 @@ class Test(Action):
 class ShTest(Action):
     """Test command usage examples in a file, and exit"""
     err = False
+
     def __call__(self, parser, args, values, option_string=None):
         file, = values
         examples = build_commands(open(file).read())
@@ -796,6 +793,7 @@ class ShTest(Action):
 
 class Command(Action):
     """Execute a program string and exit"""
+
     def __call__(self, parser, args, values, option_string=None):
         program, = values
         exec(program, parent_module.__dict__, locals())
@@ -804,6 +802,7 @@ class Command(Action):
 
 class Split(Action):
     """Split FILE by SEPARATOR into files with PATTERN %% 0, 1 ..., and exit"""
+
     def __call__(self, parser, args, values, option_string=None):
         file, escaped_separator, pattern = values
         separator = bytes(escaped_separator, "utf-8").decode("unicode_escape")
@@ -814,6 +813,7 @@ class Split(Action):
 class Prompt(Action):
     """Print an openai continuation from a promt file, model, temperature and bearer
     rot13 key, and exit"""
+
     def __call__(self, parser, args, values, option_string=None):
         import requests
         import json
