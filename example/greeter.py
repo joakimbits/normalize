@@ -23,21 +23,21 @@ def hello(world=None):
     """Greetings from the source code examples in this folder
 
     >>> hello()
-    Hello from test.py!
+    Hello from greeter.py!
     Hello from main.c!
     Hello from greeter.cpp!
     """
-    print(f"Hello {world or 'from test.py'}!")
+    print(f"Hello {world or 'from greeter.py'}!")
     if not world:
         print(run(f"{makemake.path}example"))
 
 EXAMPLES = """
-$ ./test.py
-Hello from test.py!
+$ ./greeter.py
+Hello from greeter.py!
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ ./test.py world
+$ ./greeter.py world
 Hello world!
 """
 

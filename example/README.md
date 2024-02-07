@@ -6,12 +6,12 @@ $ ./example
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ ./test.py
-Hello from test.py!
+$ ./greeter.py
+Hello from greeter.py!
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ ./test.py world
+$ ./greeter.py world
 Hello world!
 
 ~~~
