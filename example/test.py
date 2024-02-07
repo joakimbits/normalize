@@ -24,7 +24,6 @@ def hello(world=None):
 
     >>> hello()
     Hello from test.py!
-    Hello from _start.s!
     Hello from main.c!
     Hello from greeter.cpp!
     """
@@ -35,7 +34,6 @@ def hello(world=None):
 EXAMPLES = """
 $ ./test.py
 Hello from test.py!
-Hello from _start.s!
 Hello from main.c!
 Hello from greeter.cpp!
 
