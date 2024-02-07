@@ -42,6 +42,7 @@ import platform
 import sys
 import os
 import re
+import time
 from argparse import Action
 import pydoc
 
@@ -73,16 +74,13 @@ The project report we look at changes within is organized like this:
     test results for each source code, and finally test results for the complete 
     integrated project.
 
-Here is the command you should use for releasing the software:
+You have now four goals:
 
-    $ tag=<new version> git tag -a $$tag -m "$$tag\\n\\n<release summary>")
+1. Summarize the commit comments and project changes below in a more user-friendly style as release summary.
+2. Choose a title explaining the gits of the changes as release title.   
+3. Choose a new semantic version number for the changes as new version. 
+4. Fill in the command `git tag -m "<new version> <release title>" <new version>`
 
-Chose a new semantic version number that is larger than the previously released version
-for the <new version>. Summarize the commit comments and project changes I printed
-below in a more user-friendly style for the <release summary>.
-
-If you can do this well I will consider automating releases with your help. Otherwise
-I will need to wait for gpt-4. Thank you for your service.
 ---
 """
 
@@ -93,12 +91,11 @@ _Makefile := $(lastword $(MAKEFILE_LIST))
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
     $/project.mk: $/makemake.py
 	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
-	$/makemake.py:
+    $/makemake.py:
 	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/makemake.py -o $@
 endif
 
--include $/project.mk
-"""
+-include $/project.mk"""
 COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 
 
@@ -145,7 +142,7 @@ def build_commands(doc, heading=None, embed="%s", end="", pip=""):
                 command_lines.append(embed % command + end)
                 comment_lines.append(comment)
             elif command_lines and not pip:
-                output_lines.append(command)
+                output_lines.append(line)
             elif command and pip:
                 commands.append(([f"{pip} install {command} --no-warn-script-location"],
                                  [comment], []))
@@ -263,7 +260,6 @@ if parent_module.__name__ == '__main__':
         commands = []
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
                                   pip=f"{recipy_python} -m pip")
-        bringups.append(([f'{recipy_python} {source} --shebang'], [''], []))
         op = ">"
         remaining = len(bringups)
         for command_lines, comment_lines, output_lines in bringups:
@@ -427,7 +423,15 @@ class Split(Action):
 
 class Prompt(Action):
     """Print an openai continuation from a promt file, model, temperature and bearer
-    rot13 key, and exit"""
+    rot13 key, and exit
+
+    If the model does not support the full prompt, try with the largest diff '-' chunk removed until it works, or there
+    are no more such deletions to remove.
+    """
+    code_for_too_many_tokens = 'context_length_exceeded'
+    try_again_in_seconds = re.compile(r'Please try again in ([0-9]+\.[0-9]+)s')
+    try_again_in_milliseconds = re.compile(r'Please try again in ([0-9]+)ms')
+    split_consecutive_removals_in_diff = re.compile(r'((^-.*\n)+)', re.MULTILINE).split
 
     def __call__(self, parser, args, values, option_string=None):
         import requests
@@ -437,23 +441,65 @@ class Prompt(Action):
         file, model, temperature, key = values
         prompt = open(file).read()
         key = codecs.decode(key, 'rot13')
-        data = {
-            "model": model,
-            "messages": [{
-                "role": "user",
-                "content": prompt}],
-            "temperature": float(temperature)
-        }
-        data = json.dumps(data).encode('UTF-8')
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept-Charset': 'UTF-8',
-            'Authorization': f"Bearer {key}"
-        }
-        url = 'https://api.openai.com/v1/chat/completions'
-        r = requests.post(url, data=data, headers=headers)
-        status = r.status_code, r.reason, r.text
-        assert status[:2] == (200, 'OK'), status
+        while True:
+            data = {
+                "model": model,
+                "messages": [{
+                    "role": "user",
+                    "content": prompt}],
+                "temperature": float(temperature)
+            }
+            data = json.dumps(data).encode('UTF-8')
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept-Charset': 'UTF-8',
+                'Authorization': f"Bearer {key}"
+            }
+            url = 'https://api.openai.com/v1/chat/completions'
+            r = requests.post(url, data=data, headers=headers)
+            status = r.status_code, r.reason, r.text
+            if status[:2] == (429, 'Too Many Requests'):
+                seconds = self.try_again_in_seconds.findall(r.text)
+                wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
+                print(f'Waiting {wait}s for {model} to accept new requests')
+                time.sleep(wait)
+                continue
+
+            if status[:2] == (400, 'Bad Request'):
+                splits = self.split_consecutive_removals_in_diff(prompt)
+                adds = splits[0::3]
+                drops =  splits[1::3]
+                for changed, changes in [('dropped', drops), ('added', adds)]:
+                    lines = [s.split('\n') for s in changes]
+                    nlines = tuple(map(len, lines))
+                    candidates = [i for i, n in enumerate(nlines) if n > 5]
+                    if candidates:
+                        char_changes = [sum(map(len, lines[c][2:-2])) for c in candidates]
+                        choice = candidates[char_changes.index(max(char_changes))]
+                        head = lines[choice][:2]
+                        body = f'-:(another {nlines[choice] - 4} lines {changed} here)'
+                        tail = lines[choice][-2:]
+                        changes = changes[:choice] + ['\n'.join(head + [body] + tail)] + changes[choice + 1:]
+                        if changed == 'dropped':
+                            drops = changes
+                        else:
+                            adds = changes
+
+                        prompt = ''.join(list(map(''.join, zip(adds, drops))) + splits[-1:])
+                        print(f'Retrying after compressing {body}')
+                        break
+                else:
+                    raise ValueError(f'{model} is not able to process the large {prompt},'
+                                     ' even after having tried all diff body removals possible. '
+                                     f'Please edit {prompt} and try {option_string} again.\n')
+
+                continue
+
+            break
+
+        if status[:2] != (200, 'OK'):
+            raise RuntimeError(f"{url} {model} {file}: {' '.join(map(str, status))}")
+
         c = json.loads(r.content)
         u = c['usage']
         print(c['model'], c['object'], c['id'],
@@ -564,8 +610,7 @@ include build/makemake.dep
 
 $ cat build/makemake.dep
 build/makemake.py.bringup: makemake.py build/makemake.dep | $(PYTHON)
-	$(PYTHON) -m pip install requests --no-warn-script-location > $@ && \\
-	$(PYTHON) makemake.py --shebang >> $@
+	$(PYTHON) -m pip install requests --no-warn-script-location > $@
 
 $ makemake.py --dep build/makemake.dep --makemake
 all: build/makemake.py.tested
