@@ -174,8 +174,26 @@ _{dir}_REMOVE := $(filter-out $(_{dir}_SOURCE),$(_{dir}_KNOWN))
 _{dir}_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
 _{dir}_HOME := $(_{dir}_HOME_DIR:./%%=%%)
 _{dir}_NAME := $(notdir $(abspath $(_{dir}_HOME_DIR)))
-_{dir}_HERE_DIR := $(shell realpath --relative-to=$$(dirname\
- `git rev-parse --git-common-dir`) $(_{dir}_DIR) )/
+
+# ToDo: Refactor _{dir}_HERE_DIR into a dynamic variable
+# Installing missing --relative-to option on Mac:
+# On Mac: REALPATH := /opt/homebrew/opt/coreutils/libexec/gnubin/realpath
+#/opt/homebrew/opt/coreutils/libexec/gnubin/realpath: coreutils
+#coreutils: homebrew
+#	brew install coreutils
+#homebrew: /opt/homebrew/bin/brew
+#/opt/homebrew/bin/brew:
+#	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+#	(echo; echo 'eval "$(/opt/homebrew/bin/brew shellenv)"') >> ~/.zprofile
+#	eval "$(/opt/homebrew/bin/brew shellenv)"
+ifeq ($(shell which realpath),/usr/bin/realpath)
+  # Use a git-project common worktree
+  _{dir}_HERE_DIR := $(shell realpath --relative-to=$(_{dir}_HOME_DIR) $(_example_DIR) )
+else
+  # Use a local worktree
+  _{dir}_HERE_DIR := $(_example_DIR)
+endif
+
 _{dir}_HERE := $(_{dir}_HERE_DIR:%%./=%%)
 _{dir}_OLD_WORKTREE := $(_{dir}_HOME)$(__{dir}_BUILD)$(_{dir}_BASELINE)/$(_{dir}_NAME)/
 _{dir}_OLD := $(_{dir}_OLD_WORKTREE)$(_{dir}_HERE)
