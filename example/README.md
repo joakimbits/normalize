@@ -6,12 +6,12 @@ $ ./example
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ ./test.py
-Hello from test.py!
+$ ./greeter.py
+Hello from greeter.py!
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ ./test.py world
+$ ./greeter.py world
 Hello world!
 
 ~~~
@@ -27,8 +27,8 @@ Hello world!
 
 \footnotesize
 ~~~ {.sh}
-$ cat build/test.py.mk
-$(_example_BUILD)test.py.bringup: $(_example)test.py $(_example_BUILD)test.py.mk $(_example_PYTHON)
+$ cat build/greeter.py.mk
+$(_example_BUILD)greeter.py.bringup: $(_example)greeter.py $(_example_BUILD)greeter.py.mk $(_example_PYTHON)
 	( cd $(_example_DIR) && make example --no-print-directory ) > $@ && \
 	$(_example_PYTHON) -m pip install fire >> $@ && \
 	chmod +x $< >> $@
