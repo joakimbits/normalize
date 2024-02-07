@@ -19,6 +19,25 @@ $ make pdf html slides
 - The generic Makefile builds exactly the same when included in a parent Makefile anywhere. 
 - It also isolates its own dependencies into a local python venv. 
 
+```sh
+$ python3 makemake.py --makemake --generic
+# normalize$ makemake.py --makemake --generic
+_Makefile := $(lastword $(MAKEFILE_LIST))
+/ := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
+
+ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
+    $/project.mk: $/makemake.py
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
+    $/makemake.py:
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/makemake.py -o $@
+endif
+
+-include $/project.mk
+
+```
+
+---
+
 There is a simpler variant:
 
 - It can only be included from within the same directory, without a venv.
@@ -32,8 +51,7 @@ build/makemake.py.tested: makemake.py build/makemake.py.bringup
 	makemake.py --test > $@
 build/makemake.py.bringup: makemake.py | $(PYTHON)
 	mkdir -p build/ && \
-	$(PYTHON) -m pip install requests --no-warn-script-location > $@ && \
-	$(PYTHON) makemake.py --shebang >> $@
+	$(PYTHON) -m pip install requests --no-warn-script-location > $@
 
 ```
 
