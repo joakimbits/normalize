@@ -331,7 +331,11 @@ $(_{dir}_BUILD)%%.sh-test.tested: $(_{dir}_BUILD)%%.sh-test $(_{dir}_PRETESTED) 
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $(_{dir}_DIR) && python3 -m makemake --timeout 60 --sh-test \
 	    $(__{dir}_BUILD)$*.sh-test ) > $$tmp && mv $$tmp $@
-$(_{dir}_BUILD)%%.md.sh-test: $(_{dir})%%.md | /usr/bin/pandoc /usr/bin/jq
+# ToDo: depend on pandoc and jq
+# On Mac: 
+#jq: /opt/homebrew/bin/jq
+#/opt/homebrew/bin/jq: homebrew; brew install jq
+$(_{dir}_BUILD)%%.md.sh-test: $(_{dir})%%.md | #/usr/bin/pandoc /usr/bin/jq
 	pandoc -i $< -t json --preserve-tabs | \
 	jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | \
 select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && \\
@@ -360,13 +364,17 @@ $(_{dir}_BUILD)report.txt: $(_{dir}_TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a standalone html, pdf, gfm or dzslides document.
+# ToDo: install xelatex
+# On Mac:
+#	brew install --cask basictex
+#	eval "$(/usr/libexec/path_helper)"
 $(_{dir})%%.gfm: $(_{dir}_BUILD)%%.md
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`"
 $(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md | \\
-  /usr/bin/pandoc /usr/bin/xelatex \\
-  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
-  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
+#  /usr/bin/pandoc /usr/bin/xelatex \\
+#  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
+#  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`" \\
 	       -V min-width=80%%\!important -V geometry:margin=1in \\
@@ -374,13 +382,15 @@ $(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md | \\
 ifndef pandoc
 pandoc:=/usr/bin/pandoc
 # Make doesn't detect /usr/bin/pandoc: A phony target that may actually exist.
-/usr/bin/pandoc: pandoc-3.1.6.1-1-amd64.deb
-	@if [ ! -e /usr/bin/pandoc ] ; then (sudo dpkg -i $< ) ; fi
-pandoc-%%-1-amd64.deb:
-	@if [ ! -e /usr/bin/pandoc ] ; then ( \\
-	  echo "Need a small general text processing framework: pandoc" && \\
-	  curl https://github.com/jgm/pandoc/releases/download/$*/pandoc-$*-1-amd64.deb -o $@\\
-	) ; fi
+# ToDo on Mac: /opt/homebrew/bin/pandoc: homebrew; brew install pandoc
+# ToDo on Windows and Ubuntu: install pandoc
+#/usr/bin/pandoc: pandoc-3.1.6.1-1-amd64.deb
+#	@if [ ! -e /usr/bin/pandoc ] ; then (sudo dpkg -i $< ) ; fi
+#pandoc-%%-1-amd64.deb:
+#	@if [ ! -e /usr/bin/pandoc ] ; then ( \\
+#	  echo "Need a small general text processing framework: pandoc" && \\
+#	  curl https://github.com/jgm/pandoc/releases/download/$*/pandoc-$*-1-amd64.deb -o $@\\
+#	) ; fi
 /usr/bin/xelatex:
 	# Need a modern pdf generation framework: xelatex
 	sudo apt-get update && sudo apt install -y texlive-xetex
