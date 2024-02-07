@@ -247,7 +247,7 @@ ifneq ($(strip $(_{dir}_S)),)
   _{dir}_LDFLAGS += -nostartfiles -no-pie
 endif
 _{dir}_CXXFLAGS := $(_{dir}_LDFLAGS)
-_{dir}_CXXFLAGS += -S $(addprefix -I,$(_{dir}_INC_DIRS)) -MMD -MP
+_{dir}_CXXFLAGS += -S $(addprefix -I,$(_{dir}_INC_DIRS)) -MMD -MP -Wall
 _{dir}_CFLAGS := $(_{dir}_CXXFLAGS)
 _{dir}_CXXFLAGS += $(CXXFLAGS)
 _{dir}_CFLAGS += $(CFLAGS)
