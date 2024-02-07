@@ -174,9 +174,27 @@ _{dir}_REMOVE := $(filter-out $(_{dir}_SOURCE),$(_{dir}_KNOWN))
 _{dir}_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
 _{dir}_HOME := $(_{dir}_HOME_DIR:./%%=%%)
 _{dir}_NAME := $(notdir $(abspath $(_{dir}_HOME_DIR)))
-_{dir}_HERE_DIR := $(shell realpath --relative-to=$$(dirname\
- `git rev-parse --git-common-dir`) $(_{dir}_DIR) )/
-_{dir}_HERE := $(_{dir}_HERE_DIR:%%./=%%)
+
+# ToDo: Refactor _{dir}_HERE_DIR into a dynamic variable
+# Installing missing --relative-to option on Mac:
+# On Mac: REALPATH := /opt/homebrew/opt/coreutils/libexec/gnubin/realpath
+#/opt/homebrew/opt/coreutils/libexec/gnubin/realpath: coreutils
+#coreutils: homebrew
+#	brew install coreutils
+#homebrew: /opt/homebrew/bin/brew
+#/opt/homebrew/bin/brew:
+#	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+#	(echo; echo 'eval "$(/opt/homebrew/bin/brew shellenv)"') >> ~/.zprofile
+#	eval "$(/opt/homebrew/bin/brew shellenv)"
+ifeq ($(shell which realpath),/usr/bin/realpath)
+  # Use a git-project common worktree
+  _{dir}_HERE_DIR := $(shell realpath --relative-to=$(_{dir}_HOME_DIR) $(_{dir}_DIR) )
+else
+  # Use a local worktree
+  _{dir}_HERE_DIR := $(_{dir}_DIR)
+endif
+
+_{dir}_HERE := $(_{dir}_HERE_DIR:%%.=%%)
 _{dir}_OLD_WORKTREE := $(_{dir}_HOME)$(__{dir}_BUILD)$(_{dir}_BASELINE)/$(_{dir}_NAME)/
 _{dir}_OLD := $(_{dir}_OLD_WORKTREE)$(_{dir}_HERE)
 
@@ -229,7 +247,7 @@ ifneq ($(strip $(_{dir}_S)),)
   _{dir}_LDFLAGS += -nostartfiles -no-pie
 endif
 _{dir}_CXXFLAGS := $(_{dir}_LDFLAGS)
-_{dir}_CXXFLAGS += -S $(addprefix -I,$(_{dir}_INC_DIRS)) -MMD -MP
+_{dir}_CXXFLAGS += -S $(addprefix -I,$(_{dir}_INC_DIRS)) -MMD -MP -Wall
 _{dir}_CFLAGS := $(_{dir}_CXXFLAGS)
 _{dir}_CXXFLAGS += $(CXXFLAGS)
 _{dir}_CFLAGS += $(CFLAGS)
@@ -276,7 +294,7 @@ $(_{dir}){dir}: $(_{dir}_OBJS)
 
 # Test executable:
 $(_{dir}_BUILD){dir}.tested: $(_{dir}){dir}
-	./$< > $@ || (cat $@ && false)
+	true | ./$< > $@ || (cat $@ && false)
 
 # Check Python 3.9 syntax
 $(_{dir})syntax: $(_{dir}_BUILD)syntax
@@ -313,7 +331,11 @@ $(_{dir}_BUILD)%%.sh-test.tested: $(_{dir}_BUILD)%%.sh-test $(_{dir}_PRETESTED) 
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $(_{dir}_DIR) && python3 -m makemake --timeout 60 --sh-test \
 	    $(__{dir}_BUILD)$*.sh-test ) > $$tmp && mv $$tmp $@
-$(_{dir}_BUILD)%%.md.sh-test: $(_{dir})%%.md | /usr/bin/pandoc /usr/bin/jq
+# ToDo: depend on pandoc and jq
+# On Mac: 
+#jq: /opt/homebrew/bin/jq
+#/opt/homebrew/bin/jq: homebrew; brew install jq
+$(_{dir}_BUILD)%%.md.sh-test: $(_{dir})%%.md | #/usr/bin/pandoc /usr/bin/jq
 	pandoc -i $< -t json --preserve-tabs | \
 	jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | \
 select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && \\
@@ -342,13 +364,24 @@ $(_{dir}_BUILD)report.txt: $(_{dir}_TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a standalone html, pdf, gfm or dzslides document.
+# ToDo: install xelatex
+# On Mac:
+# /Library/TeX/texbin/tex: homebrew
+#	brew install --cask basictex
+#	eval "$(/usr/libexec/path_helper)"
 $(_{dir})%%.gfm: $(_{dir}_BUILD)%%.md
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`"
-$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md | \\
-  /usr/bin/pandoc /usr/bin/xelatex \\
-  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
-  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
+# WIP add missing dependencies
+# for Mac: | \\
+#  ~/Library/Fonts/Carlito-Regular.ttf \\
+#  ~/Library/Fonts/Cousine-Regular.ttf \\
+#  /opt/homebrew/bin/pandoc /Library/TeX/texbin/xelatex
+# for Linux: | \\
+#  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
+#  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf \\
+#  /usr/bin/pandoc /usr/bin/xelatex
+$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`" \\
 	       -V min-width=80%%\!important -V geometry:margin=1in \\
@@ -356,28 +389,45 @@ $(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md | \\
 ifndef pandoc
 pandoc:=/usr/bin/pandoc
 # Make doesn't detect /usr/bin/pandoc: A phony target that may actually exist.
-/usr/bin/pandoc: pandoc-3.1.6.1-1-amd64.deb
-	@if [ ! -e /usr/bin/pandoc ] ; then (sudo dpkg -i $< ) ; fi
-pandoc-%%-1-amd64.deb:
-	@if [ ! -e /usr/bin/pandoc ] ; then ( \\
-	  echo "Need a small general text processing framework: pandoc" && \\
-	  wget https://github.com/jgm/pandoc/releases/download/$*/pandoc-$*-1-amd64.deb \\
-	) ; fi
+# ToDo on Mac: /opt/homebrew/bin/pandoc: homebrew; brew install pandoc
+# ToDo on Windows and Ubuntu: install pandoc
+#/usr/bin/pandoc: pandoc-3.1.6.1-1-amd64.deb
+#	@if [ ! -e /usr/bin/pandoc ] ; then (sudo dpkg -i $< ) ; fi
+#pandoc-%%-1-amd64.deb:
+#	@if [ ! -e /usr/bin/pandoc ] ; then ( \\
+#	  echo "Need a small general text processing framework: pandoc" && \\
+#	  curl https://github.com/jgm/pandoc/releases/download/$*/pandoc-$*-1-amd64.deb -o $@\\
+#	) ; fi
 /usr/bin/xelatex:
 	# Need a modern pdf generation framework: xelatex
 	sudo apt-get update && sudo apt install -y texlive-xetex
 /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
 	# Need a more screen-readable normal font: carlito
 	sudo apt-get install fonts-crosextra-carlito
-/usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
-	# Need a more screen-readable fixed-size font: cousine
+# Mac: drop each font file into ~/Library/Fonts/
+~/Library/Fonts/%%-Regular.ttf: 
+	# Installing $< font family $* into $(dir $@)
+	( cd $(dir $@) && \\
+	  family=`echo $* | tr A-Z a-z` && \\
+	  fonts=https://raw.githubusercontent.com/google/fonts/main/$</$$family && \\
+	  curl $$fonts/$*-Bold.ttf -o $*-Bold.ttf && \\
+	  curl $$fonts/$*-BoldItalic.ttf -o $*-BoldItalic.ttf && \\
+	  curl $$fonts/$*-Italic.ttf -o $*-Italic.ttf && \\
+	  curl $$fonts/$*-Regular.ttf -o $*-Regular.ttf )
+~/Library/Fonts/Carlito-Regular.ttf: ofl
+~/Library/Fonts/Cousine-Regular.ttf: apache
+ofl apache:
+	touch $@
+# Ubuntu: create a font directory in /usr/share/fonts/
+/usr/share/fonts/truetype/%%-Regular.ttf:
+	# Installing font family $(notdir $*) into $(dir $@)
 	( sudo mkdir -p $(dir $@) && cd $(dir $@) && \\
 	  fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \\
-	  sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \\
-	  sudo wget $$fonts/cousine/Cousine-Bold.ttf && \\
-	  sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \\
-	  sudo wget $$fonts/cousine/Cousine-Italic.ttf && \\
-	  sudo wget $$fonts/cousine/Cousine-Regular.ttf )
+	  sudo curl $$fonts/$*/DESCRIPTION.en_us.html -o DESCRIPTION.en_us.html && \\
+	  sudo curl $$fonts/$*-Bold.ttf -o $(notdir $*)-Bold.ttf && \\
+	  sudo curl $$fonts/$*-BoldItalic.ttf -o $(notdir $*)-BoldItalic.ttf && \\
+	  sudo curl $$fonts/$*-Italic.ttf -o $(notdir $*)-Italic.ttf && \\
+	  sudo curl $$fonts/$*-Regular.ttf -o $(notdir $*)-Regular.ttf )
 /usr/bin/jq:
 	# Need a tool to filter json: jq
 	sudo apt install -y jq
@@ -447,8 +497,8 @@ ifneq ($(_{dir}_EXES),)
 	echo "$(_{dir}_h)## Usage" >> $@
 	echo "$(_{dir}~~~sh)" >> $@
 	for x in $(subst $(_{dir}_DIR),,$(_{dir}_EXES)) ; do \\
-	  echo "\\$$ ./$$x -h | $(_{dir}_h_fixup)" >> $@ && \\
-	  ( cd $(_{dir}_DIR) && ./$$x -h ) > $@.tmp && \\
+	  echo "\\$$ true | ./$$x -h | $(_{dir}_h_fixup)" >> $@ && \\
+	  ( cd $(_{dir}_DIR) && true | ./$$x -h ) > $@.tmp && \\
 	  $(_{dir}_h_fixup) $@.tmp >> $@ && rm $@.tmp ; \\
 	done
 	echo >> $@
