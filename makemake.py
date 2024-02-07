@@ -379,7 +379,7 @@ pandoc:=/usr/bin/pandoc
 pandoc-%%-1-amd64.deb:
 	@if [ ! -e /usr/bin/pandoc ] ; then ( \\
 	  echo "Need a small general text processing framework: pandoc" && \\
-	  wget https://github.com/jgm/pandoc/releases/download/$*/pandoc-$*-1-amd64.deb \\
+	  curl https://github.com/jgm/pandoc/releases/download/$*/pandoc-$*-1-amd64.deb -o $@\\
 	) ; fi
 /usr/bin/xelatex:
 	# Need a modern pdf generation framework: xelatex
@@ -391,11 +391,11 @@ pandoc-%%-1-amd64.deb:
 	# Need a more screen-readable fixed-size font: cousine
 	( sudo mkdir -p $(dir $@) && cd $(dir $@) && \\
 	  fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \\
-	  sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \\
-	  sudo wget $$fonts/cousine/Cousine-Bold.ttf && \\
-	  sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \\
-	  sudo wget $$fonts/cousine/Cousine-Italic.ttf && \\
-	  sudo wget $$fonts/cousine/Cousine-Regular.ttf )
+	  sudo curl $$fonts/cousine/DESCRIPTION.en_us.html -o DESCRIPTION.en_us.html && \\
+	  sudo curl $$fonts/cousine/Cousine-Bold.ttf -o Cousine-Bold.ttf && \\
+	  sudo curl $$fonts/cousine/Cousine-BoldItalic.ttf -o Cousine-BoldItalic.ttf && \\
+	  sudo curl $$fonts/cousine/Cousine-Italic.ttf -o Cousine-Italic.ttf && \\
+	  sudo curl $$fonts/cousine/Cousine-Regular.ttf -o Cousine-Regular.ttf )
 /usr/bin/jq:
 	# Need a tool to filter json: jq
 	sudo apt install -y jq
