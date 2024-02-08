@@ -2,20 +2,19 @@
 #include <ctype.h>
 #include <string.h>
 
+// Rövarspråket - a simple spoken langugage obfuscator https://en.wikipedia.org/wiki/R%C3%B6varspr%C3%A5ket
+// Everything up to a first exclamation mark (!) gets translated into Rövarspråket
 int rovarsprak(void)
 {
-    const char consontants[] = "bcdfghjklmnpqrstvwxz";
-    char c;
-
-    while ((c = tolower(getchar()))) {
-        switch (c) {
+    for (char c; (c = getchar());) {
+        switch (c)
             case EOF:
             case '!':
                 return 0;
-        }
 
-        for (int i = 0; i < strlen(consontants); i++)
-            if (c == consontants[i])
+        char lowercase_c = tolower(c);
+        for (const char *consontant = "bcdfghjklmnpqrstvwxz"; *consontant; consontant++)
+            if (lowercase_c == *consontant)
                 printf("%co", c);
 
         putchar(c);
