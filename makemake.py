@@ -366,15 +366,16 @@ $(_{dir}_BUILD)report.txt: $(_{dir}_TESTED)
 # Make a standalone html, pdf, gfm or dzslides document.
 # ToDo: install xelatex
 # On Mac:
+# /Library/TeX/texbin/tex: homebrew
 #	brew install --cask basictex
 #	eval "$(/usr/libexec/path_helper)"
 $(_{dir})%%.gfm: $(_{dir}_BUILD)%%.md
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`"
 $(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md | \\
-#  /usr/bin/pandoc /usr/bin/xelatex \\
-#  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
-#  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
+  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
+  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf \\
+  /usr/bin/pandoc /usr/bin/xelatex
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`" \\
 	       -V min-width=80%%\!important -V geometry:margin=1in \\
