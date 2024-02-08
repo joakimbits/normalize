@@ -294,7 +294,7 @@ $(_{dir}){dir}: $(_{dir}_OBJS)
 
 # Test executable:
 $(_{dir}_BUILD){dir}.tested: $(_{dir}){dir}
-	./$< > $@ || (cat $@ && false)
+	true | ./$< > $@ || (cat $@ && false)
 
 # Check Python 3.9 syntax
 $(_{dir})syntax: $(_{dir}_BUILD)syntax
@@ -474,8 +474,8 @@ ifneq ($(_{dir}_EXES),)
 	echo "$(_{dir}_h)## Usage" >> $@
 	echo "$(_{dir}~~~sh)" >> $@
 	for x in $(subst $(_{dir}_DIR),,$(_{dir}_EXES)) ; do \\
-	  echo "\\$$ ./$$x -h | $(_{dir}_h_fixup)" >> $@ && \\
-	  ( cd $(_{dir}_DIR) && ./$$x -h ) > $@.tmp && \\
+	  echo "\\$$ true | ./$$x -h | $(_{dir}_h_fixup)" >> $@ && \\
+	  ( cd $(_{dir}_DIR) && true | ./$$x -h ) > $@.tmp && \\
 	  $(_{dir}_h_fixup) $@.tmp >> $@ && rm $@.tmp ; \\
 	done
 	echo >> $@
