@@ -372,10 +372,16 @@ $(_{dir}_BUILD)report.txt: $(_{dir}_TESTED)
 $(_{dir})%%.gfm: $(_{dir}_BUILD)%%.md
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`"
-$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md | \\
-  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
-  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf \\
-  /usr/bin/pandoc /usr/bin/xelatex
+# WIP add missing dependencies
+# for Mac: | \\
+#  ~/Library/Fonts/Carlito-Regular.ttf \\
+#  ~/Library/Fonts/Cousine-Regular.ttf \\
+#  /opt/homebrew/bin/pandoc /Library/TeX/texbin/xelatex
+# for Linux: | \\
+#  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
+#  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf \\
+#  /usr/bin/pandoc /usr/bin/xelatex
+$(_{dir})%%.html $(_{dir})%%.pdf $(_{dir})%%.dzslides: $(_{dir}_BUILD)%%.md
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{dir} $*" -M author="`git log -1 --pretty=format:'%%an'`" \\
 	       -V min-width=80%%\!important -V geometry:margin=1in \\
@@ -398,15 +404,30 @@ pandoc:=/usr/bin/pandoc
 /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
 	# Need a more screen-readable normal font: carlito
 	sudo apt-get install fonts-crosextra-carlito
-/usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
-	# Need a more screen-readable fixed-size font: cousine
+# Mac: drop each font file into ~/Library/Fonts/
+~/Library/Fonts/%%-Regular.ttf: 
+	# Installing $< font family $* into $(dir $@)
+	( cd $(dir $@) && \\
+	  family=`echo $* | tr A-Z a-z` && \\
+	  fonts=https://raw.githubusercontent.com/google/fonts/main/$</$$family && \\
+	  curl $$fonts/$*-Bold.ttf -o $*-Bold.ttf && \\
+	  curl $$fonts/$*-BoldItalic.ttf -o $*-BoldItalic.ttf && \\
+	  curl $$fonts/$*-Italic.ttf -o $*-Italic.ttf && \\
+	  curl $$fonts/$*-Regular.ttf -o $*-Regular.ttf )
+~/Library/Fonts/Carlito-Regular.ttf: ofl
+~/Library/Fonts/Cousine-Regular.ttf: apache
+ofl apache:
+	touch $@
+# Ubuntu: create a font directory in /usr/share/fonts/
+/usr/share/fonts/truetype/%%-Regular.ttf:
+	# Installing font family $(notdir $*) into $(dir $@)
 	( sudo mkdir -p $(dir $@) && cd $(dir $@) && \\
 	  fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \\
-	  sudo curl $$fonts/cousine/DESCRIPTION.en_us.html -o DESCRIPTION.en_us.html && \\
-	  sudo curl $$fonts/cousine/Cousine-Bold.ttf -o Cousine-Bold.ttf && \\
-	  sudo curl $$fonts/cousine/Cousine-BoldItalic.ttf -o Cousine-BoldItalic.ttf && \\
-	  sudo curl $$fonts/cousine/Cousine-Italic.ttf -o Cousine-Italic.ttf && \\
-	  sudo curl $$fonts/cousine/Cousine-Regular.ttf -o Cousine-Regular.ttf )
+	  sudo curl $$fonts/$*/DESCRIPTION.en_us.html -o DESCRIPTION.en_us.html && \\
+	  sudo curl $$fonts/$*-Bold.ttf -o $(notdir $*)-Bold.ttf && \\
+	  sudo curl $$fonts/$*-BoldItalic.ttf -o $(notdir $*)-BoldItalic.ttf && \\
+	  sudo curl $$fonts/$*-Italic.ttf -o $(notdir $*)-Italic.ttf && \\
+	  sudo curl $$fonts/$*-Regular.ttf -o $(notdir $*)-Regular.ttf )
 /usr/bin/jq:
 	# Need a tool to filter json: jq
 	sudo apt install -y jq
