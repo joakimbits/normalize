@@ -188,10 +188,10 @@ _{dir}_NAME := $(notdir $(abspath $(_{dir}_HOME_DIR)))
 #	eval "$(/opt/homebrew/bin/brew shellenv)"
 ifeq ($(shell which realpath),/usr/bin/realpath)
   # Use a git-project common worktree
-  _{dir}_HERE_DIR := $(shell realpath --relative-to=$(_{dir}_HOME_DIR) $(_example_DIR) )
+  _{dir}_HERE_DIR := $(shell realpath --relative-to=$(_{dir}_HOME_DIR) $(_{dir}_DIR) )
 else
   # Use a local worktree
-  _{dir}_HERE_DIR := $(_example_DIR)
+  _{dir}_HERE_DIR := $(_{dir}_DIR)
 endif
 
 _{dir}_HERE := $(_{dir}_HERE_DIR:%%./=%%)
