@@ -35,7 +35,7 @@ Buzz
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=__doc__,
+        description=makemake.brief(),
         epilog=f"Examples:{EXAMPLES}")
     makemake.add_arguments(argparser)
     argparser.add_argument('number', nargs=argparse.REMAINDER, help=fizz3fuzz5.__doc__)

@@ -15,19 +15,19 @@ ifeq ($(filter clean,$(MAKECMDGOALS)),)
   -include build.mk
 endif
 
-# Manage the example sub-project also.
-include example/Makefile
-all: | example/all
-tested: | example/tested
-build/report.txt: $(_example_TESTED)
-gfm: | example/gfm
-pdf: | example/pdf
-html: | example/html
-slides: | example/slides
-old: | example/old
+# Manage the example sub-projects also.
+include example/Makefile example2/Makefile
+all: | example/all example2/all
+tested: | example/tested example2/tested
+build/report.txt: $(_example_TESTED) $(_example2_TESTED)
+gfm: | example/gfm example2/gfm
+pdf: | example/pdf example2/pdf
+html: | example/html example2/html
+slides: | example/slides example2/slides
+old: | example/old example2/old
 new: gfm
-build/review.diff: example/build/review.diff
-clean: | example/clean
+build/review.diff: example/build/review.diff example2/build/review.diff
+clean: | example/clean example2/clean
 	rm -rf venv/ build/ .ruff_cache/
 	rm -f build.mk makemake.dep *.pdf *.html *.gfm
 
