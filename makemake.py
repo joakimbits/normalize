@@ -4,8 +4,9 @@
 Adds the following command line options to the main module:
 
 --makemake: Print a Makefile for bringup and test of the parent module.
---generic: Generalize it so that any other Makefile can include the Makefile.
---dep <file>: Create a separate Makefile for a bringup.
+--generic: Generalize it to make everything that is makeable within the parent module directory, and from anywhere.
+--dep <file>: Create a separate Makefile for bringup of the parent module, and set the build directory to its parent
+  directory.
 
 Makes it easy to add the following command line options to the parent module:
 
@@ -13,7 +14,7 @@ Makes it easy to add the following command line options to the parent module:
 --sh-test <file>: Test command line usage examples in a file and exit.
 --test: Verify python and command line usage examples in the module and exit.
 -c <string>: Execute a program string in the module and exit.
---prompt <file> <openai model> <T> <rot13-encoded key>: Print a continuation and exit.
+--prompt <file> <openai model> <T> <rot13-encoded key>: Print a GPT continuation of the file and exit.
 
 
 USER MANUAL
@@ -33,10 +34,10 @@ $ make
 To use a tools/tool.py in another Makefile:
 
 Makefile:
-    tooled.txt: tools/tool.py tools/build/tool.py.bringup | tools/Makefile  # (1, 4)
-        tools/venv/bin/python $< > $@  # (5)
+    tooled.txt: tools/tool.py tools/build/tool.py.bringup  # (1, 4)
+        $(_tools_PYTHON) $< > $@  # (5)
     tools/Makefile:
-        python3 tools/tool.py --makemake --generic >$@  # (2)
+        $(PYTHON) tools/tool.py --makemake --generic >$@  # (2)
     -include tools/Makefile  # (0, 3)
 
 $ make tooled.txt
@@ -68,10 +69,11 @@ Usage:
         args = argparser.parse_args()
 
 Dependencies:
-$ python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version'
+$ $(PYTHON) -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version'
 requests  # Needed for the --prompt option
 """
 
+import platform
 import sys
 import os
 import re
@@ -79,9 +81,11 @@ from argparse import Action
 import pydoc
 
 parent_module = sys.modules['.'.join(__name__.split('.')[:-1]) or '__main__']
-_ = os.path.split(os.getcwd())[1]
-module_path = sys.argv[0]
+cwd = os.getcwd()
+_ = os.path.split(cwd)[1]
+module_path = os.path.relpath(os.path.abspath(sys.argv[0]))
 module_dir, module_py = os.path.split(module_path)
+makemake_py = os.path.relpath(os.path.abspath(__file__), os.path.abspath(module_dir))
 if module_dir:
     path = f"./{module_dir}/"
 else:
@@ -117,28 +121,104 @@ I will need to wait for gpt-4. Thank you for your service.
 ---
 """
 
-MAKEFILE_FROM_BUILD_DIR = f"""# $ {" ".join(sys.argv)}
-ifeq ($(_{_}_DIR),) 
+MAKEFILE_FROM_BUILD_DIR = f"""# {_}$ {" ".join(sys.argv)}
+ifeq ($(_{_}_DIR),)
 
-# A large-context openai model suitable for code review
-_{_}_MODEL := gpt-3.5-turbo-16k
+# Configure a GPT _{_}_MODEL to use for `audit`
+#  - A large-context openai model suitable for code review
+#  - A rot13 encoded openai Bearer key for its GPT session.
+#  - A temperature for its openai continuation.
+_{_}_MODEL ?= gpt-3.5-turbo-16k
+_{_}_BEARER_rot13 ?= fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
+_{_}_TEMPERATURE ?= 0.7
 
-# A temperature for the openai continuation.
-_{_}_TEMPERATURE = 0.7
-
-# A rot13 encoded openai Bearer key
-_{_}_BEARER_rot13 := fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
-
-# Figure out where to find and build files
-_{_}_THIS_MAKEFILE_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
-_{_}_ABSPATH := $(dir $(_{_}_THIS_MAKEFILE_ABSPATH))
-_{_} := $(subst $(PWD)/,,$(_{_}_ABSPATH))
-__{_}_BUILD := %s
-_{_}_BUILD := $(subst $(PWD)/,,$(_{_}_ABSPATH)$(__{_}_BUILD))
-ifeq ($(_{_}),)
-  _{_}_DIR := ./
+# Configure a base PYTHON to use. It can be one of:
+#  - `python3` on Ubuntu or Mac,
+#  - `python.exe` in Windows from WSL Ubuntu, or
+#  - `python` on Windows.
+#  - or any given PYTHON.
+ifeq ($H,/home/$I)
+    ifeq (,$(shell echo $$WSL_DISTRO_NAME))
+        PYTHON ?= python3
+    else
+        PYTHON ?= python.exe
+    endif
 else
-  _{_}_DIR := $(_{_})
+    PYTHON ?= python
+endif
+
+# Configure an OS and CPU to build the project for.
+OS ?= $(shell $(PYTHON) $(_{_}){makemake_py} -s)
+CPU ?= $(shell $(PYTHON) $(_{_}){makemake_py} -m)
+ifeq ($(OS),MacOSX)
+    ! ?= brew install
+    ? ?= /opt/homebrew/bin
+    FONTS ?= ~/Library/Fonts
+    COUSINE := $(FONTS)
+    CARLITO := $(FONTS)
+else
+    ! ?= sudo apt install -y
+    ? ?= /usr/bin
+    COUSINE ?= /usr/share/fonts/truetype/cousine
+    CARLITO ?= /usr/share/fonts/truetype/crosextra
+endif 
+
+
+### 
+# Generic recipies for bringup, testing, reporting and auditing a project
+# on any OS and CPU with PYTHON >= Python 3.7.
+# Tested on WSL1 and bare Windows x86 and MacOSX Arm64.
+
+# The local python we bringup
+__{_}_PYTHON := venv/$(VENV_PYTHON)
+_{_}_PYTHON := $(_{_})$(__{_}_PYTHON)
+
+# The builder's home directory and name
+H := $(shell echo ~)
+I := $(shell whoami)
+
+# Workaround Windows feature: Windows domain in whoami
+I := $(subst \\, ,$I)
+ifneq ($(words $I),1)
+    DOMAIN := $(firstword $(WHOAMI))
+    I := $(lastword $I)
+endif
+
+# Workaround Windows WSL1 bug: Recursive make shell believes it is git bash on Windows
+ifeq ($H,/Users/$I)
+    H := /home/$I
+endif
+
+# How to reach here from the current working directory
+_{_}_Makefile := $(lastword $(MAKEFILE_LIST))
+_{_} := $(patsubst ./,,$(subst \\,/,$(subst C:\\,/c/,$(dir $(_{_}_Makefile)))))
+ifeq (,$(_{_}))
+    _{_}_DIR := ./
+else
+    _{_}_DIR := $(_{_})
+endif
+
+# Where to build files
+__{_}_BUILD := %s
+_{_}_BUILD := $(_{_})$(__{_}_BUILD)
+
+# Default rule
+.DELETE_ON_ERROR:
+$(_{_})all: $(_{_})bringup
+
+# Greet the user if new rules were built and included, and make therefore restarted
+ifeq (1,$(MAKE_RESTARTS))
+    $(info # Hello $I) 
+    $(info # This is $(_{_}_Makefile) in $(shell $(MAKE) -v) on $(OS))
+    $(info # It is now building $H $(PWD) `$(MAKE) $(MAKECMDGOALS)`\
+ using $(OS)-$(CPU) $(PYTHON) $(_{_}){makemake_py} $(_{_}_PYTHON) $(_{_}_BUILD))
+
+    # Notify the user on abusage of make
+    ifneq (0,$(MAKELEVEL))
+        $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
+        $(info # https://aegis.sourceforge.net/auug97.pdf)
+        $(info # https://github.com/joakimbits/normalize/blob/main/example/Makefile)
+    endif
 endif
 
 # Find all source files
@@ -155,7 +235,7 @@ _{_}_CPP := $(wildcard $(_{_})*.cpp)
 _{_}_SOURCE += $(_{_}_CPP)
 _{_}_HPP := $(wildcard $(_{_})*.hpp)
 _{_}_SOURCE += $(_{_}_HPP)
-_{_}_PY := $(shell cd $(_{_}_DIR) && find . -maxdepth 1 -type f -name '*.py')
+_{_}_PY := $(wildcard $(_{_})*.py)
 _{_}_PY := $(subst ./,$(_{_}),$(_{_}_PY))
 _{_}_SOURCE += $(_{_}_PY)
 _{_}_MD := $(wildcard $(_{_})*.md)
@@ -164,37 +244,17 @@ _{_}_SOURCE += $(_{_}_MD)
 # Find our git status
 _{_}_BRANCH := $(shell git branch --show-current)
 _{_}_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
-_{_}_KNOWN := $(addprefix $(_{_}),$(shell cd $(_{_}_DIR) &&\
- git ls-files . ':!:*/*'))
+_{_}_KNOWN := $(addprefix $(_{_}),$(shell cd $(_{_}_DIR) ; git ls-files . ':!:*/*'))
 _{_}_ADD := $(filter-out $(_{_}_KNOWN),$(_{_}_SOURCE))
-_{_}_MODIFIED := $(shell cd $(_{_}_DIR) && echo `git status -s . | grep '^ M ' |\
- awk '{{ print $(_{_})$$2 }}'`)
+_{_}_MODIFIED := $(shell cd $(_{_}_DIR) && $(PYTHON) {makemake_py} --git-status . M)
 _{_}_REMOVE := $(filter-out $(_{_}_SOURCE),$(_{_}_KNOWN))
 
 # Figure out where to checkout an old worktree
-_{_}_HOME_DIR := $(dir $(shell git rev-parse --git-common-_))
+_{_}_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
 _{_}_HOME := $(_{_}_HOME_DIR:./%%=%%)
 _{_}_NAME := $(notdir $(abspath $(_{_}_HOME_DIR)))
-
-# ToDo: Refactor _{_}_HERE_DIR into a dynamic variable
-# Installing missing --relative-to option on Mac:
-# On Mac: REALPATH := /opt/homebrew/opt/coreutils/libexec/gnubin/realpath
-#/opt/homebrew/opt/coreutils/libexec/gnubin/realpath: coreutils
-#coreutils: homebrew
-#	brew install coreutils
-#homebrew: /opt/homebrew/bin/brew
-#/opt/homebrew/bin/brew:
-#	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-#	(echo; echo 'eval "$(/opt/homebrew/bin/brew shellenv)"') >> ~/.zprofile
-#	eval "$(/opt/homebrew/bin/brew shellenv)"
-ifeq ($(shell which realpath),/usr/bin/realpath)
-  # Use a git-project common worktree
-  _{_}_HERE_DIR := $(shell realpath --relative-to=$(_{_}_HOME_DIR) $(_{_}_DIR) )
-else
-  # Use a local worktree
-  _{_}_HERE_DIR := $(_{_}_DIR)
-endif
-
+_{_}_GIT_DIR := $(dir $(shell git rev-parse --git-common-dir))
+_{_}_HERE_DIR := $(shell $(PYTHON) $(_{_}){makemake_py} --relpath $(_{_}_GIT_DIR) $(_{_}_DIR))/
 _{_}_HERE := $(_{_}_HERE_DIR:%%./=%%)
 _{_}_OLD_WORKTREE := $(_{_}_HOME)$(__{_}_BUILD)$(_{_}_BASELINE)/$(_{_}_NAME)/
 _{_}_OLD := $(_{_}_OLD_WORKTREE)$(_{_}_HERE)
@@ -208,16 +268,19 @@ ifeq ($(NORMAL),)
   BLUE := `tput setaf 4`
   REVERSED := `tput rev`
 endif
+
 _{_}_BRANCH_STATUS := $(if $(_{_}_ADD),$(RED)$(_{_}_ADD)$(NORMAL))
 _{_}_BRANCH_STATUS += $(if $(_{_}_MODIFIED),$(BLUE)$(_{_}_MODIFIED)$(NORMAL))
 _{_}_BRANCH_STATUS += $(if $(_{_}_REMOVE),$(REVERSED)$(_{_}_REMOVE)$(NORMAL))
 _{_}_COMMIT_INFO := $(shell git log -1 --oneline $(_{_}_DIR))
 _{_}_BRANCH_STATUS += $(_{_}_COMMIT_INFO)
+
 ifeq ($(filter v%%,$(_{_}_BASELINE)),)
-  _{_}_BASELINE_INFO := $(shell git show --oneline -s $(_{_}_BASELINE))
+    _{_}_BASELINE_INFO := $(shell git show --oneline -s $(_{_}_BASELINE))
 else
-  _{_}_BASELINE_INFO := $(strip $(shell git tag --list $(_{_}_BASELINE) -n1))
+    _{_}_BASELINE_INFO := $(strip $(shell git tag --list $(_{_}_BASELINE) -n1))
 endif
+
 _{_}_CHANGES := $(_{_}_BASELINE_INFO) --> $(_{_}_BRANCH_STATUS)
 _{_}_CHANGES_AUDIT := $(_{_}_BASELINE_INFO) -->
 _{_}_CHANGES_AUDIT += $(_{_}_ADD)
@@ -231,10 +294,12 @@ _{_}_CXX += $(_{_}_CPP)
 _{_}_SRCS += $(_{_}_CXX)
 _{_}_CODE := $(_{_}_SRCS)
 _{_}_CODE += $(_{_}_PY)
+
 ifneq ($(strip $(_{_}_SRCS)),)
-  _{_}_EXE := $(_{_}){_}
-  _{_}_EXE_TESTED := $(_{_}_BUILD){_}.tested
+    _{_}_EXE := $(_{_}){_}
+    _{_}_EXE_TESTED := $(_{_}_BUILD){_}.tested
 endif
+
 _{_}_BRINGUP := $(_{_}_PY:$(_{_})%%=$(_{_}_BUILD)%%.bringup)
 _{_}_TESTED := $(_{_}_EXE_TESTED)
 _{_}_TESTED += $(_{_}_PY:$(_{_})%%=$(_{_}_BUILD)%%.tested)
@@ -244,11 +309,13 @@ _{_}_TESTED += $(_{_}_MD:$(_{_})%%=$(_{_}_BUILD)%%.sh-test.tested)
 # Prepare for compilation
 _{_}_INC_DIRS := $(_{_}_DIR)
 _{_}_LDFLAGS := $(LDFLAGS)
+
 ifneq ($(strip $(_{_}_S)),)
-  _{_}_LDFLAGS += -nostartfiles -no-pie
+    _{_}_LDFLAGS += -nostartfiles -no-pie
 endif
+
 _{_}_CXXFLAGS := $(_{_}_LDFLAGS)
-_{_}_CXXFLAGS += -S $(addprefix -I,$(_{_}_INC_DIRS)) -MMD -MP -Wall
+_{_}_CXXFLAGS += -S $(addprefix -I,$(_{_}_INC_DIRS)) -MMD -MP
 _{_}_CFLAGS := $(_{_}_CXXFLAGS)
 _{_}_CXXFLAGS += $(CXXFLAGS)
 _{_}_CFLAGS += $(CFLAGS)
@@ -260,7 +327,6 @@ _{_}_EXES := $(_{_}_EXE)
 _{_}_EXES += $(_{_}_PY)
 
 # Prepare for bringup
-_{_}_PYTHON := $(_{_}_DIR)venv/bin/python
 _{_}_PY_MK := $(_{_}_PY:$(_{_})%%=$(_{_}_BUILD)%%.mk)
 _{_}_DEPS += $(_{_}_PY_MK)
 
@@ -274,10 +340,8 @@ _{_}_REPORT := $(_{_}_BUILD)report-details.md
 _{_}_REPORT += $(_{_}_LOGIC:$(_{_})%%=$(_{_}_BUILD)%%.md)
 _{_}_REPORT += $(_{_}_RESULT:%%=%%.md)
 
-# Default rule
-.DELETE_ON_ERROR:
-$(_{_})all: $(_{_})bringup
-
+# Convenience targets
+.PHONY: $(_{_})bringup $(_{_})tested $(_{_})clean
 $(_{_})bringup: $(_{_}_EXE) $(_{_}_BRINGUP)
 $(_{_})tested: $(_{_}_TESTED)
 
@@ -303,43 +367,40 @@ $(_{_}_BUILD)syntax: $(_{_}_PY) | $(_{_})venv/bin/ruff
 	$(_{_}_PYTHON) -m ruff \\
 	    --select=E9,F63,F7,F82 \\
 	    --target-version=py39 $(_{_}_DIR) > $@ || (cat $@ && false)
-$(_{_})venv/bin/ruff: | $(_{_}_PYTHON)
-	$(_{_}_PYTHON) -m pip install ruff
-$(_{_})venv $(_{_}_PYTHON):
-	( cd $(_{_}_DIR) && python3 -m venv venv )
+
+# Install pip package in the local python:
+$(_{_})venv/Lib/site-packages/%%: $(_{_}_PYTHON)
+	$(_{_}_PYTHON) -m pip install $*
+
+# Setup a local python:
+$(_{_}_PYTHON):
+	( cd $(_{_}_DIR) && $(PYTHON) -m venv venv )
 	$(_{_}_PYTHON) -m pip install --upgrade pip
 	$(_{_}_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
 
 # Check Python 3.9 style
 $(_{_})style: $(_{_}_BUILD)style
 $(_{_}_BUILD)style: $(_{_}_BUILD)syntax
-	$(_{_}_PYTHON) -m ruff --fix --target-version=py39 $(_{_}_DIR) > $@ \\
-	|| (cat $@ && false)
+	$(_{_}_PYTHON) -m ruff --fix --target-version=py39 $(_{_}_DIR) > $@ ||\
+ (cat $@ && false)
 
 # Build a recipy for $(_{_}_BUILD)%%.py.bringup
 $(_{_}_BUILD)%%.py.mk: $(_{_})%%.py
-	( cd $(_{_}_DIR) && PYTHONPATH=$(_{_}_DIR) python3 $*.py --generic --dep $(__{_}_BUILD)$*.py.mk ) ; \\
-	if [ ! -f $@ ]; then echo "\\$$(_{_}_BUILD)$*.py.bringup:; touch \\$$@" >$@; fi
+	rm -f $@ && ( cd $(_{_}_DIR) && $(PYTHON) $*.py --generic --dep $(__{_}_BUILD)$*.py.mk ) ;\
+ [ -e $@ ] || echo "\\$$(_{_}_BUILD)$*.py.bringup:; touch \\$$@" >$@
 
 # Check Python and command line usage examples in .py files
 $(_{_}_BUILD)%%.py.tested: $(_{_})%%.py $(_{_}_BUILD)%%.py.mk \\
   $(_{_}_BUILD)style $(_{_}_BUILD)%%.py.bringup $(_{_}_EXE_TESTED)
-	$(_{_}_PYTHON) $< --test > $@ || (cat $@ && false)
+	( cd $(_{_}_DIR) && $(__{_}_PYTHON) $*.py --test ) > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
 $(_{_}_BUILD)%%.sh-test.tested: $(_{_}_BUILD)%%.sh-test $(_{_}_PRETESTED) | \\
-  $(_{_})makemake.py
+  $(_{_}){makemake_py}
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
-	( cd $(_{_}_DIR) && python3 -m makemake --timeout 60 --sh-test \
+	( cd $(_{_}_DIR) && $(PYTHON) {makemake_py} --timeout 60 --sh-test \
 	    $(__{_}_BUILD)$*.sh-test ) > $$tmp && mv $$tmp $@
-# ToDo: depend on pandoc and jq
-# On Mac: 
-#jq: /opt/homebrew/bin/jq
-#/opt/homebrew/bin/jq: homebrew; brew install jq
-# On Ubuntu: 
-#jq: /usr/bin/jq
-#/usr/bin/jq: ; sudo apt install -y jq
-$(_{_}_BUILD)%%.md.sh-test: $(_{_})%%.md | #/usr/bin/pandoc /usr/bin/jq
+$(_{_}_BUILD)%%.md.sh-test: $(_{_})%%.md | $?/pandoc $?/jq
 	pandoc -i $< -t json --preserve-tabs | \
 	jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | \
 select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && \\
@@ -368,99 +429,60 @@ $(_{_}_BUILD)report.txt: $(_{_}_TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a standalone html, pdf, gfm or dzslides document.
-# ToDo: install xelatex
-# On Mac:
-# /Library/TeX/texbin/tex: homebrew
-#	brew install --cask basictex
-#	eval "$(/usr/libexec/path_helper)"
 $(_{_})%%.gfm: $(_{_}_BUILD)%%.md
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{_} $*" -M author="`git log -1 --pretty=format:'%%an'`"
-# WIP add missing dependencies
-# for Mac: | \\
-#  ~/Library/Fonts/Carlito-Regular.ttf \\
-#  ~/Library/Fonts/Cousine-Regular.ttf \\
-#  /opt/homebrew/bin/pandoc /Library/TeX/texbin/xelatex
-# for Linux: | \\
-#  /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf \\
-#  /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf \\
-#  /usr/bin/pandoc /usr/bin/xelatex
-$(_{_})%%.html $(_{_})%%.pdf $(_{_})%%.dzslides: $(_{_}_BUILD)%%.md
+$(_{_})%%.html $(_{_})%%.pdf $(_{_})%%.dzslides: $(_{_}_BUILD)%%.md | \\
+  $?/pandoc $?/xelatex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
 	pandoc --standalone -t $(patsubst .%%,%%,$(suffix $@)) -o $@ $^ \\
 	       -M title="{_} $*" -M author="`git log -1 --pretty=format:'%%an'`" \\
-	       -V min-width=80%%\!important -V geometry:margin=1in \\
+	       -V min-width=80%%\\!important -V geometry:margin=1in \\
 	       --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
-ifndef pandoc
-pandoc:=/usr/bin/pandoc
-# Make doesn't detect /usr/bin/pandoc: A phony target that may actually exist.
-# ToDo on Mac: /opt/homebrew/bin/pandoc: homebrew; brew install pandoc
-# ToDo on Ubuntu: 
-#	sudo apt update && sudo apt upgrade && sudo apt install -y git make python3 python3.10-venv build-essential pandoc libc-bin texlive-xetex fonts-crosextra-carlito
-#	make /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf
-# ToDo on Windows: install pandoc
-#/usr/bin/pandoc: pandoc-3.1.6.1-1-amd64.deb
-#	@if [ ! -e /usr/bin/pandoc ] ; then (sudo dpkg -i $< ) ; fi
-#pandoc-%%-1-amd64.deb:
-#	@if [ ! -e /usr/bin/pandoc ] ; then ( \\
-#	  echo "Need a small general text processing framework: pandoc" && \\
-#	  curl https://github.com/jgm/pandoc/releases/download/$*/pandoc-$*-1-amd64.deb -o $@\\
-#	) ; fi
-/usr/bin/xelatex:
-	# Need a modern pdf generation framework: xelatex
-	sudo apt-get update && sudo apt install -y texlive-xetex
-/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
+$?/xelatex: | $?/texlive-xetex
+$?/%%:
+	$! $*
+$(CARLITO)/Carlito-Regular.ttf:
 	# Need a more screen-readable normal font: carlito
-	sudo apt-get install fonts-crosextra-carlito
-~/Library/Fonts/%%-Regular.ttf: # Mac user font
-	# Installing $< font family $* into $(dir $@)
-	( cd $(dir $@) && \\
-	  family=`echo $* | tr A-Z a-z` && \\
-	  fonts=https://raw.githubusercontent.com/google/fonts/main/$</$$family && \\
-	  curl $$fonts/$*-Bold.ttf -o $*-Bold.ttf && \\
-	  curl $$fonts/$*-BoldItalic.ttf -o $*-BoldItalic.ttf && \\
-	  curl $$fonts/$*-Italic.ttf -o $*-Italic.ttf && \\
-	  curl $$fonts/$*-Regular.ttf -o $*-Regular.ttf )
-~/Library/Fonts/Carlito-Regular.ttf: ofl
-~/Library/Fonts/Cousine-Regular.ttf: apache
-ofl apache:
-	touch $@
-/usr/share/fonts/truetype/%%-Regular.ttf: # Ubuntu shared font
-	# Installing font family $(notdir $*) into $(dir $@)
+	$! fonts-crosextra-carlito
+$(COUSINE)/Cousine-Regular.ttf:
+	# Need a more screen-readable fixed-size font: cousine
 	( sudo mkdir -p $(dir $@) && cd $(dir $@) && \\
 	  fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \\
-	  sudo curl $$fonts/$*/DESCRIPTION.en_us.html -o DESCRIPTION.en_us.html && \\
-	  sudo curl $$fonts/$*-Bold.ttf -o $(notdir $*)-Bold.ttf && \\
-	  sudo curl $$fonts/$*-BoldItalic.ttf -o $(notdir $*)-BoldItalic.ttf && \\
-	  sudo curl $$fonts/$*-Italic.ttf -o $(notdir $*)-Italic.ttf && \\
-	  sudo curl $$fonts/$*-Regular.ttf -o $(notdir $*)-Regular.ttf )
-/usr/bin/jq:
+      ifneq ($(OS),MacOSX)
+	      sudo curl $$fonts/cousine/DESCRIPTION.en_us.html -o DESCRIPTION.en_us.html && \\
+      endif	
+	  sudo curl $$fonts/cousine/Cousine-Bold.ttf -o Cousine-Bold.ttf && \\
+	  sudo curl $$fonts/cousine/Cousine-BoldItalic.ttf -o Cousine-BoldItalic.ttf && \\
+	  sudo curl $$fonts/cousine/Cousine-Italic.ttf -o Cousine-Italic.ttf && \\
+	  sudo curl $$fonts/cousine/Cousine-Regular.ttf -o Cousine-Regular.ttf )
+$?/jq:
 	# Need a tool to filter json: jq
 	sudo apt install -y jq
 endif
 
 # Make a markdown document.
-_{_}_h :=\\n---\\n\\n\#
+_{_}_h :=\\n---\\n\\n\\#
 _{_}~~~. =\\\\\\footnotesize\\n~~~ {{$1}}
 _{_}~~~sh :=$(call _{_}~~~.,.sh)
 _{_}~~~ :=~~~\\n\\\\\\normalsize\\n
 $(_{_}_BUILD)Makefile.md: $(_{_})Makefile
-	( echo "$(_{_}_h)## [$(subst $(_{_}),,$<)]($<)" && \\
+	( echo "$(_{_}_h)## [$*]($*)" && \\
 	  echo "$(call _{_}~~~.,.mk)" && \\
 	  cat $< && echo "$(_{_}~~~)" ) >$@
 $(_{_}_BUILD)%%.md: $(_{_})%%
-	( echo "$(_{_}_h)## [$(subst $(_{_}),,$<)]($<)" && \\
+	( echo "$(_{_}_h)## [$*]($*)" && \\
 	  echo "$(call _{_}~~~.,$(suffix $<))" && \\
 	  cat $< && echo "$(_{_}~~~)" ) >$@
 $(_{_}_BUILD)%%.md: $(_{_}_BUILD)%%
-	( echo "$(_{_}_h)## [$(subst $(_{_}),,$<)]($<)" && \\
+	( echo "$(_{_}_h)## [$*]($(__{_}_BUILD)$*)" && \\
 	  echo "$(call _{_}~~~.,$(suffix $<))" && \\
 	  cat $< && echo "$(_{_}~~~)" ) >$@
 $(_{_}_BUILD)%%.bringup.md: $(_{_}_BUILD)%%.bringup
-	( echo "$(_{_}_h)## [$(subst $(_{_}),,$<)]($<)" && \\
+	( echo "$(_{_}_h)## [$*]($(__{_}_BUILD)$*)" && \\
 	  echo "$(_{_}~~~sh)" && \\
 	  cat $< && echo "$(_{_}~~~)" ) >$@
 $(_{_}_BUILD)%%.tested.md: $(_{_}_BUILD)%%.tested
-	( echo "$(_{_}_h)## [$(subst $(_{_}),,$<)]($<)" && \\
+	( echo "$(_{_}_h)## [$*]($(__{_}_BUILD)$*)" && \\
 	  echo "$(_{_}~~~sh)" && \\
 	  cat $< && echo "$(_{_}~~~)" ) >$@
 
@@ -555,7 +577,7 @@ $(_{_}_BUILD)audit.diff: $(_{_}_BUILD)prompt.diff | $(_{_}_PYTHON)
 	$(_{_}_PYTHON) -m makemake --prompt $< $(_{_}_MODEL) $(_{_}_TEMPERATURE)\
  $(_{_}_BEARER_rot13) >> $@
 $(_{_}_BUILD)prompt.diff: $(_{_}_BUILD)review.diff
-	python3 -m makemake -c 'print(REVIEW)' > $@
+	$(PYTHON) $(_{_}){makemake_py} -c 'print(REVIEW)' > $@
 	echo "$$ $(MAKE) $(_{_})review" >> $@
 	cat $^ >> $@
 	echo -n "$$ " >> $@
@@ -575,13 +597,13 @@ $(_{_}_BUILD)report.diff: $(_{_}_OLD)report.gfm $(_{_})report.gfm
 	  for part in $$parts ; do \\
 	    if `echo "$$changed_parts" | fgrep -wq "$$part" \\
 	    || test "$$(wc $$part)" = "1"` ; then \\
-	      python3 -m makemake --split $$part '\\n \\n \\n' 's%%02d' && \\
+	      $(PYTHON) $(_{_}){makemake_py} --split $$part '\\n \\n \\n' 's%%02d' && \\
 	      sections=`ls s**` && \\
 	      changed_sections=`grep -l -e '^-' -e '^+' s**` && \\
 	      for section in $$sections ; do \\
 	        if `echo "$$changed_sections" | fgrep -wq "$$section" \\
 	        || test "$$(wc $$section)" = "1"` ; then \\
-	          python3 -m makemake --split $$section '\\n \\n' 'p%%02d' && \\
+	          $(PYTHON) $(_{_}){makemake_py} --split $$section '\\n \\n' 'p%%02d' && \\
 	          paragraphs=`ls p**` && \\
 	          changed_paragraphs=`grep -l -e '^-' -e '^+' p**` && \\
 	          for paragraph in $$paragraphs ; do \\
@@ -605,7 +627,7 @@ $(_{_}_BUILD)report.diff: $(_{_}_OLD)report.gfm $(_{_})report.gfm
 endif  # _{_}_DIR
 """  # noqa: E101
 
-COMMENT_GROUP_PATTERN = re.compile("(\s*#.*)?$")
+COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 
 
 def make_rule(rule, commands, file=sys.stdout):
@@ -652,7 +674,8 @@ def build_commands(doc, heading=None, embed="%s", end="", pip=""):
             elif command_lines and not pip:
                 output_lines.append(command)
             elif command and pip:
-                commands.append(([f"{pip} install " + command], [comment], []))
+                commands.append(([f"{pip} install {command} --no-warn-script-location"],
+                                 [comment], []))
 
     return commands
 
@@ -664,19 +687,29 @@ def run_command_examples(commands, timeout=3):
 
     import subprocess
 
+    # Add PWD to Path so that Windows can run files from there.
+    my_env = os.environ.copy()
+    my_env["PATH"] = f".{os.pathsep}{my_env['PATH']}"
+
     for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
         command = "\n".join(map("".join, zip(command_lines, comment_lines)))
+        if platform.system() == 'Windows':
+            command = f"cmd /C {command}"
+
         if module_dir:
             command = f"( cd {module_dir} && {command} )"
+
         output = "\n".join(output_lines)
         result = subprocess.run(command, shell=True, capture_output=True, text=True,
-                                timeout=timeout)
+                                timeout=timeout, env=my_env)
         assert not result.returncode, (
-            f"Example {i + 1} failed: $ {command}\n"
+            f"Example {i + 1} failed ({result.returncode}): $ {command}\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}")
+
         received = result.stdout or ""
-        assert received == output, (
+        pattern = '.*'.join(map(re.escape, output.split('...')))
+        assert re.fullmatch(pattern, received), (
             f"Example {i + 1}: $ {command}\n"
             f"Expected: {repr(output)}\n"
             f"Received: {repr(received)}")
@@ -722,7 +755,7 @@ if parent_module.__name__ == '__main__':
             pattern = module
             source = module_path
             stem = module
-            python = 'python3'
+            python = '$(PYTHON)'
             src_dir = ""
             build_dir = dep_dir
             generic = ""
@@ -753,6 +786,7 @@ if parent_module.__name__ == '__main__':
         commands = []
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
                                   pip=f"{python} -m pip")
+        bringups.append(([f'{python} {source} --shebang'], [''], []))
         bringups.append((['chmod +x $<'], [''], []))
         op = ">"
         remaining = len(bringups)
@@ -791,6 +825,33 @@ if parent_module.__name__ == '__main__':
                         make_rule(rule, commands, file=dep)
             elif dependencies:
                 make_rule(rule, commands)
+
+        exit(0)
+
+
+class Shebang(Action):
+    """Insert a Windows-compatible shebang, print its PATH configuration if needed, and exit"""
+
+    SHEBANG = '#!venv/python.exe'
+
+    def __call__(self, parser, args, values, option_string=None):
+        shebang = None
+        src = open(module_path).read()
+        if src[:2] == '#!':
+            shebang, src = src.split("\n", 1)
+
+        if shebang != self.SHEBANG:
+            open(module_path, 'w').write(f'{self.SHEBANG}\n{src}')
+
+        search_path = os.environ['PATH']
+        for_windows = '\\' in search_path
+        search_dirs = search_path.split(';' if for_windows else ':')
+        if '.' not in search_dirs:
+            if for_windows:
+                print("[System.Environment]::SetEnvironmentVariable('Path',"
+                      " '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')")
+            else:
+                print("export PATH='.:$PATH'")
 
         exit(0)
 
@@ -904,6 +965,70 @@ class Prompt(Action):
         print(c['choices'][0]['message']['content'])
         exit(0)
 
+
+class Uname(Action):
+    """Print the uname parameter and exit"""
+
+    OPTIONS = dict([
+        ('-m', '--machine'),
+        ('-p', '--processor'),
+        ('-s', '--kernel-name'),
+    ])
+
+    TRANSLATIONS = dict([
+        ('kernel-name', 'system'),
+        ('AMD64', 'x86_64')
+    ])
+
+    def __call__(self, parser, args, values, option_string=None):
+        import platform
+
+        command = self.OPTIONS.get(option_string, option_string)[2:]
+        command = self.TRANSLATIONS.get(command, command)
+        value = getattr(platform, command)()
+        value = self.TRANSLATIONS.get(value, value)
+        print(value)
+        exit(0)
+
+
+class GitStatus(Action):
+    """List git files wanted git status in a directory, and exit"""
+
+    def __call__(self, parser, args, values, option_string=None):
+        import subprocess
+
+        directory, wanted_status = values
+        result = subprocess.run(f'git status -s {directory}', shell=True, capture_output=True, text=True)
+        assert not result.returncode, result
+        for (status, file) in ((row[1], row[3:]) for row in result.stdout.split('\n') if row):
+            if status == wanted_status:
+                print(file)
+
+
+class Relpath(Action):
+    """Print a relative path and exit"""
+
+    def __call__(self, parser, args, values, option_string=None):
+        relative_to = os.path.abspath(values[0])
+        for path in values[1:]:
+            print(os.path.relpath(os.path.abspath(path), relative_to).replace('\\', '/') + '/')
+
+
+def add_arguments(argparser):
+    argparser.add_argument('--makemake', action='store_true', help=(
+        f"Print Makefile for {module_path}, and exit"))
+    argparser.add_argument('--generic', action='store_true', help=(
+        f"Print generic Makefile for {module_path}, and exit"))
+    argparser.add_argument('--dep', action='store', help=(
+        f"Build a {module}.dep target, print its Makefile include statement, and exit"))
+    argparser.add_argument('--shebang', nargs=0, action=Shebang, help=Shebang.__doc__)
+    argparser.add_argument('-c', nargs=1, action=Command, help=Command.__doc__)
+    argparser.add_argument('--timeout', type=int, default=10, help=(
+        "Test timeout in seconds (10)"))
+    argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
+    argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
+
+
 def brief(*callables):
     """Return a summary of all callables"""
     usage = (parent_module.__doc__ or '').split('\nDependencies:\n')[0]
@@ -953,27 +1078,41 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=brief(),
         epilog="""Examples:
-$ python3 makemake.py --dep makemake.dep
-include makemake.dep
+$ makemake.py --dep build/makemake.dep
+include build/makemake.dep
 
 $ cat makemake.dep
-makemake.py.bringup: makemake.py makemake.dep
-	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@"""
+build/makemake.py.bringup: makemake.py build/makemake.dep
+	$(PYTHON) -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@"""
                """ && \\
-	python3 -m pip install requests >> $@ && \\
+	$(PYTHON) -m pip install requests --no-warn-script-location >> $@ && \\
+	$(PYTHON) makemake.py --shebang >> $@ && \\
 	chmod +x $< >> $@
 
-$ python3 makemake.py --dep makemake.dep --makemake
-all: makemake.py.tested
-	
-makemake.py.tested: makemake.py makemake.dep makemake.py.bringup
-	python3 makemake.py --test > $@
-makemake.dep: makemake.py
-	python3 makemake.py --dep $@
-include makemake.dep
+$ makemake.py --dep build/makemake.dep --makemake
+all: build/makemake.py.tested
 
-$ python3 -m makemake -c "print(module_py)"
+build/makemake.py.tested: makemake.py build/makemake.dep build/makemake.py.bringup
+	makemake.py --test > $@
+build/makemake.dep: makemake.py
+	makemake.py --dep $@
+include build/makemake.dep
+
+$ makemake.py -c "print(module_py)"
 makemake.py
+
+$ makemake.py -m
+x86_64
+
+$ makemake.py -s
+Windows
 """)
     add_arguments(argparser)
+    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)
+    argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__)
+    for brief, long in Uname.OPTIONS.items():
+        argparser.add_argument(brief, long, nargs=0, action=Uname, help=Uname.__doc__)
+    argparser.add_argument('--git-status', nargs=2, metavar=('directory', 'wanted_status'), default=('.', 'M'),
+                           action=GitStatus, help=GitStatus.__doc__)
+    argparser.add_argument('--relpath', nargs=2, action=Relpath, help=Relpath.__doc__)
     args = argparser.parse_args()
