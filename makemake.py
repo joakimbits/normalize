@@ -43,14 +43,9 @@ Makefile:
 $ make tooled.txt
 
 How it works:
-    0. Make tries to include tools/Makefile but continues without it. (The - continues.)
-    1. Make wants tooled.txt, needs tools/build/tool.py.bringup, but can't build it.
-    2. Make also needs tools/Makefile and builds that. (The | ignores its timestamp.)
-    3. Make detects a tools/Makefile to include and therefore restarts.
-    4. Make wants tooled.txt, needs tools/build/tool.py.bringup that needs tools/venv.
-       Make builds tools/venv and then tools/build/tool.py.bringup using it. (The
-       Dependencies for tools/tool.py gets added to tools/venv and possibly elsewhere).
-    5. Make builds tooled.txt using tools/tool.py and that same tools/venv.
+    1. Make softly fails -include tools/Makefile, builds it, restarts, and now includes it.
+    2. Make wants tooled.txt, needs tools/build/tool.py.bringup that needs $(_tools_PYTHON).
+    3. Make builds $(_tools_PYTHON), tools/build/tool.py.bringup and finally tooled.txt.
        (The $< becomes tools/tool.py, and the $@ becomes tooled.txt).
 
 Usage:
@@ -363,7 +358,7 @@ $(_{_}_BUILD){_}.tested: $(_{_}){_}
 
 # Check Python 3.9 syntax
 $(_{_})syntax: $(_{_}_BUILD)syntax
-$(_{_}_BUILD)syntax: $(_{_}_PY) | $(_{_})venv/bin/ruff
+$(_{_}_BUILD)syntax: $(_{_}_PY) | $(_{_})venv/Lib/site-packages/ruff
 	$(_{_}_PYTHON) -m ruff \\
 	    --select=E9,F63,F7,F82 \\
 	    --target-version=py39 $(_{_}_DIR) > $@ || (cat $@ && false)
@@ -457,7 +452,7 @@ $(COUSINE)/Cousine-Regular.ttf:
 	  sudo curl $$fonts/cousine/Cousine-Regular.ttf -o Cousine-Regular.ttf )
 $?/jq:
 	# Need a tool to filter json: jq
-	sudo apt install -y jq
+	$! jq
 endif
 
 # Make a markdown document.
@@ -774,14 +769,14 @@ if parent_module.__name__ == '__main__':
                 rules += [
                     ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
                       f" {dep_file} {build_dir}{pattern}.py.bringup"),
-                     [f"{python} {source} --test > $@"]),
+                     [f"{source} --test > $@"]),
                     (f"{dep_file}: {src_dir}{pattern}.py",
-                     [f"{python} {source} --dep $@{generic}"])]
+                     [f"{source} --dep $@{generic}"])]
             else:
                 rules.append(
                     ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
                       f" {build_dir}{pattern}.py.bringup"),
-                     [f"{python} {source} --test > $@"]))
+                     [f"{source} --test > $@"]))
 
         commands = []
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
