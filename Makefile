@@ -8,12 +8,15 @@
 # Define an initial default build target $(_example)all: A definition of how to build stuff here.
 all: build.mk
 build.mk: makemake.py
-	python3 -m makemake --makemake --generic > $@
+	$(PYTHON) -m makemake --makemake --generic > $@
 
 # If we do want to build stuff, include its builder:
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
   -include build.mk
 endif
+
+# python3 on Linux, or python.exe on Windows
+PYTHON ?= python3
 
 # Manage the example sub-projects also.
 include example/Makefile example2/Makefile
@@ -28,8 +31,8 @@ old: | example/old example2/old
 new: gfm
 build/review.diff: example/build/review.diff example2/build/review.diff
 clean: | example/clean example2/clean
-	rm -rf venv/ build/ .ruff_cache/
-	rm -f build.mk makemake.dep *.pdf *.html *.gfm
+	rm -rf build.mk venv/ build/ .ruff_cache/
+	rm -f *.pdf *.html *.gfm
 
 # Compilation steps are still under development, so this rule applies here.
 $(_normalize_DEPS) $(_normalize_OBJS): Makefile build.mk
