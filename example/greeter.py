@@ -44,7 +44,7 @@ Hello world!
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=__doc__,
+        description=makemake.brief(),
         epilog=f"Examples:{EXAMPLES}")
     argparser.add_argument('world', nargs=argparse.REMAINDER, help=(
         "hello(world)"))
