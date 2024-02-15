@@ -1,4 +1,4 @@
-#!./venv/bin/python3
+#!venv/python.exe
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
@@ -127,47 +127,6 @@ _{_}_MODEL ?= gpt-3.5-turbo-16k
 _{_}_BEARER_rot13 ?= fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
 _{_}_TEMPERATURE ?= 0.7
 
-# Configure a base PYTHON to use. It can be one of:
-#  - `python3` on Ubuntu or Mac,
-#  - `python.exe` in Windows from WSL Ubuntu, or
-#  - `python` on Windows.
-#  - or any given PYTHON.
-ifeq ($H,/home/$I)
-    ifeq (,$(shell echo $$WSL_DISTRO_NAME))
-        PYTHON ?= python3
-    else
-        PYTHON ?= python.exe
-    endif
-else
-    PYTHON ?= python
-endif
-
-# Configure an OS and CPU to build the project for.
-OS ?= $(shell $(PYTHON) $(_{_}){makemake_py} -s)
-CPU ?= $(shell $(PYTHON) $(_{_}){makemake_py} -m)
-ifeq ($(OS),MacOSX)
-    ! ?= brew install
-    ? ?= /opt/homebrew/bin
-    FONTS ?= ~/Library/Fonts
-    COUSINE := $(FONTS)
-    CARLITO := $(FONTS)
-else
-    ! ?= sudo apt install -y
-    ? ?= /usr/bin
-    COUSINE ?= /usr/share/fonts/truetype/cousine
-    CARLITO ?= /usr/share/fonts/truetype/crosextra
-endif 
-
-
-### 
-# Generic recipies for bringup, testing, reporting and auditing a project
-# on any OS and CPU with PYTHON >= Python 3.7.
-# Tested on WSL1 and bare Windows x86 and MacOSX Arm64.
-
-# The local python we bringup
-__{_}_PYTHON := venv/$(VENV_PYTHON)
-_{_}_PYTHON := $(_{_})$(__{_}_PYTHON)
-
 # The builder's home directory and name
 H := $(shell echo ~)
 I := $(shell whoami)
@@ -184,6 +143,38 @@ ifeq ($H,/Users/$I)
     H := /home/$I
 endif
 
+# Configure a base PYTHON to use. It can be one of:
+#  - `python3` on Ubuntu or Mac,
+#  - `python.exe` in Windows from WSL Ubuntu, or
+#  - `python` on Windows.
+#  - or any given PYTHON.
+ifeq ($H,/home/$I)
+    PYTHON ?= python3
+    VENV_PYTHON ?= bin/python3
+    
+    # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
+    ifneq ($(shell echo $$WSL_DISTRO_NAME),)
+        SPEEDUP_WSL_DNS ?= $H/use_windows_dns.sh
+        SPEEDUP_WSL_PIP ?= sudo apt install -y python3-pip && DISPLAY= $(PYTHON) -m pip install -U keyring && DISPLAY= #
+        SPEEDUP_WSL_VENV_PIP ?= DISPLAY= $(_{_}_PYTHON) -m pip install -U keyring && #
+        SPEEDUP_WSL_VENV_PIP_INSTALL ?= DISPLAY= #
+    endif
+else
+    PYTHON ?= python
+    VENV_PYTHON ?= python.exe
+endif
+PYTHON := $(shell which $(PYTHON))
+
+
+### 
+# Generic recipies for bringup, testing, reporting and auditing a project
+# on any OS and CPU with PYTHON >= Python 3.7.
+# Tested on WSL1 and bare Windows x86 and MacOSX Arm64.
+
+# The local python we bringup
+__{_}_PYTHON := venv/$(VENV_PYTHON)
+_{_}_PYTHON := $(_{_})$(__{_}_PYTHON)
+
 # How to reach here from the current working directory
 _{_}_Makefile := $(lastword $(MAKEFILE_LIST))
 _{_} := $(patsubst ./,,$(subst \\,/,$(subst C:\\,/c/,$(dir $(_{_}_Makefile)))))
@@ -197,16 +188,31 @@ endif
 __{_}_BUILD := %s
 _{_}_BUILD := $(_{_})$(__{_}_BUILD)
 
-# Default rule
-.DELETE_ON_ERROR:
-$(_{_})all: $(_{_})bringup
+# Configure an OS and CPU to build the project for.
+ifndef ! 
+    OS ?= $(shell $(PYTHON) $(_{_}){makemake_py} -s)
+    CPU ?= $(shell $(PYTHON) $(_{_}){makemake_py} -m)
+    ifeq ($(OS),MacOSX)
+        ! ?= brew install
+        ? ?= /opt/homebrew/bin
+        FONTS ?= ~/Library/Fonts
+        COUSINE := $(FONTS)
+        CARLITO := $(FONTS)
+    else
+        ! ?= sudo apt install -y
+        ? ?= /usr/bin
+        COUSINE ?= /usr/share/fonts/truetype/cousine
+        CARLITO ?= /usr/share/fonts/truetype/crosextra
+    endif 
+endif
 
-# Greet the user if new rules were built and included, and make therefore restarted
-ifeq (1,$(MAKE_RESTARTS))
-    $(info # Hello $I) 
-    $(info # This is $(_{_}_Makefile) in $(shell $(MAKE) -v) on $(OS))
-    $(info # It is now building $H $(PWD) `$(MAKE) $(MAKECMDGOALS)`\
- using $(OS)-$(CPU) $(PYTHON) $(_{_}){makemake_py} $(_{_}_PYTHON) $(_{_}_BUILD))
+# Notify the user if new rules were built and included, and make therefore restarted
+ifeq ($(MAKE_RESTARTS),2)
+    MAKER := $(shell $(MAKE) -v))
+    INCLUDING ?= $(_{_}_BUILD)
+    $(info # $(PWD) $(filter-out $(INCLUDING)%%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $(_{_}){makemake_py} $(_{_}_PYTHON) $(_{_}_BUILD))
+    INCLUDED := $(MAKEFILE_LIST)
+    INCLUDING := $(_{_}_BUILD)
 
     # Notify the user on abusage of make
     ifneq (0,$(MAKELEVEL))
@@ -215,6 +221,10 @@ ifeq (1,$(MAKE_RESTARTS))
         $(info # https://github.com/joakimbits/normalize/blob/main/example/Makefile)
     endif
 endif
+
+# Default rule
+.DELETE_ON_ERROR:
+$(_{_})all: $(_{_})bringup
 
 # Find all source files
 _{_}_SOURCE :=
@@ -368,10 +378,24 @@ $(_{_})venv/Lib/site-packages/%%: $(_{_}_PYTHON)
 	$(_{_}_PYTHON) -m pip install $*
 
 # Setup a local python:
-$(_{_}_PYTHON):
-	( cd $(_{_}_DIR) && $(PYTHON) -m venv venv )
-	$(_{_}_PYTHON) -m pip install --upgrade pip
-	$(_{_}_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
+$(_{_}_PYTHON): $(SPEEDUP_WSL_DNS)
+	( cd $(_{_}_DIR) && $(SPEEDUP_WSL_PIP)$(PYTHON) -m venv venv )
+	$(SPEEDUP_WSL_VENV_PIP)$(SPEEDUP_WSL_VENV_PIP_INSTALL)$(_{_}_PYTHON) -m pip install --upgrade pip
+	$(SPEEDUP_WSL_VENV_PIP_INSTALL)$(_{_}_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
+
+ifndef SPEEDUP_WSL_DNS_FIX
+    SPEEDUP_WSL_DNS_FIX = 1
+    $H/use_windows_dns.sh: ;
+	    echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@                
+	    echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
+	    echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
+	    echo -n   "'(Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | " >> $@
+	    echo -n    "ForEach-Object {{ \\"nameserver \\$$_\\" }}' | tr -d '\\\\\\\\r' | " >> $@
+	    echo "tee -a /etc/resolv.conf > /dev/null" >> $@
+	    sudo sed -i '\|command=$@|d' /etc/wsl.conf
+	    echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
+	    sudo sh $@
+endif
 
 # Check Python 3.9 style
 $(_{_})style: $(_{_}_BUILD)style
@@ -433,27 +457,6 @@ $(_{_})%%.html $(_{_})%%.pdf $(_{_})%%.dzslides: $(_{_}_BUILD)%%.md | \\
 	       -M title="{_} $*" -M author="`git log -1 --pretty=format:'%%an'`" \\
 	       -V min-width=80%%\\!important -V geometry:margin=1in \\
 	       --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
-$?/xelatex: | $?/texlive-xetex
-$?/%%:
-	$! $*
-$(CARLITO)/Carlito-Regular.ttf:
-	# Need a more screen-readable normal font: carlito
-	$! fonts-crosextra-carlito
-$(COUSINE)/Cousine-Regular.ttf:
-	# Need a more screen-readable fixed-size font: cousine
-	( sudo mkdir -p $(dir $@) && cd $(dir $@) && \\
-	  fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \\
-      ifneq ($(OS),MacOSX)
-	      sudo curl $$fonts/cousine/DESCRIPTION.en_us.html -o DESCRIPTION.en_us.html && \\
-      endif	
-	  sudo curl $$fonts/cousine/Cousine-Bold.ttf -o Cousine-Bold.ttf && \\
-	  sudo curl $$fonts/cousine/Cousine-BoldItalic.ttf -o Cousine-BoldItalic.ttf && \\
-	  sudo curl $$fonts/cousine/Cousine-Italic.ttf -o Cousine-Italic.ttf && \\
-	  sudo curl $$fonts/cousine/Cousine-Regular.ttf -o Cousine-Regular.ttf )
-$?/jq:
-	# Need a tool to filter json: jq
-	$! jq
-endif
 
 # Make a markdown document.
 _{_}_h :=\\n---\\n\\n\\#
@@ -780,7 +783,7 @@ if parent_module.__name__ == '__main__':
 
         commands = []
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
-                                  pip=f"{python} -m pip")
+                                  pip=f"$(SPEEDUP_WSL_VENV_PIP_INSTALL){python} -m pip")
         bringups.append(([f'{python} {source} --shebang'], [''], []))
         bringups.append((['chmod +x $<'], [''], []))
         op = ">"
@@ -1062,8 +1065,7 @@ def add_arguments(argparser):
         "Test timeout in seconds (3)"))
     argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
     argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
-    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)
-    argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__)
+    argparser.add_argument('--shebang', nargs=0, action=Shebang, help=Shebang.__doc__)
 
 
 if __name__ == '__main__':
