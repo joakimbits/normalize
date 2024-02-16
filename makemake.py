@@ -1,4 +1,4 @@
-#!venv/python.exe
+#!venv/bin/python3
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
@@ -154,7 +154,7 @@ ifeq ($H,/home/$I)
     
     # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
     ifneq ($(shell echo $$WSL_DISTRO_NAME),)
-        SPEEDUP_WSL_DNS ?= | $H/use_windows_dns.sh $?/pip
+        SPEEDUP_WSL_DNS ?= $H/use_windows_dns.sh $?/pip
         SPEEDUP_WSL_PIP ?= DISPLAY= #
         SPEEDUP_WSL_VENV ?= DISPLAY= $(_{_}_PYTHON) -m pip install --upgrade keyring && #
     endif
@@ -191,18 +191,26 @@ _{_}_BUILD := $(_{_})$(__{_}_BUILD)
 ifndef ! 
     OS ?= $(shell $(PYTHON) $(_{_}){makemake_py} -s)
     CPU ?= $(shell $(PYTHON) $(_{_}){makemake_py} -m)
-    ifeq ($(OS),MacOSX)
+    ifeq ($(OS),Windows)
+        # ToDo
+    else ifeq ($(OS),MacOSX)
         ! ?= brew install
         ? ?= /opt/homebrew/bin
         FONTS ?= ~/Library/Fonts
         COUSINE := $(FONTS)
         CARLITO := $(FONTS)
     else
-        ! ?= sudo apt install -y
+        ! ?= sudo apt update && sudo apt install -y
         ? ?= /usr/bin
         COUSINE ?= /usr/share/fonts/truetype/cousine
         CARLITO ?= /usr/share/fonts/truetype/crosextra
-    endif 
+    endif
+endif
+
+# Make local commands available
+PATHS := $(subst ;, ,$(subst :, ,$(PATH)))
+ifneq ($(filter .,$(PATHS)),.)
+    .-ON-PATH := .-on-$(OS)-path
 endif
 
 # Notify the user if new rules were built and included, and make therefore restarted
@@ -371,24 +379,37 @@ $(_{_}_BUILD){_}.tested: $(_{_}){_}
 
 # Check Python 3.9 syntax
 $(_{_})syntax: $(_{_}_BUILD)syntax
-$(_{_}_BUILD)syntax: $(_{_}_PY) | $(_{_})venv/Lib/site-packages/ruff
-	$(_{_}_PYTHON) -m ruff \\
-	    --select=E9,F63,F7,F82 \\
-	    --target-version=py39 $(_{_}_DIR) > $@ || (cat $@ && false)
+$(_{_}_BUILD)%%.py.syntax: $(_{_})%%.py | $(_{_})venv/lib/python/site-packages/ruff
+	$(_{_}_PYTHON) -m ruff --select=E9,F63,F7,F82 --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Install pip package in the local python:
-$(_{_})venv/Lib/site-packages/%%: $(_{_}_PYTHON)
+$(_{_})venv/lib/python/site-packages/%%: | $(_{_})venv/lib/python/site-packages
 	$(_{_}_PYTHON) -m pip install $*
 
+# Link to actual site-packages
+$(_{_})venv/lib/python/site-packages: | $(_{_}_PYTHON)
+	mkdir -p $(dir $@)
+	ln -s $$(realpath --relative-to=$(dir $@) `venv/bin/python3 -c "import sys; print(sys.path[-1])"`) $@
+
 # Setup a local python:
-$(_{_}_PYTHON): $(SPEEDUP_WSL_DNS)
+$(_{_}_PYTHON): | $(PYTHON) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
 	( cd $(_{_}_DIR) && $(SPEEDUP_WSL_PIP)$(PYTHON) -m venv venv )
 	$(SPEEDUP_WSL_VENV)$(SPEEDUP_WSL_PIP)$(_{_}_PYTHON) -m pip install --upgrade pip
 	$(SPEEDUP_WSL_PIP)$(_{_}_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
 
-ifndef SPEEDUP_WSL
-    SPEEDUP_WSL = 1
-    $H/use_windows_dns.sh: ;
+# Install local commands before other commands
+ifndef .-ON-PATH_TARGETS
+    .-ON-PATH_TARGETS = 1
+    %%-on-Linux-path %%-on-MacOSX-path: ~/.profile
+	    echo 'export PATH="$*:$$PATH"' >> $< 
+	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+    %%-on-Windows-path:
+	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
+endif
+
+ifndef SPEEDUP_WSL_DNS_TARGET
+    SPEEDUP_WSL_DNS_TARGET = 1
+    $H/use_windows_dns.sh:
 	    echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@                
 	    echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
 	    echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
@@ -400,39 +421,31 @@ ifndef SPEEDUP_WSL
 	    sudo sh $@
 endif
 
-ifndef INSTALL_PIP
-    INSTALL_PIP = 1
+ifndef INSTALL_PIP_TARGET
+    INSTALL_PIP_TARGET = 1
     $?/pip:
 	    $! python3-pip
 endif
 
 # Check Python 3.9 style
-$(_{_})style: $(_{_}_BUILD)style
-$(_{_}_BUILD)style: $(_{_}_BUILD)syntax
-	$(_{_}_PYTHON) -m ruff --fix --target-version=py39 $(_{_}_DIR) > $@ ||\
- (cat $@ && false)
+$(_{_}_BUILD)%%.py.style: $(_{_})%%.py $(_{_}_BUILD)%%.py.syntax
+	$(_{_}_PYTHON) -m ruff --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Build a recipy for $(_{_}_BUILD)%%.py.bringup
 $(_{_}_BUILD)%%.py.mk: $(_{_})%%.py
-	rm -f $@ && ( cd $(_{_}_DIR) && $(PYTHON) $*.py --generic --dep $(__{_}_BUILD)$*.py.mk ) ;\
- [ -e $@ ] || echo "\\$$(_{_}_BUILD)$*.py.bringup:; touch \\$$@" >$@
+	rm -f $@ && ( cd $(_{_}_DIR) && $(PYTHON) $*.py --generic --dep $(__{_}_BUILD)$*.py.mk ) ; [ -e $@ ] || echo "\\$$(_{_}_BUILD)$*.py.bringup:; touch \\$$@" >$@
 
 # Check Python and command line usage examples in .py files
-$(_{_}_BUILD)%%.py.tested: $(_{_})%%.py $(_{_}_BUILD)%%.py.mk \\
-  $(_{_}_BUILD)style $(_{_}_BUILD)%%.py.bringup $(_{_}_EXE_TESTED)
-	( cd $(_{_}_DIR) && $(__{_}_PYTHON) $*.py --test ) > $@ || (cat $@ && false)
+$(_{_}_BUILD)%%.py.tested: $(_{_})%%.py $(_{_}_BUILD)%%.py.mk $(_{_}_BUILD)%%.py.style $(_{_}_BUILD)%%.py.bringup $(_{_}_EXE_TESTED) | $(_{_}_PYTHON)
+	( cd $(_{_}_DIR) && $*.py --test ) > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
-$(_{_}_BUILD)%%.sh-test.tested: $(_{_}_BUILD)%%.sh-test $(_{_}_PRETESTED) | \\
-  $(_{_}){makemake_py}
+$(_{_}_BUILD)%%.sh-test.tested: $(_{_}_BUILD)%%.sh-test $(_{_}_PRETESTED) | $(_{_}){makemake_py}
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $(_{_}_DIR) && $(PYTHON) {makemake_py} --timeout 60 --sh-test \
 	    $(__{_}_BUILD)$*.sh-test ) > $$tmp && mv $$tmp $@
 $(_{_}_BUILD)%%.md.sh-test: $(_{_})%%.md | $?/pandoc $?/jq
-	pandoc -i $< -t json --preserve-tabs | \
-	jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | \
-select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && \\
-	truncate -s -1 $@
+	pandoc -i $< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && truncate -s -1 $@
 
 # Document all source codes:
 $(_{_})s: $(_{_}_SOURCE)
@@ -640,7 +653,8 @@ COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 def make_rule(rule, commands, file=sys.stdout):
     """Make a Makefile build recipy"""
     print(rule, file=file)
-    print('\t' + " \\\n\t".join(commands), file=file)
+    if commands:
+        print('\t' + " \\\n\t".join(commands), file=file)
 
 
 def build_commands(doc, heading=None, embed="%s", end="", pip=""):
@@ -839,7 +853,7 @@ if parent_module.__name__ == '__main__':
 class Shebang(Action):
     """Insert a Windows-compatible shebang, print its PATH configuration if needed, and exit"""
 
-    SHEBANG = '#!venv/python.exe'
+    SHEBANG = '#!venv/bin/python3'
 
     def __call__(self, parser, args, values, option_string=None):
         shebang = None
@@ -851,10 +865,9 @@ class Shebang(Action):
             open(module_path, 'w').write(f'{self.SHEBANG}\n{src}')
 
         search_path = os.environ['PATH']
-        for_windows = '\\' in search_path
-        search_dirs = search_path.split(';' if for_windows else ':')
+        search_dirs = search_path.split(os.pathsep)
         if '.' not in search_dirs:
-            if for_windows:
+            if os.pathsep == ';':
                 print("[System.Environment]::SetEnvironmentVariable('Path',"
                       " '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')")
             else:
@@ -1072,31 +1085,21 @@ if __name__ == '__main__':
 $ makemake.py --dep build/makemake.dep
 include build/makemake.dep
 
-$ cat makemake.dep
+$ cat build/makemake.dep
 build/makemake.py.bringup: makemake.py build/makemake.dep
 	$(PYTHON) -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@"""
                """ && \\
-	$(PYTHON) -m pip install requests --no-warn-script-location >> $@ && \\
+	$(SPEEDUP_WSL_PIP)$(PYTHON) -m pip install requests --no-warn-script-location >> $@ && \\
 	$(PYTHON) makemake.py --shebang >> $@ && \\
 	chmod +x $< >> $@
 
 $ makemake.py --dep build/makemake.dep --makemake
 all: build/makemake.py.tested
-
 build/makemake.py.tested: makemake.py build/makemake.dep build/makemake.py.bringup
 	makemake.py --test > $@
 build/makemake.dep: makemake.py
 	makemake.py --dep $@
 include build/makemake.dep
-
-$ makemake.py -c "print(module_py)"
-makemake.py
-
-$ makemake.py -m
-x86_64
-
-$ makemake.py -s
-Windows
 """)
     add_arguments(argparser)
     argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)
