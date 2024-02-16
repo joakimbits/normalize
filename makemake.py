@@ -154,10 +154,9 @@ ifeq ($H,/home/$I)
     
     # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
     ifneq ($(shell echo $$WSL_DISTRO_NAME),)
-        SPEEDUP_WSL_DNS ?= $H/use_windows_dns.sh
-        SPEEDUP_WSL_PIP ?= sudo apt install -y python3-pip && DISPLAY= $(PYTHON) -m pip install -U keyring && DISPLAY= #
-        SPEEDUP_WSL_VENV_PIP ?= DISPLAY= $(_{_}_PYTHON) -m pip install -U keyring && #
-        SPEEDUP_WSL_VENV_PIP_INSTALL ?= DISPLAY= #
+        SPEEDUP_WSL_DNS ?= $H/use_windows_dns.sh $?/pip
+        SPEEDUP_WSL_PIP ?= DISPLAY= #
+        SPEEDUP_WSL_VENV ?= DISPLAY= $(_{_}_PYTHON) -m pip install --upgrade keyring && #
     endif
 else
     PYTHON ?= python
@@ -208,6 +207,10 @@ endif
 
 # Notify the user if new rules were built and included, and make therefore restarted
 ifeq ($(MAKE_RESTARTS),2)
+    ifndef MAKER
+        $(info # Hello $I, Welcome to makemake https://github.com/joakimbits/normalize)
+    endif
+    
     MAKER := $(shell $(MAKE) -v))
     INCLUDING ?= $(_{_}_BUILD)
     $(info # $(PWD) $(filter-out $(INCLUDING)%%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $(_{_}){makemake_py} $(_{_}_PYTHON) $(_{_}_BUILD))
@@ -380,11 +383,11 @@ $(_{_})venv/Lib/site-packages/%%: $(_{_}_PYTHON)
 # Setup a local python:
 $(_{_}_PYTHON): $(SPEEDUP_WSL_DNS)
 	( cd $(_{_}_DIR) && $(SPEEDUP_WSL_PIP)$(PYTHON) -m venv venv )
-	$(SPEEDUP_WSL_VENV_PIP)$(SPEEDUP_WSL_VENV_PIP_INSTALL)$(_{_}_PYTHON) -m pip install --upgrade pip
-	$(SPEEDUP_WSL_VENV_PIP_INSTALL)$(_{_}_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
+	$(SPEEDUP_WSL_VENV)$(SPEEDUP_WSL_PIP)$(_{_}_PYTHON) -m pip install --upgrade pip
+	$(SPEEDUP_WSL_PIP)$(_{_}_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
 
-ifndef SPEEDUP_WSL_DNS_FIX
-    SPEEDUP_WSL_DNS_FIX = 1
+ifndef SPEEDUP_WSL
+    SPEEDUP_WSL = 1
     $H/use_windows_dns.sh: ;
 	    echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@                
 	    echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
@@ -395,6 +398,12 @@ ifndef SPEEDUP_WSL_DNS_FIX
 	    sudo sed -i '\|command=$@|d' /etc/wsl.conf
 	    echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
 	    sudo sh $@
+endif
+
+ifndef INSTALL_PIP
+    INSTALL_PIP = 1
+    $?/pip:
+	    $! python3-pip
 endif
 
 # Check Python 3.9 style
@@ -783,7 +792,7 @@ if parent_module.__name__ == '__main__':
 
         commands = []
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
-                                  pip=f"$(SPEEDUP_WSL_VENV_PIP_INSTALL){python} -m pip")
+                                  pip=f"$(SPEEDUP_WSL_PIP){python} -m pip")
         bringups.append(([f'{python} {source} --shebang'], [''], []))
         bringups.append((['chmod +x $<'], [''], []))
         op = ">"
