@@ -154,7 +154,7 @@ ifeq ($H,/home/$I)
     
     # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
     ifneq ($(shell echo $$WSL_DISTRO_NAME),)
-        SPEEDUP_WSL_DNS ?= $H/use_windows_dns.sh $?/pip
+        SPEEDUP_WSL_DNS ?= | $H/use_windows_dns.sh $?/pip
         SPEEDUP_WSL_PIP ?= DISPLAY= #
         SPEEDUP_WSL_VENV ?= DISPLAY= $(_{_}_PYTHON) -m pip install --upgrade keyring && #
     endif
@@ -1019,21 +1019,6 @@ class Relpath(Action):
         relative_to = os.path.abspath(values[0])
         for path in values[1:]:
             print(os.path.relpath(os.path.abspath(path), relative_to).replace('\\', '/') + '/')
-
-
-def add_arguments(argparser):
-    argparser.add_argument('--makemake', action='store_true', help=(
-        f"Print Makefile for {module_path}, and exit"))
-    argparser.add_argument('--generic', action='store_true', help=(
-        f"Print generic Makefile for {module_path}, and exit"))
-    argparser.add_argument('--dep', action='store', help=(
-        f"Build a {module}.dep target, print its Makefile include statement, and exit"))
-    argparser.add_argument('--shebang', nargs=0, action=Shebang, help=Shebang.__doc__)
-    argparser.add_argument('-c', nargs=1, action=Command, help=Command.__doc__)
-    argparser.add_argument('--timeout', type=int, default=10, help=(
-        "Test timeout in seconds (10)"))
-    argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
-    argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
 
 
 def brief(*callables):
