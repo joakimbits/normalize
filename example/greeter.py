@@ -1,4 +1,4 @@
-#!venv/python.exe
+#!venv/bin/python3
 """Greetings from the source code
 
 Dependencies:
@@ -19,7 +19,7 @@ def run(cmd):
     """
     return subprocess.check_output(cmd.split()).decode('utf-8')[:-1]
 
-def hello(world=None):
+def hello(*world):
     """Greetings from the source code examples in this folder
 
     >>> hello()
@@ -27,8 +27,11 @@ def hello(world=None):
     Hello from main.c!
     Hello from greeter.cpp!
     """
-    print(f"Hello {world or 'from greeter.py'}!")
-    if not world:
+
+    if world:
+        print(f"Hello {' '.join(world)}!")
+    else:
+        print("Hello from greeter.py!")
         print(run(f"{makemake.path}example"))
 
 EXAMPLES = """
