@@ -209,7 +209,7 @@ endif
 
 # Make local commands available
 PATHS := $(subst ;, ,$(subst :, ,$(PATH)))
-ifneq ($(filter .,$(PATHS)),.)
+ifeq (,$(filter .,$(PATHS)))
     .-ON-PATH := .-on-$(OS)-path
 endif
 
