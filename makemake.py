@@ -191,9 +191,7 @@ _{_}_BUILD := $(_{_})$(__{_}_BUILD)
 ifndef ! 
     OS ?= $(shell $(PYTHON) $(_{_}){makemake_py} -s)
     CPU ?= $(shell $(PYTHON) $(_{_}){makemake_py} -m)
-    ifeq ($(OS),Windows)
-        # ToDo
-    else ifeq ($(OS),MacOSX)
+    ifeq ($(OS),MacOSX)
         ! ?= brew install
         ? ?= /opt/homebrew/bin
         FONTS ?= ~/Library/Fonts
@@ -391,9 +389,14 @@ $(_{_})venv/lib/python/site-packages: | $(_{_}_PYTHON)
 	mkdir -p $(dir $@)
 	ln -s $$(realpath --relative-to=$(dir $@) `venv/bin/python3 -c "import sys; print(sys.path[-1])"`) $@
 
+# Workaround Windows python not installing #!venv/bin/python3
+ifeq ($(PYTHON),/mnt/c/tools/miniconda3/python.exe)
+    _{_}_PYTHON_FINALIZE ?= && mkdir -p $(dir $@) && ln -s ../Scripts/python.exe $@
+endif
+
 # Setup a local python:
 $(_{_}_PYTHON): | $(PYTHON) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
-	( cd $(_{_}_DIR) && $(SPEEDUP_WSL_PIP)$(PYTHON) -m venv venv )
+	( cd $(_{_}_DIR) && $(SPEEDUP_WSL_PIP)$(PYTHON) -m venv venv ) $(_{_}_PYTHON_FINALIZE)
 	$(SPEEDUP_WSL_VENV)$(SPEEDUP_WSL_PIP)$(_{_}_PYTHON) -m pip install --upgrade pip
 	$(SPEEDUP_WSL_PIP)$(_{_}_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
 
