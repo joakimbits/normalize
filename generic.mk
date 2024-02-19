@@ -290,8 +290,11 @@ $(_{_}_PYTHON): | $(PYTHON) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
 # Install local commands before other commands
 ifndef .-ON-PATH_TARGETS
     .-ON-PATH_TARGETS = 1
-    %-on-Linux-path %-on-MacOSX-path: ~/.profile
+    %-on-Linux-path: ~/.profile
 	    echo 'export PATH="$*:$$PATH"' >> $< 
+	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+    %-on-MacOSX-path: ~/.zshrc
+	    echo 'export PATH="$*:$$PATH"' >> $<
 	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
     %-on-Windows-path:
 	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))

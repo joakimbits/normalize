@@ -488,6 +488,7 @@ class Uname(Action):
 
     TRANSLATIONS = dict([
         ('kernel-name', 'system'),
+        ('Darwin', 'MacOSX'),
         ('AMD64', 'x86_64')
     ])
 
