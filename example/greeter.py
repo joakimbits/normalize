@@ -1,4 +1,4 @@
-#!venv/python.exe
+#!venv/bin/python3
 """Greetings from the source code
 
 Dependencies:

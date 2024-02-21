@@ -30,12 +30,10 @@ $ python3 makemake.py --makemake
 all: build/makemake.py.tested
 build/makemake.py.tested: makemake.py build/makemake.py.bringup
 	makemake.py --test > $@
-build/makemake.py.bringup: makemake.py
-	mkdir build/ && \
-	$(PYTHON) -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@ && \
-	$(SPEEDUP_WSL_PIP)$(PYTHON) -m pip install requests --no-warn-script-location >> $@ && \
-	$(PYTHON) makemake.py --shebang >> $@ && \
-	chmod +x $< >> $@
+build/makemake.py.bringup: makemake.py | $(PYTHON)
+	mkdir -p build/ && \
+	$(PYTHON) -m pip install requests --no-warn-script-location > $@ && \
+	$(PYTHON) makemake.py --shebang >> $@
 
 ```
 
