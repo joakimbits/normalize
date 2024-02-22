@@ -21,7 +21,7 @@ def fizz3fuzz5(*numbers):
             s += 'Fizz'
         if i % 5 == 0:
             s += 'Buzz'
-        yield s if s else str(i)
+        yield s or str(i)
 
 EXAMPLES = """
 $ ./factorize.py 1 3 5 15 100
