@@ -21,6 +21,7 @@ _Makefile := $(lastword $(MAKEFILE_LIST))
 # `make gfm pdf html slides`: Print reports with all details of the project.
 # `make old changes review audit`: Compare the project with last release.
 # clean: Remove everything built by the project.
+$(info -include $/project.mk)
 -include $/project.mk
 
 ## How to make that generic project maker
@@ -61,4 +62,5 @@ $/clean: | $($/ACTIVE_SUBPROJECTS:%=%clean)
 
 ## Finally attempt to include all sub-projects
 # Note: Subprojects modify $/, this has to be the last command using it as a prefix to here.
+$(info -include $($/SUBPROJECTS:%=%Makefile))
 -include $($/SUBPROJECTS:%=%Makefile)
