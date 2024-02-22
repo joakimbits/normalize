@@ -29,7 +29,6 @@ ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
     $/project.mk: $/generic.mk $/makemake.py
 	    mkdir -p $(dir $@) && cat $< | \
 	      sed 's/{" ".join(sys.argv)}/$(MAKE) $(MAKECMDGOALS)/g' | \
-	      sed 's/{_}/$(notdir $(realpath $(dir $@)))/g' | \
 	      sed 's|{build_dir}|build/|g' | \
 	      sed 's/{makemake_py}/makemake.py/g' > $@
     $/generic.mk $/makemake.py:

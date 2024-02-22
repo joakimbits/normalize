@@ -15,12 +15,16 @@ GPT_TEMPERATURE ?= 0.7
 project.mk := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(project.mk)))))
 
+# Default rule
+$(info $/all: $/bringup)
+$/all: $/bringup
+
 # Where to make files
 _$/BUILD := {build_dir}
 $/BUILD :=$/$(_$/BUILD)
 
 # The maker's home directory and name
-H := $(shell echo ~)
+~ := $(shell echo ~)
 I := $(shell whoami)
 
 # Workaround Windows feature: Windows domain in whoami
@@ -31,8 +35,8 @@ ifneq ($(words $I),1)
 endif
 
 # Workaround Windows WSL1 bug: Recursive make shell believes it is git bash on Windows
-ifeq ($H,/Users/$I)
-    H := /home/$I
+ifeq ($~,/Users/$I)
+    ~ := /home/$I
 endif
 
 # A base PYTHON to use. It can be one of:
@@ -40,21 +44,22 @@ endif
 #  - `python.exe` in Windows from WSL Ubuntu, or
 #  - `python` on Windows.
 #  - or any given PYTHON.
-ifeq ($H,/home/$I)
+ifeq ($~,/home/$I)
     PYTHON ?= python3
     VENV_PYTHON ?= bin/python3
 
     # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
     ifneq ($(shell echo $$WSL_DISTRO_NAME),)
-        SPEEDUP_WSL_DNS ?= $H/use_windows_dns.sh $?/pip
+        SPEEDUP_WSL_DNS ?= $~/use_windows_dns.sh $?/pip
         SPEEDUP_WSL_PIP ?= DISPLAY= #
-        SPEEDUP_WSL_VENV ?= DISPLAY= $(_{_}_PYTHON) -m pip install --upgrade keyring && #
+        SPEEDUP_WSL_VENV ?= DISPLAY= $($/PROJECT_PYTHON) -m pip install --upgrade keyring && #
     endif
 else
     PYTHON ?= python
     VENV_PYTHON ?= python.exe
 endif
 PYTHON := $(shell which $(PYTHON))
+$/PROJECT_PYTHON := $/venv/$(VENV_PYTHON)
 
 # A package manager for the PYTHON OS
 ifndef !
@@ -106,7 +111,7 @@ ifeq (2,$(MAKE_RESTARTS))
     
     MAKER := $(shell $(MAKE) -v))
     INCLUDING ?= $($/BUILD)
-    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $/{makemake_py} $($/PYTHON) $($/BUILD))
+    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $/{makemake_py} $($/PROJECT_PYTHON) $($/BUILD))
     INCLUDED := $(MAKEFILE_LIST)
     INCLUDING := $($/BUILD)
 
@@ -118,31 +123,28 @@ ifeq (2,$(MAKE_RESTARTS))
     endif
 endif
 
-# Default rule
-$/all: $/bringup
-
 # Find all source files
 $/SOURCE :=
 $/MAKEFILE := $(wildcardproject.mk)
 $/SOURCE += $($/MAKEFILE)
-$/S := $(wildcard$/*.s)
+$/S := $(wildcard $/*.s)
 $/SOURCE += $($/S)
-$/C := $(wildcard$/*.c)
+$/C := $(wildcard $/*.c)
 $/SOURCE += $($/C)
-$/H := $(wildcard$/*.h)
+$/H := $(wildcard $/*.h)
 $/SOURCE += $($/H)
-$/CPP := $(wildcard$/*.cpp)
+$/CPP := $(wildcard $/*.cpp)
 $/SOURCE += $($/CPP)
-$/HPP := $(wildcard$/*.hpp)
+$/HPP := $(wildcard $/*.hpp)
 $/SOURCE += $($/HPP)
-$/PY := $(wildcard$/*.py)
+$/PY := $(wildcard $/*.py)
 $/PY := $(subst ./,$/,$($/PY))
 $/SOURCE += $($/PY)
-$/MD := $(wildcard$/*.md)
+$/MD := $(wildcard $/*.md)
 $/SOURCE += $($/MD)
 
 # Find our git status
-$/BRANCH := $(shell git branch --show-current)
+$/BRANC~ := $(shell git branch --show-current)
 $/BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
 $/KNOWN := $(addprefix$/,$(shell cd $($/PROJECT) ; git ls-files . ':!:*/*'))
 $/ADD := $(filter-out $($/KNOWN),$($/SOURCE))
@@ -220,14 +222,14 @@ $/EXES := $($/EXE)
 $/EXES += $($/PY)
 
 # Collect bringup and tested targets
-$/BRINGUP := $($/PY: $/%=$($/BUILD)%.bringup)
+$/BRINGUP := $($/PY:$/%=$($/BUILD)%.bringup)
 $/TESTED := $($/EXE_TESTED)
 $/TESTED += $($/PY: $/%=$($/BUILD)%.tested)
 $/PRETESTED := $($/TESTED)
 $/TESTED += $($/MD: $/%=$($/BUILD)%.sh-test.tested)
 
 # Prepare for bringup
-$/PY_MK := $($/PY: $/%=$($/BUILD)%.mk)
+$/PY_MK := $($/PY:$/%=$($/BUILD)%.mk)
 $/DEPS += $($/PY_MK)
 
 # Prepare for reporting
@@ -242,6 +244,7 @@ $/REPORT += $($/RESULT:%=%.md)
 
 # Convenience targets
 .PHONY: $/bringup $/tested $/clean
+$(info $/bringup: $($/EXE) $($/BRINGUP))
 $/bringup: $($/EXE) $($/BRINGUP)
 $/tested: $($/TESTED)
 
@@ -264,14 +267,14 @@ $($/BUILD)$($/NAME).tested: $/$($/NAME)
 # Check Python 3.9 syntax
 $/syntax: $($/BUILD)syntax
 $($/BUILD)%.py.syntax: $/%.py | $/venv/lib/python/site-packages/ruff
-	$($/PYTHON) -m ruff --select=E9,F63,F7,F82 --target-version=py39 $< > $@ || (cat $@ && false)
+	$($/PROJECT_PYTHON) -m ruff --select=E9,F63,F7,F82 --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Install pip package in the local python:
 $/venv/lib/python/site-packages/%: | $/venv/lib/python/site-packages
-	$($/PYTHON) -m pip install $*
+	$($/PROJECT_PYTHON) -m pip install $*
 
 # Link to actual site-packages
-$/venv/lib/python/site-packages: | $($/PYTHON)
+$/venv/lib/python/site-packages: | $($/PROJECT_PYTHON)
 	mkdir -p $(dir $@)
 	ln -s $$(realpath --relative-to=$(dir $@) `venv/bin/python3 -c "import sys; print(sys.path[-1])"`) $@
 
@@ -281,10 +284,10 @@ ifeq ($(PYTHON),/mnt/c/tools/miniconda3/python.exe)
 endif
 
 # Setup a local python:
-$($/PYTHON): | $(PYTHON) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
+$($/PROJECT_PYTHON): | $(PYTHON) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
 	( cd $($/PROJECT) && $(SPEEDUP_WSL_PIP)$(PYTHON) -m venv venv ) $($/PYTHON_FINALIZE)
-	$(SPEEDUP_WSL_VENV)$(SPEEDUP_WSL_PIP)$($/PYTHON) -m pip install --upgrade pip
-	$(SPEEDUP_WSL_PIP)$($/PYTHON) -m pip install requests  # Needed by -m makemake --prompt
+	$(SPEEDUP_WSL_VENV)$(SPEEDUP_WSL_PIP)$($/PROJECT_PYTHON) -m pip install --upgrade pip
+	$(SPEEDUP_WSL_PIP)$($/PROJECT_PYTHON) -m pip install requests  # Needed by -m makemake --prompt
 
 # Install local commands before other commands
 ifndef .-ON-PATH_TARGETS
@@ -301,7 +304,7 @@ endif
 
 ifndef SPEEDUP_WSL_DNS_TARGET
     SPEEDUP_WSL_DNS_TARGET = 1
-    $H/use_windows_dns.sh:
+    $~/use_windows_dns.sh:
 	    echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@                
 	    echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
 	    echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
@@ -321,14 +324,14 @@ endif
 
 # Check Python 3.9 style
 $($/BUILD)%.py.style: $/%.py $($/BUILD)%.py.syntax
-	$($/PYTHON) -m ruff --fix --target-version=py39 $< > $@ || (cat $@ && false)
+	$($/PROJECT_PYTHON) -m ruff --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Build a recipy for $($/BUILD)%.py.bringup
 $($/BUILD)%.py.mk: $/%.py
 	rm -f $@ && ( cd $($/PROJECT) && $(PYTHON) $*.py --generic --dep $(_$/BUILD)$*.py.mk ) ; [ -e $@ ] || echo "\$$($/BUILD)$*.py.bringup:; touch \$$@" >$@
 
 # Check Python and command line usage examples in .py files
-$($/BUILD)%.py.tested: $/%.py $($/BUILD)%.py.mk $($/BUILD)%.py.style $($/BUILD)%.py.bringup $($/EXE_TESTED) | $($/PYTHON)
+$($/BUILD)%.py.tested: $/%.py $($/BUILD)%.py.mk $($/BUILD)%.py.style $($/BUILD)%.py.bringup $($/EXE_TESTED) | $($/PROJECT_PYTHON)
 	( cd $($/PROJECT) && $*.py --test ) > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
@@ -483,9 +486,9 @@ $($/OLD)report.gfm: $(_OLD_WORKTREE)
 $/%: $($/BUILD)%.diff
 	cat $<
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/CHANGES)"
-$($/BUILD)audit.diff: $($/BUILD)prompt.diff | $($/PYTHON)
+$($/BUILD)audit.diff: $($/BUILD)prompt.diff | $($/PROJECT_PYTHON)
 	cat $< > $@
-	$($/PYTHON) -m makemake --prompt $< $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) >> $@
+	$($/PROJECT_PYTHON) -m makemake --prompt $< $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) >> $@
 $($/BUILD)prompt.diff: $($/BUILD)review.diff
 	$(PYTHON) $/{makemake_py} -c 'print(REVIEW)' > $@
 	echo "$$ $(MAKE) $/review" >> $@

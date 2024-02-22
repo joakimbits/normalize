@@ -251,9 +251,9 @@ if parent_module.__name__ == '__main__':
             pattern = '%'
             source = '$<'
             stem = '$*'
-            python = f'$(_{_}_PYTHON)'
-            src_dir = f'$(_{_})'
-            build_dir = f'$(_{_}_BUILD)'
+            python = f'$($/PROJECT_PYTHON)'
+            src_dir = f'$/'
+            build_dir = f'$($/BUILD)'
             build_dir_var_value = f"{src_dir}{build_dir}"
             generic = " --generic"
         else:
@@ -266,7 +266,7 @@ if parent_module.__name__ == '__main__':
             generic = ""
 
         if generic_dependencies:
-            embed = f"( cd $(_{_}_DIR) && %s"
+            embed = f"( cd $($/DIR) && %s"
             end = " )"
             rules = []  # The generic rules are already printed
         else:
@@ -306,7 +306,7 @@ if parent_module.__name__ == '__main__':
         if generic_dependencies or dep_path:
             bringup_rule += f" {build_dir}{dep_filename}"
             if generic_dependencies:
-                bringup_rule += f" $(_{_}_PYTHON)"
+                bringup_rule += f" $($/PROJECT_PYTHON)"
         else:
             commands = [f"mkdir {build_dir}" + (" &&" if commands else "")] + commands
 
