@@ -117,26 +117,16 @@ I will need to wait for gpt-4. Thank you for your service.
 """
 
 GENERIC_MAKEFILE = f"""# {_}$ {" ".join(sys.argv)}
-## How to reach here from the current working directory
 _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
-
-## How to make a generic project
-# build/%.bringup: Bringup %
-# report: Print a self-test summary.
-# gfm pdf html slides: Print a self-test project report.
-# old changes review audit: Compare with last release.
-# clean: Remove everything built here.
--include $/project.mk
-$/project.mk: $/generic.mk $/makemake.py
-	mkdir -p $(dir $@) && cat $< | \\
-	  sed 's/{{" ".join(sys.argv)}}/$(MAKE) $(MAKECMDGOALS)/g' | \\
-	  sed 's/{{_}}/$(notdir $(realpath $(dir $@)))/g' | \\
-	  sed 's|{{build_dir}}|build/|g' | \\
-	  sed 's/{{makemake_py}}/makemake.py/g' > $@
-$/generic.mk $/makemake.py:
-	curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/$(notdir $@) -o $@
-.PRECIOUS: $/makemake.py
+-include $/Makefile
+ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
+    $/Makefile:
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/$(notdir $@) -o $@
+endif
+$/clean: $/clean_Makefile
+$/clean_Makefile:
+	rm -f $/Makefile
 """
 COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 

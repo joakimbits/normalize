@@ -4,7 +4,8 @@
 # {build_dir} = sub-directory-for-intermediate-files
 # {makemake_py} = path-to-makemake.py
 
-ifeq (,$(_{_}_DIR))
+## Make this project maker only once
+ifndef _{_}_DIR
 
 # Configure a GPT _{_}_MODEL to use for `audit`
 #  - A large-context openai model suitable for code review
