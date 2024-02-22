@@ -85,7 +85,7 @@ endif
 $/NAME ?= $(notdir $(realpath $/PROJECT))
 
 
-### 
+###
 # Generic recipies for bringup, testing, reporting and auditing a project on any OS and CPU with PYTHON >= Python 3.7.
 # Tested on x86 WSL1, x86 Windows and Arm64 MacOSX.
 
@@ -159,16 +159,13 @@ $/HERE := $($/HERE_DIR:%./=%)
 $/OLD_WORKTREE := $($/HOME)$(_$/BUILD)$($/BASELINE)/$($/NAME)/
 $/OLD := $($/OLD_WORKTREE)$($/HERE)
 
-# Create status lines
-ifeq ($(NORMAL),)
-  NORMAL := `tput sgr0`
-  RED := `tput setaf 1`
-  GREEN := `tput setaf 2`
-  YELLOW := `tput setaf 3`
-  BLUE := `tput setaf 4`
-  REVERSED := `tput rev`
-endif
-
+## Colorize edited files by their git status
+NORMAL ?= `tput sgr0`
+RED ?= `tput setaf 1`
+GREEN ?= `tput setaf 2`
+YELLOW ?= `tput setaf 3`
+BLUE ?= `tput setaf 4`
+REVERSED ?= `tput rev`
 $/BRANCH_STATUS := $(if $($/ADD),$(RED)$($/ADD)$(NORMAL))
 $/BRANCH_STATUS += $(if $($/MODIFIED),$(BLUE)$($/MODIFIED)$(NORMAL))
 $/BRANCH_STATUS += $(if $($/REMOVE),$(REVERSED)$($/REMOVE)$(NORMAL))
@@ -187,29 +184,25 @@ $/CHANGES_AUDIT += $($/ADD)
 $/CHANGES_AUDIT += $($/MODIFIED)
 $/CHANGES_AUDIT += $($/COMMIT_INFO)
 
-# List all installation and test targets
-$/SRCS := $($/S)
-$/CXX := $($/C)
-$/CXX += $($/CPP)
-$/SRCS += $($/CXX)
+# Collect code
+$/LINKABLE := $($/S)
+$/COMPILABLE := $($/C)
+$/COMPILABLE += $($/CPP)
+$/LINKABLE += $($/COMPILABLE)
 $/CODE := $($/SRCS)
 $/CODE += $($/PY)
 
-ifneq ($(strip $($/SRCS)),)
-    $/EXE :=$/{_}
-    $/EXE_TESTED := $($/BUILD){_}.tested
-endif
-
-$/BRINGUP := $($/PY: $/%=$($/BUILD)%.bringup)
-$/TESTED := $($/EXE_TESTED)
-$/TESTED += $($/PY: $/%=$($/BUILD)%.tested)
-$/PRETESTED := $($/TESTED)
-$/TESTED += $($/MD: $/%=$($/BUILD)%.sh-test.tested)
-
-# Prepare for compilation
+## Prepare for compilation
 $/INC_DIRS := $($/PROJECT)
 $/LDFLAGS := $(LDFLAGS)
 
+# A linked executable has the same name as the project
+ifneq (,$(strip $($/LINKABLE)))
+    $/EXE := $/$($/NAME)
+    $/EXE_TESTED := $($/BUILD)($/EXE).tested
+endif
+
+# If we got assembly source, assume it has _start code
 ifneq ($(strip $($/S)),)
     $/LDFLAGS += -nostartfiles -no-pie
 endif
@@ -219,12 +212,19 @@ $/CXXFLAGS += -S $(addprefix -I,$($/INC_DIRS)) -MMD -MP
 $/CFLAGS := $($/CXXFLAGS)
 $/CXXFLAGS += $(CXXFLAGS)
 $/CFLAGS += $(CFLAGS)
-$/COBJS := $($/CXX: $/%=$($/BUILD)%.s)
+$/COBJS := $($/COMPILABLE: $/%=$($/BUILD)%.s)
 $/DEPS := $($/COBJS:.s=.d)
 $/OBJS := $($/S)
 $/OBJS += $($/COBJS)
 $/EXES := $($/EXE)
 $/EXES += $($/PY)
+
+# Collect bringup and tested targets
+$/BRINGUP := $($/PY: $/%=$($/BUILD)%.bringup)
+$/TESTED := $($/EXE_TESTED)
+$/TESTED += $($/PY: $/%=$($/BUILD)%.tested)
+$/PRETESTED := $($/TESTED)
+$/TESTED += $($/MD: $/%=$($/BUILD)%.sh-test.tested)
 
 # Prepare for bringup
 $/PY_MK := $($/PY: $/%=$($/BUILD)%.mk)
@@ -241,7 +241,7 @@ $/REPORT += $($/LOGIC: $/%=$($/BUILD)%.md)
 $/REPORT += $($/RESULT:%=%.md)
 
 # Convenience targets
-.PHONY: $/bringup$/tested$/clean
+.PHONY: $/bringup $/tested $/clean
 $/bringup: $($/EXE) $($/BRINGUP)
 $/tested: $($/TESTED)
 
@@ -254,20 +254,20 @@ $($/BUILD)%.cpp.s: $/%.cpp
 	$(CXX) $($/CXXFLAGS) -c $< -o $@
 
 # Link executable
-$/{_}: $($/OBJS)
+$/$($/NAME): $($/OBJS)
 	$(CC) $($/LDFLAGS) $^ -o $@
 
 # Test executable:
-$($/BUILD){_}.tested: $/{_}
+$($/BUILD)$($/NAME).tested: $/$($/NAME)
 	true | ./$< > $@ || (cat $@ && false)
 
 # Check Python 3.9 syntax
 $/syntax: $($/BUILD)syntax
-$($/BUILD)%.py.syntax: $/%.py |$/venv/lib/python/site-packages/ruff
+$($/BUILD)%.py.syntax: $/%.py | $/venv/lib/python/site-packages/ruff
 	$($/PYTHON) -m ruff --select=E9,F63,F7,F82 --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Install pip package in the local python:
-$/venv/lib/python/site-packages/%: |$/venv/lib/python/site-packages
+$/venv/lib/python/site-packages/%: | $/venv/lib/python/site-packages
 	$($/PYTHON) -m pip install $*
 
 # Link to actual site-packages
@@ -289,8 +289,11 @@ $($/PYTHON): | $(PYTHON) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
 # Install local commands before other commands
 ifndef .-ON-PATH_TARGETS
     .-ON-PATH_TARGETS = 1
-    %-on-Linux-path %-on-MacOSX-path: ~/.profile
-	    echo 'export PATH="$*: $$PATH"' >> $< 
+    %-on-Linux-path: ~/.profile
+	    echo 'export PATH="$*:$$PATH"' >> $< 
+	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+    %-on-MacOSX-path: ~/.zshrc
+	    echo 'export PATH="$*:$$PATH"' >> $<
 	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
     %-on-Windows-path:
 	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
@@ -329,7 +332,7 @@ $($/BUILD)%.py.tested: $/%.py $($/BUILD)%.py.mk $($/BUILD)%.py.style $($/BUILD)%
 	( cd $($/PROJECT) && $*.py --test ) > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
-$($/BUILD)%.sh-test.tested: $($/BUILD)%.sh-test $($/PRETESTED) |$/{makemake_py}
+$($/BUILD)%.sh-test.tested: $($/BUILD)%.sh-test $($/PRETESTED) | $/{makemake_py}
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $($/PROJECT) && $(PYTHON) {makemake_py} --timeout 60 --sh-test \
 	    $(_$/BUILD)$*.sh-test ) > $$tmp && mv $$tmp $@
@@ -362,7 +365,7 @@ $($/BUILD)report.txt: $($/TESTED)
 $/%.gfm: $($/BUILD)%.md
 	pandoc --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
 	       -M title="{_} $*" -M author="`git log -1 --pretty=format:'%an'`"
-$/%.html$/%.pdf$/%.dzslides: $($/BUILD)%.md | \
+$/%.html $/%.pdf $/%.dzslides: $($/BUILD)%.md | \
   $?/pandoc $?/xelatex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
 	pandoc --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
 	       -M title="{_} $*" -M author="`git log -1 --pretty=format:'%an'`" \
@@ -370,10 +373,10 @@ $/%.html$/%.pdf$/%.dzslides: $($/BUILD)%.md | \
 	       --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 
 # Make a markdown document.
-$/h :=\n---\n\n\#
-$/~~~. =\\footnotesize\n~~~ {{$1}}
-$/~~~sh :=$(call $/~~~.,.sh)
-$/~~~ :=~~~\n\\normalsize\n
+$/h := \n---\n\n\#
+$/~~~. = \\footnotesize\n~~~ {$1}
+$/~~~sh := $(call $/~~~.,.sh)
+$/~~~ := ~~~\n\\normalsize\n
 $($/BUILD)Makefile.md: project.mk
 	( echo "$($/h)## [$*]($*)" && \
 	  echo "$(call $/~~~.,.mk)" && \
@@ -402,20 +405,19 @@ $/slides: $/slides.html
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/BRANCH_STATUS)"
 $/slides.html: $/report.dzslides
 	mv $< $@
-$/report.html$/report.pdf$/report.gfm \
- $/report.dzslides: $($/MD) $($/REPORT)
+$/report.html $/report.pdf $/report.gfm $/report.dzslides: $($/MD) $($/REPORT)
 $/file = $(foreach _,$($/$1),[\`$_\`]($_))
-$/exe = $(foreach _,$($/$1),[\`./$_\`]($_))
-$/h_fixup :=sed -E '/^$$|[.]{{3}}/d'
+$/exe = $(foreach _,$($/$1),[\`$_\`]($_))
+$/h_fixup := sed -E '/^$$|[.]{{3}}/d'
 $($/BUILD)report.md: $($/BUILD)report.txt
 	echo "A build-here include-from-anywhere project \
 based on [makemake](https://github.com/joakimbits/normalize)." > $@
 	echo "\n- \`make report pdf html slides review audit\`" >> $@
 ifneq ($(strip $($/EXE)),)
-	echo "- \`./{_}\`: $(subst$/,,$(call $/file,SRCS))" >> $@
+	echo "- \`./{_}\`: $(subst $/,,$(call $/file,SRCS))" >> $@
 endif
 ifneq ($(strip $($/PY)),)
-	echo "- $(subst$/,,$(call $/exe,PY))" >> $@
+	echo "- $(subst $/,,$(call $/exe,PY))" >> $@
 endif
 	echo "$($/h)## Installation" >> $@
 	echo "$($/~~~sh)" >> $@
@@ -426,7 +428,7 @@ ifneq ($(strip $($/EXE)),)
 endif
 ifneq ($(strip $($/PY)),)
 	echo "- Installs \`./venv\`." >> $@
-	echo "- Installs $(subst$/,,$(call $/exe,PY))." >> $@
+	echo "- Installs $(subst $/,,$(call $/exe,PY))." >> $@
 endif
 ifneq ($($/EXES),)
 	echo "$($/h)## Usage" >> $@
@@ -443,17 +445,17 @@ ifneq ($($/EXES),)
 	echo "\$$ make tested" >> $@
 	echo "$($/~~~)" >> $@
 endif
-ifneq ($(strip $($/EXE)),)
+ifneq (,$(strip $($/EXE)))
 	echo "- Tests \`./{_}\`." >> $@
 endif
-ifneq ($(strip $($/PY)),)
+ifneq (,$(strip $($/PY)))
 	echo "- Verifies style and doctests in\
  $(subst $($/PROJECT),,$(call $/file,PY))." >> $@
 endif
-ifneq ($(strip $($/MD)),)
+ifneq (,$(strip $($/MD)))
 	echo "- Verifies doctests in $(subst $($/PROJECT),,$(call $/file,MD))." >> $@
 endif
-ifneq ($(strip $($/CODE)),)
+ifneq (,$(strip $($/CODE)))
 	echo "$($/h)## Result" >> $@
 	echo "$($/~~~sh)" >> $@
 	echo "\$$ make report" >> $@
@@ -466,9 +468,9 @@ endif
 
 # Build an old worktree that is shared by all projects in this git
 ifndef _OLD_WORKTREE
-_OLD_WORKTREE := $($/OLD_WORKTREE)
-$(_OLD_WORKTREE):
-	git worktree add -d $(_OLD_WORKTREE) $($/TAG)
+    _OLD_WORKTREE := $($/OLD_WORKTREE)
+    $(_OLD_WORKTREE):
+	    git worktree add -d $(_OLD_WORKTREE) $($/TAG)
 endif
 
 # Document last release.
@@ -489,8 +491,7 @@ $($/BUILD)prompt.diff: $($/BUILD)review.diff
 	echo "$$ $(MAKE) $/review" >> $@
 	cat $^ >> $@
 	echo -n "$$ " >> $@
-$($/BUILD)review.diff: $($/BUILD)files.diff $($/BUILD)comments.diff\
-  $($/BUILD)report.diff
+$($/BUILD)review.diff: $($/BUILD)files.diff $($/BUILD)comments.diff $($/BUILD)report.diff
 	cat $^ > $@
 $($/BUILD)files.diff:
 	echo "# $($/CHANGES_AUDIT)" > $@
