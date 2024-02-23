@@ -120,16 +120,12 @@ GENERIC_MAKEFILE = f"""# {_}$ {" ".join(sys.argv)}
 _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
 
--include $/Makefile
-
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
-    $/Makefile:
+    $/project.mk:
 	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/$(notdir $@) -o $@
 endif
 
-$/clean: $/clean_Makefile
-$/clean_Makefile:
-	rm -f $/Makefile
+-include $/project.mk
 """
 COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 
