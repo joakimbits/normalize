@@ -55,7 +55,7 @@
 # `old changes review audit`: Compare the project with last release.
 # Changes are very brief, as part of an otherwise collapsed complete source code tree.
 # Audit is done with help of openai, using GPT-3.5-turbo by default.
-# Configure your own openai account in your maker if you need a larger context - see Variables below.
+# Configure your own openai account in your maker if you need a larger context - see Parameters below.
 
 #### Recommended dependencies
 
@@ -162,7 +162,7 @@ $/greeter:
 # You could also consider making this a sibling project to the parent project instead.
 
 
-## Variables
+## Parameters
 
 # Configure a GPT model to use for `audit`
 #  - A large-context openai model suitable for code review
@@ -233,6 +233,9 @@ ifndef !
     endif
 endif
 
+
+### Variables
+
 # Define the rest here only once
 ifndef $/PROJECT
 ifeq (,$/)
@@ -242,6 +245,24 @@ else
 endif
 $/NAME ?= $(notdir $(realpath $/PROJECT))
 
+## Find subdirectories containing at least one .md file
+$/SUBDIRS := $(foreach d,$(shell find $/. -mindepth 1 -maxdepth 1),$(notdir $d))
+$/SUBPROJECTS += $(sort $(dir $(foreach d,$($/SUBDIRS),$(wildcard $/$d/*.md))))
+$/SUBPROJECTS := $(filter-out $($/NON-SUBPROJECTS),$($/SUBPROJECTS))
+$/ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/SUBPROJECTS),$(wildcard $/$d/Makefile)))
+
+## Make these as sub-projects before this project
+$/all: | $($/ACTIVE_SUBPROJECTS:%=%all)
+$/tested: | $($/ACTIVE_SUBPROJECTS:%=%tested)
+$/build/report.txt: $($/ACTIVE_SUBPROJECTS:%=%build/report.txt)
+$/gfm: | $($/ACTIVE_SUBPROJECTS:%=%gfm)
+$/pdf: | $($/ACTIVE_SUBPROJECTS:%=%pdf)
+$/html: | $($/ACTIVE_SUBPROJECTS:%=%html)
+$/slides: | $($/ACTIVE_SUBPROJECTS:%=%slides)
+$/old: | $($/ACTIVE_SUBPROJECTS:%=%old)
+$/new: $($/ACTIVE_SUBPROJECTS:%=%new)
+$/build/review.diff: $($/ACTIVE_SUBPROJECTS:%=%build/review.diff)
+$/clean: | $($/ACTIVE_SUBPROJECTS:%=%clean)
 
 # Make local commands available
 PATHS := $(subst ;, ,$(subst :, ,$(PATH)))
@@ -685,25 +706,6 @@ $($/BUILD)report.diff: $($/OLD)report.gfm$/report.gfm
 	      echo "$$(sed -n '3p' $$part) ..." ; fi ; \
 	    done ; \
 	  rm xx**; ) >> $@
-
-## Find subdirectories containing at least one .md file
-$/SUBDIRS := $(foreach d,$(shell find $/. -mindepth 1 -maxdepth 1),$(notdir $d))
-$/SUBPROJECTS += $(sort $(dir $(foreach d,$($/SUBDIRS),$(wildcard $/$d/*.md))))
-$/SUBPROJECTS := $(filter-out $($/NON-SUBPROJECTS),$($/SUBPROJECTS))
-$/ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/SUBPROJECTS),$(wildcard $/$d/Makefile)))
-
-## Make these as sub-projects before this project
-$/all: | $($/ACTIVE_SUBPROJECTS:%=%all)
-$/tested: | $($/ACTIVE_SUBPROJECTS:%=%tested)
-$/build/report.txt: $($/ACTIVE_SUBPROJECTS:%=%build/report.txt)
-$/gfm: | $($/ACTIVE_SUBPROJECTS:%=%gfm)
-$/pdf: | $($/ACTIVE_SUBPROJECTS:%=%pdf)
-$/html: | $($/ACTIVE_SUBPROJECTS:%=%html)
-$/slides: | $($/ACTIVE_SUBPROJECTS:%=%slides)
-$/old: | $($/ACTIVE_SUBPROJECTS:%=%old)
-$/new: $($/ACTIVE_SUBPROJECTS:%=%new)
-$/build/review.diff: $($/ACTIVE_SUBPROJECTS:%=%build/review.diff)
-$/clean: | $($/ACTIVE_SUBPROJECTS:%=%clean)
 
 ## Finally attempt to include all bringup files and sub-projects
 # Note: Subprojects modify $/, so this has to be the last command using it as a prefix here.
