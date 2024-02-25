@@ -4,7 +4,7 @@
 
 # Defines generic make targets `bringup tested report review audit clean` for arbitrarily knitted projects.
 # Can be included in any other project. Will always make project files in the same location.
-# Warns if building recursively rather than being included, but it should still make the same.
+# Warns if building recursively rather than being included, but still makes the same.
 # Developed on x86 WSL1 and Arm64 MacOSX. Release-tested on GitHub, PowerShell, cmd and Git Bash.
 
 ### Usage
