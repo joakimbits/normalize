@@ -37,8 +37,8 @@
 
 # `build/*.py.bringup`: *.py is executable using the venv/bin/python3 next to it.
 # `build/directory-name.bringup`: directory-name is executable as-is.
-# `build/*.tested`: * is self-tested.
-# `build/*.md`: * is documented.
+# `build/*.tested`: * is self-tested without failure, and the test output is here.
+# `build/*.md`: * is documented here.
 # `report`: Print a project self-test summary.
 # `gfm pdf html slides`: Print links to reports documenting all details of the project.
 # `old changes review audit`: Compare the project with last release.
