@@ -33,16 +33,6 @@
 # `make`: `.` becomes first directory on the current user's PATH - if there is at least one .py file in a project here.
 # `make pdf html slides`: Installs latex and fonts.
 
-#### Other targets
-
-# `build/*.py.bringup`: *.py is executable using the venv/bin/python3 next to it.
-# `build/directory-name.bringup`: directory-name is executable as-is.
-# `build/*.tested`: * is self-tested without failure, and the test output is here.
-# `build/*.md`: * is documented here.
-# `report`: Print a project self-test summary.
-# `gfm pdf html slides`: Print links to reports documenting all details of the project.
-# `old changes review audit`: Compare the project with last release.
-
 #### Self-tests
 
 # `make report`: The following tests are performed, in this order, without any tear-down in-between.
@@ -53,6 +43,26 @@
 
 # Even if only a single character in a self-test does not match, it blocks progress for anything after it.
 # This means that every usage examples can safely assume that everything above exists already and passed their tests.
+
+#### Documentation
+
+# `gfm pdf html slides`: Print links to reports documenting all details of the project, including its *.md files.
+# The `--help` usage information for each executable is included.
+# Any examples in `--help` matched exactly what the executable did when tested in its project directory.
+
+#### Review
+
+# `old changes review audit`: Compare the project with last release.
+# Changes are very brief, as part of an otherwise collapsed complete source code tree.
+# Audit is done with help of openai, using GPT-3.5-turbo by default.
+# Configure your own openai account in your maker if you need a larger context - see Variables below.
+
+#### Recommended dependencies
+
+# `build/*.py.bringup`: *.py is executable using a venv/bin/python3 next to it.
+# `build/directory-name.bringup`: ./directory-name is executable as-is.
+# `build/*.tested`: * is self-tested without failure, and the test output is here.
+# `build/*.md`: * is documented here.
 
 #### Binary executable
 
