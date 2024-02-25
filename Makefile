@@ -150,11 +150,11 @@ $/greeter:
     endif
 
     $/NON-SUBPROJECTS += $/this-project
-    $/DEPS += $/this-project/Makefile
+    #$/DEPS += $/this-project/Makefile
     -include $/project.mk
 
-# After this change, this project is no longer built and reported together with the parent project, but it can still
-# build everything here on a per-need basis.
+# Replace `#$/DEPS += $/this-project/Makefile` with this Makefile. Then this project is no longer built and reported
+# together with the parent project, but the parent project can still build everything here on a per-need basis.
 
 # To build the parent project from here, `make DEPS=../Makefile` or consider making also this a custom Makefile with
 # `$/DEPS += $/../Makefile` (and no `$/NON-SUBPROJECTS`).
