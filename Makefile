@@ -136,7 +136,7 @@ $/greeter:
 
     ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
         $/project.mk:
-	        curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/$(notdir $@) -o $@
+	        curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
     endif
 
     $/NON-SUBPROJECTS += $/this-project
