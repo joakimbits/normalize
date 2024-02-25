@@ -45,7 +45,7 @@
 
 #### Self-tests
 
-# The following tests are performed, in this order, without any tear-down in-between.
+# `make report`: The following tests are performed, in this order, without any tear-down in-between.
 
 #   1. The binary executable is tested: Not failing to execute with an empty file as stdin.
 #   2. All usage examples in .py files are verified to match exactly. Command line usage examples also.
