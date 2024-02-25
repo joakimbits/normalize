@@ -113,12 +113,12 @@ $/greeter:
 
 ### Daughter project dependencies
 
-# If you #include daughter .h files in your source code, or have daughter Depedencies in your .py header, all is fine.
+# If you #include daughter .h files in your source code, or have daughter Dependencies in your .py header, all is fine.
 # You may need to create links to sibling source code or sibling documentation needed here though.
 
 ### Sibling project dependencies
 
-# If you #include sibling .h files in your source code, or have sibling Depedencies in your .py header, all is fine
+# If you #include sibling .h files in your source code, or have sibling Dependencies in your .py header, all is fine
 # as long as you build from the parent project level or `make DEPS=../sibling/Makefile` from here.
 # You may need to create links to sibling source code or sibling documentation needed here though.
 
