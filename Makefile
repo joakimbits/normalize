@@ -340,22 +340,22 @@ endif
 
 # Find all source files
 $/SOURCE :=
-$/MAKEFILE := $(wildcardproject.mk)
+$/MAKEFILE := $(shell find $/Makefile \! -type l 2>/dev/null)
 $/SOURCE += $($/MAKEFILE)
-$/S := $(wildcard $/*.s)
+$/S := $(shell find $/*.s \! -type l 2>/dev/null)
 $/SOURCE += $($/S)
-$/C := $(wildcard $/*.c)
+$/C := $(shell find $/*.c \! -type l 2>/dev/null)
 $/SOURCE += $($/C)
-$/H := $(wildcard $/*.h)
+$/H := $(shell find $/*.h \! -type l 2>/dev/null)
 $/SOURCE += $($/H)
-$/CPP := $(wildcard $/*.cpp)
+$/CPP := $(shell find $/*.cpp \! -type l 2>/dev/null)
 $/SOURCE += $($/CPP)
-$/HPP := $(wildcard $/*.hpp)
+$/HPP := $(shell find $/*.hpp \! -type l 2>/dev/null)
 $/SOURCE += $($/HPP)
-$/PY := $(wildcard $/*.py)
+$/PY := $(shell find $/*.py \! -type l 2>/dev/null)
 $/PY := $(subst ./,$/,$($/PY))
 $/SOURCE += $($/PY)
-$/MD := $(wildcard $/*.md)
+$/MD := $(shell find $/*.md \! -type l 2>/dev/null)
 $/SOURCE += $($/MD)
 
 # Find our git status
