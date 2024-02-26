@@ -28,10 +28,10 @@ Hello world!
 \footnotesize
 ~~~ {.sh}
 $ cat build/greeter.py.mk
-$(_example_BUILD)greeter.py.bringup: $(_example)greeter.py $(_example_BUILD)greeter.py.mk $(_example_PYTHON)
-	( cd $(_example_DIR) && make example --no-print-directory ) > $@ && \
-	$(SPEEDUP_WSL_PIP)$(_example_PYTHON) -m pip install fire --no-warn-script-location >> $@ && \
-	$(_example_PYTHON) $< --shebang >> $@ && \
+$($/BUILD)greeter.py.bringup: $/greeter.py $($/BUILD)greeter.py.mk | $/venv/$(VENV_PYTHON)
+	( cd $(dir $<). && make example --no-print-directory ) > $@ && \
+	$(dir $<)venv/$(VENV_PYTHON) -m pip install fire --no-warn-script-location >> $@ && \
+	$(dir $<)venv/$(VENV_PYTHON) $< --shebang >> $@ && \
 	chmod +x $< >> $@
 
 $ greeter.py --help | awk '{ print "\t" $0 }'
@@ -57,8 +57,8 @@ $ greeter.py --help | awk '{ print "\t" $0 }'
 	  --timeout TIMEOUT  Test timeout in seconds (3)
 	  --test             Verify usage examples and exit
 	  --sh-test SH_TEST  Test command usage examples in a file, and exit
-	  --shebang          Insert a Windows-compatible shebang, print its PATH
-	                     configuration if needed, and exit
+	  --shebang          Insert a local venv shebang, print its PATH configuration
+	                     if needed, and exit
 	
 	Examples:
 	$ ./greeter.py

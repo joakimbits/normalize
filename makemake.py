@@ -1,4 +1,4 @@
-#!venv/bin/python3
+#!venv/bin/python
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
@@ -23,48 +23,17 @@ To integrate a tool.py module that uses makemake, check the Dependencies section
 header. Dependencies can include pip installation lines as well as bash commands.
 
 To self-test a tool.py that uses makemake - while adding its dependencies into python3:
-$ python3 tool.py --makemake > tool.mk && make -f tool.mk
 
-To self-test all such tools in a folder - while adding their dependencies into venv:
-$ python3 tool.py --makemake --generic > Makefile
-$ make
-<modify any .py in the same folder>
-$ make
+    $ python3 tool.py --makemake > tool.mk && make -f tool.mk
 
-To use a tools/tool.py in another Makefile:
+To self-test all such tools in a directory - while adding their dependencies into a directory python venv:
 
-Makefile:
-    tooled.txt: tools/tool.py tools/build/tool.py.bringup  # (1, 4)
-        $(_tools_PYTHON) $< > $@  # (5)
-    tools/Makefile:
-        $(PYTHON) tools/tool.py --makemake --generic >$@  # (2)
-    -include tools/Makefile  # (0, 3)
-
-$ make tooled.txt
-
-How it works:
-    1. Make softly fails -include tools/Makefile, builds it, restarts, and now includes it.
-    2. Make wants tooled.txt, needs tools/build/tool.py.bringup that needs $(_tools_PYTHON).
-    3. Make builds $(_tools_PYTHON), tools/build/tool.py.bringup and finally tooled.txt.
-       (The $< becomes tools/tool.py, and the $@ becomes tooled.txt).
-
-Usage:
-    import makemake  # before importing (other) external dependencies
-
-    if __name__ == '__main__':
-        import argparse
-
-        argparser = argparse.ArgumentParser(
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=makemake.brief(),
-            epilog='''Examples:
-    $ echo hello world''')
-
-        makemake.add_arguments(argparser)
-        args = argparser.parse_args()
+    $ python3 tool.py --makemake --generic > Makefile
+    $ make
+    <modify any source file in the same folder>
+    $ make
 
 Dependencies:
-$ $(PYTHON) -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version'
 requests  # Needed for the --prompt option
 """
 
@@ -213,7 +182,9 @@ def run_command_examples(commands, timeout=3):
         assert re.fullmatch(pattern, received), (
             f"Example {i + 1}: $ {command}\n"
             f"Expected: {repr(output)}\n"
-            f"Received: {repr(received)}")
+            f"{output}\n"
+            f"Received: {repr(received)}\n"
+            f"{received}")
 
 
 if parent_module.__name__ == '__main__':
@@ -247,9 +218,10 @@ if parent_module.__name__ == '__main__':
             pattern = '%'
             source = '$<'
             stem = '$*'
-            python = f'$($/PROJECT_PYTHON)'
-            src_dir = f'$/'
-            build_dir = f'$($/BUILD)'
+            python = '$/venv/$(VENV_PYTHON)'
+            recipy_python = '$(dir $<)venv/$(VENV_PYTHON)'
+            src_dir = '$/'
+            build_dir = '$($/BUILD)'
             build_dir_var_value = f"{src_dir}{build_dir}"
             generic = " --generic"
         else:
@@ -257,12 +229,13 @@ if parent_module.__name__ == '__main__':
             source = module_path
             stem = module
             python = '$(PYTHON)'
+            recipy_python = python
             src_dir = ""
             build_dir = build_dir
             generic = ""
 
         if generic_dependencies:
-            embed = f"( cd $($/DIR) && %s"
+            embed = "( cd $(dir $<). && %s"
             end = " )"
             rules = []  # The generic rules are already printed
         else:
@@ -286,8 +259,8 @@ if parent_module.__name__ == '__main__':
 
         commands = []
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
-                                  pip=f"$(SPEEDUP_WSL_PIP){python} -m pip")
-        bringups.append(([f'{python} {source} --shebang'], [''], []))
+                                  pip=f"{recipy_python} -m pip")
+        bringups.append(([f'{recipy_python} {source} --shebang'], [''], []))
         bringups.append((['chmod +x $<'], [''], []))
         op = ">"
         remaining = len(bringups)
@@ -298,14 +271,13 @@ if parent_module.__name__ == '__main__':
             commands.append(f'{command_lines[-1]} {op} $@{glue}')
             op = '>>'
 
-        bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py"
         if generic_dependencies or dep_path:
-            bringup_rule += f" {build_dir}{dep_filename}"
-            if generic_dependencies:
-                bringup_rule += f" $($/PROJECT_PYTHON)"
+            dep = f"{build_dir}{dep_filename} "
         else:
-            commands = [f"mkdir {build_dir}" + (" &&" if commands else "")] + commands
+            dep = ""
+            commands = [f"mkdir -p {build_dir}" + (" &&" if commands else "")] + commands
 
+        bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {dep}| {python}"
         rules.append(
             (bringup_rule,
              commands))
@@ -331,9 +303,9 @@ if parent_module.__name__ == '__main__':
 
 
 class Shebang(Action):
-    """Insert a Windows-compatible shebang, print its PATH configuration if needed, and exit"""
+    """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
 
-    SHEBANG = '#!venv/bin/python3'
+    SHEBANG = '#!venv/bin/python'
 
     def __call__(self, parser, args, values, option_string=None):
         shebang = None
@@ -567,10 +539,8 @@ $ makemake.py --dep build/makemake.dep
 include build/makemake.dep
 
 $ cat build/makemake.dep
-build/makemake.py.bringup: makemake.py build/makemake.dep
-	$(PYTHON) -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@"""
-               """ && \\
-	$(SPEEDUP_WSL_PIP)$(PYTHON) -m pip install requests --no-warn-script-location >> $@ && \\
+build/makemake.py.bringup: makemake.py build/makemake.dep | $(PYTHON)
+	$(PYTHON) -m pip install requests --no-warn-script-location > $@ && \\
 	$(PYTHON) makemake.py --shebang >> $@ && \\
 	chmod +x $< >> $@
 
