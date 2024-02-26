@@ -619,7 +619,7 @@ define META
     $($/BUILD)%.md: $/%
 	    ( echo "$($/h)## [$$*]($$*)" && \
 	      echo "$(call $/~~~.,$$(suffix $$<))" && \
-	      cat $$< && echo "$($/~~~)" ) > $@
+	      cat $$< && echo "$($/~~~)" ) > $$@
     $($/BUILD)%.md: $($/BUILD)%
 	    ( echo "$($/h)## [$$*]($(_$/BUILD)$$*)" && \
 	      echo "$(call $/~~~.,$$(suffix $$<))" && \
@@ -649,28 +649,28 @@ $/report.html $/report.pdf $/report.gfm $/report.dzslides: $($/MD) $($/REPORT)
 $/file = $(foreach _,$1,[\`$_\`]($_))
 $/exe = $(foreach _,$1,[\`$_\`]($_))
 $/h_fixup := sed -E '/^$$|[.]{3}/d'
-#define META
+define META
     $($/BUILD)report.md: $($/BUILD)report.txt
 	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
-    ifneq (,$(strip $($/EXE)))
-	    echo "- \`./$($/NAME)\`: $(subst $/,,$(call $/file,$($/SRCS)))" >> $$@
-    endif
-    ifneq (,$(strip $($/PY)))
-	    echo "- $(subst $/,,$(call $/exe,$($/PY)))" >> $@
-    endif
-	    echo "$($/h)## Installation" >> $@
-	    echo "$($/~~~sh)" >> $@
-	    echo "\$$ make" >> $@
-	    echo "$($/~~~)" >> $@
-    ifneq (,$(strip $($/EXE)))
+ifneq (,$(strip $($/EXE)))
+	        echo "- \`./$($/NAME)\`: $(subst $/,,$(call $/file,$($/SRCS)))" >> $$@
+endif
+ifneq (,$(strip $($/PY)))
+	echo "- $(subst $/,,$(call $/exe,$($/PY)))" >> $$@
+endif
+	    echo "$($/h)## Installation" >> $$@
+	    echo "$($/~~~sh)" >> $$@
+	    echo "\$$ make" >> $$@
+	    echo "$($/~~~)" >> $$@
+ifneq (,$(strip $($/EXE)))
 	    echo "- Installs \`./$($/NAME)\`." >> $$@
-    endif
-    ifneq (,$(strip $($/PY)))
+endif
+ifneq (,$(strip $($/PY)))
 	    echo "- Installs \`./venv\`." >> $$@
 	    echo "- Installs $(subst $/,,$(call $/exe,$($/PY)))." >> $$@
-    endif
-    ifneq (,$($/EXES))
+endif
+ifneq (,$($/EXES))
 	    echo "$($/h)## Usage" >> $$@
 	    echo "$($/~~~sh)" >> $$@
 	    for x in $(subst $($/PROJECT),,$($/EXES)) ; do \
@@ -684,27 +684,26 @@ $/h_fixup := sed -E '/^$$|[.]{3}/d'
 	    echo "$($/~~~sh)" >> $$@
 	    echo "\$$$$ make tested" >> $$@
 	    echo "$($/~~~)" >> $$@
-    endif
-    ifneq (,$(strip $($/EXE)))
+endif
+ifneq (,$(strip $($/EXE)))
 	    echo "- Tests \`./$($/NAME)\`." >> $$@
-    endif
-    ifneq (,$(strip $($/PY)))
+endif
+ifneq (,$(strip $($/PY)))
 	    echo "- Verifies style and doctests in $(subst $($/PROJECT),,$(call $/file,$($/PY)))." >> $$@
-    endif
-    ifneq (,$(strip $($/MD)))
+endif
+ifneq (,$(strip $($/MD)))
 	     echo "- Verifies doctests in $(subst $($/PROJECT),,$(call $/file,$($/MD)))." >> $$@
-    endif
-    ifneq (,$(strip $($/CODE)))
+endif
+ifneq (,$(strip $($/CODE)))
 	    echo "$($/h)## Result" >> $$@
 	    echo "$($/~~~sh)" >> $$@
 	    echo "\$$$$ make report" >> $$@
 	    ( cd $($/PROJECT) && $(MAKE) report --no-print-directory ) >> $$@
 	    echo "$($/~~~)" >> $$@
 	    echo "\n---\n" >> $$@
-    endif
-#endef
-#$(info $(META))
-#$(eval $(META))
+endif
+endef
+$(eval $(META))
 $($/BUILD)report-details.md:
 	echo "$($/h)# Source code, installation and test result" >> $@
 
