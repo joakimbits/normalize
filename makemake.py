@@ -90,8 +90,10 @@ _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
 
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
-    $/project.mk:
-	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/$(notdir $@) -o $@
+    $/project.mk: $/makemake.py
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
+	$/makemake.py:
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/makemake.py -o $@
 endif
 
 -include $/project.mk
