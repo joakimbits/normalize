@@ -9,13 +9,29 @@
 
 ### Usage
 
-# Copy the following four lines into the head of your own Makefile, to make it compliant with this.
+# Copy the following your own Makefile, to make it compliant with this.
 
     # Prefix all your variable names and project files with this $/ to make your Makefile usable from anywhere.
     Makefile := $(lastword $(MAKEFILE_LIST))
     / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(Makefile)))))
+
     $(info $/all: $/bringup)
     $/all: $/bringup
+
+### Avoid project variables within recipies
+
+# If $/ *is* used within a recipy, that whole recipy needs to be expanded before the rule is defined, like this:
+
+    define $/META
+        $/meta-recipy:
+	        # If you do use $/ in a recipy, every $ except $/ in it needs to be doubled!
+	        echo "Like this: $$$$$$$$PATH = $$$$PATH"
+	        # And the recipy itself needs to be expanded before make interprets it.
+    endef
+    $(eval $($/META))
+
+    $/normal-recipy: $/this-is-better
+	    # The rule is expanded already when defined. Using that expansion here $@: $^
 
 #### Bring-up project
 
@@ -72,8 +88,8 @@
 
 # In a Makefile:
 
-    $/example.txt: $/example/build/example.bringup; ( cd $/example && ./example ) > $@
-    $/tested-example.txt: $/example/build/example.tested; ( cd $/example && ./example ) > $@
+    $/example.txt: $/example/build/example.bringup; ( cd $(dir $(dir $@)) && ./example ) > $@
+    $/tested-example.txt: $/example/build/example.tested; ( cd $(dir $(dir $@)) && ./example ) > $@
 
 # In a shell:
 $/example:
@@ -88,8 +104,8 @@ $/example:
 
 # In a Makefile:
 
-    $/greeter.txt: $/example/build/greeter.py.bringup; ( cd $/example && greeter.py ) > $@
-    $/tested-greeter.txt: $/example/build/greeter.py.tested; ( cd $/example && greeter.py ) > $@
+    $/greeter.txt: $/example/build/greeter.py.bringup; ( cd $(dir $(dir $@)) && greeter.py ) > $@
+    $/tested-greeter.txt: $/example/build/greeter.py.tested; ( cd $(dir $(dir $@)) && greeter.py ) > $@
 
 # In a command shell:
 $/greeter:
@@ -99,15 +115,10 @@ $/greeter:
 
 # In Python:
 
-#   * Copy its `Dependencies:` into your own .py header. Non-command lines there are actually pip modules.
-#     This is what happens when you `make` then
+#   * Copy its `Dependencies:` into your own .py header.
+#   * `touch __main__.py` on the complete path to it. Now you can import and use it.
 
-	make example/example --no-print-directory
-	venv/bin/python3 -m pip install -y fire
-
-#   * `touch __main__.py` on the complete path to it, and then import and use it.
-
-	touch __main__.py example/__main__.py
+	touch example/__main__.py
 	venv/bin/python3 -c "import example; open('greeter-from-py.txt).write(example.greeter.hello())"
 
 
@@ -144,17 +155,16 @@ $/greeter:
     _Makefile := $(lastword $(MAKEFILE_LIST))
     / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
 
-    ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
-        $/project.mk:
-	        curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
-    endif
+    $/project.mk:
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
 
-    $/NON-SUBPROJECTS += $/this-project
-    #$/DEPS += $/this-project/Makefile
-    -include $/project.mk
+    $/NON-SUBPROJECTS += $/this
+    #$/DEPS += $/this/Makefile
+    #-include $/project.mk
 
-# Replace `#$/DEPS += $/this-project/Makefile` with this Makefile. Then this project is no longer built and reported
-# together with the parent project, but the parent project can still build everything here on a per-need basis.
+# Replace `#$/DEPS += $/this-project/Makefile` with this Makefile, and activate the last line `-include $/project.mk`.
+# Then this project is no longer built and reported together with the parent project, but the parent project can still
+# build everything here on a per-need basis.
 
 # To build the parent project from here, `make DEPS=../Makefile` or consider making also this a custom Makefile with
 # `$/DEPS += $/../Makefile` (and no `$/NON-SUBPROJECTS`).
@@ -211,7 +221,7 @@ else
     PYTHON ?= python
     VENV_PYTHON ?= python.exe
 endif
-PYTHON := $(shell which $(PYTHON))
+override PYTHON := $(shell which $(PYTHON))
 $/PROJECT_PYTHON := $/venv/$(VENV_PYTHON)
 
 # A package manager for the PYTHON OS
@@ -244,16 +254,17 @@ ifeq (,$/)
 else
     $/PROJECT := $/
 endif
-$/NAME ?= $(notdir $(realpath $/PROJECT))
+$/NAME := $(notdir $(realpath $($/PROJECT)))
 
 #### Find subdirectories containing at least one .md file
 
 $/SUBDIRS := $(foreach d,$(shell find $/. -mindepth 1 -maxdepth 1),$(notdir $d))
 $/SUBPROJECTS += $(sort $(dir $(foreach d,$($/SUBDIRS),$(wildcard $/$d/*.md))))
 $/SUBPROJECTS := $(filter-out $($/NON-SUBPROJECTS),$($/SUBPROJECTS))
-$/ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/SUBPROJECTS),$(wildcard $/$d/Makefile)))
+$/DEPS += $($/SUBPROJECTS:%=%Makefile)
+$/ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/SUBPROJECTS),$(wildcard $/$dMakefile)))
 
-#### Make these as sub-projects before this project
+#### Make sub-projects before this project
 
 $/all: | $($/ACTIVE_SUBPROJECTS:%=%all)
 $/tested: | $($/ACTIVE_SUBPROJECTS:%=%tested)
@@ -268,7 +279,7 @@ $/build/review.diff: $($/ACTIVE_SUBPROJECTS:%=%build/review.diff)
 $/clean: | $($/ACTIVE_SUBPROJECTS:%=%clean)
 	rm -rf $/build/ $/venv/ $/.ruff_cache/
 
-#### Define the rest here only when actually building
+#### Define recipies only when actually building
 
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
 
@@ -278,8 +289,17 @@ ifeq (,$(filter .,$(PATHS)))
     .-ON-PATH := .-on-$(OS)-path
 endif
 
+# Setup this Makefile in each subproject
+
+$/%/Makefile: $/Makefile | $/%/makemake.py
+	ln -s ../Makefile $@
+$/%/makemake.py: $/makemake.py
+	ln -s ../makemake.py $@
+$/makemake.py:
+	curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/makemake.py -o $@
+
 # Notify the user if new rules were built and included, and make therefore restarted
-ifeq (2,$(MAKE_RESTARTS))
+ifeq (2,2)#$(MAKE_RESTARTS))
     ifndef MAKER
         $(info # Hello $I, Welcome to makemake https://github.com/joakimbits/normalize)
     endif
@@ -329,11 +349,11 @@ $/REMOVE := $(filter-out $($/SOURCE),$($/KNOWN))
 # Figure out where to checkout an old worktree
 $/HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
 $/HOME := $($/HOME_DIR:./%=%)
-$/NAME := $(notdir $(abspath $($/HOME_DIR)))
+$/HOME_NAME := $(notdir $(abspath $($/HOME_DIR)))
 $/GIT_DIR := $(dir $(shell git rev-parse --git-common-dir))
 $/HERE_DIR := $(shell $(PYTHON) $/makemake.py --relpath $($/GIT_DIR) $($/PROJECT))/
 $/HERE := $($/HERE_DIR:%./=%)
-$/OLD_WORKTREE := $($/HOME)$(_$/BUILD)$($/BASELINE)/$($/NAME)/
+$/OLD_WORKTREE := $($/HOME)$(_$/BUILD)$($/BASELINE)/$($/HOME_NAME)/
 $/OLD := $($/OLD_WORKTREE)$($/HERE)
 
 ## Colorize edited files by their git status
@@ -376,7 +396,7 @@ $/LDFLAGS := $(LDFLAGS)
 # A linked executable has the same name as the project
 ifneq (,$(strip $($/LINKABLE)))
     $/EXE := $/$($/NAME)
-    $/EXE_TESTED := $($/BUILD)($/EXE).tested
+    $/EXE_TESTED := $($/BUILD)$($/NAME).tested
 endif
 
 # If we got assembly source, assume it has _start code
@@ -389,7 +409,7 @@ $/CXXFLAGS += -S $(addprefix -I,$($/INC_DIRS)) -MMD -MP
 $/CFLAGS := $($/CXXFLAGS)
 $/CXXFLAGS += $(CXXFLAGS)
 $/CFLAGS += $(CFLAGS)
-$/COBJS := $($/COMPILABLE: $/%=$($/BUILD)%.s)
+$/COBJS := $($/COMPILABLE:$/%=$($/BUILD)%.s)
 $/DEPS += $($/COBJS:.s=.d)
 $/OBJS := $($/S)
 $/OBJS += $($/COBJS)
@@ -457,7 +477,7 @@ $/venv/lib/python/site-packages/%: | $/venv/lib/python/site-packages
 # Link to actual site-packages
 $/venv/lib/python/site-packages: | $($/PROJECT_PYTHON)
 	mkdir -p $(dir $@)
-	ln -s $$(realpath --relative-to=$(dir $@) `venv/bin/python3 -c "import sys; print(sys.path[-1])"`) $@
+	ln -s $$$(realpath --relative-to=$(dir $@) `venv/bin/python3 -c "import sys; print(sys.path[-1])"`) $@
 
 # Workaround Windows python not installing #!venv/bin/python3
 ifeq ($(PYTHON),/mnt/c/tools/miniconda3/python.exe)
@@ -500,7 +520,7 @@ endif
 ifndef INSTALL_PIP_TARGET
     INSTALL_PIP_TARGET = 1
     $?/pip:
-	    $! python3-pip
+	    $! python3.10-pip
 endif
 
 # Check Python 3.9 style
@@ -509,7 +529,7 @@ $($/BUILD)%.py.style: $/%.py $($/BUILD)%.py.syntax
 
 # Build a recipy for $($/BUILD)%.py.bringup
 $($/BUILD)%.py.mk: $/%.py
-	rm -f $@ && ( cd $($/PROJECT) && $(PYTHON) $*.py --generic --dep $(_$/BUILD)$*.py.mk ) ; [ -e $@ ] || echo "\$$($/BUILD)$*.py.bringup:; touch \$$@" >$@
+	rm -f $@ && ( cd $($/PROJECT) && $(PYTHON) $*.py --generic --dep $(_$/BUILD)$*.py.mk ) ; [ -e $@ ] || echo "\$$$(_$/BUILD)$*.py.bringup:; touch \$$$@" > $@
 
 # Check Python and command line usage examples in .py files
 $($/BUILD)%.py.tested: $/%.py $($/BUILD)%.py.mk $($/BUILD)%.py.style $($/BUILD)%.py.bringup $($/EXE_TESTED) | $($/PROJECT_PYTHON)
@@ -546,13 +566,14 @@ $($/BUILD)report.txt: $($/TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a standalone html, pdf, gfm or dzslides document.
+define $/META
 $/%.gfm: $($/BUILD)%.md
-	pandoc --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
-	       -M title="$($/NAME) $*" -M author="`git log -1 --pretty=format:'%an'`"
+	pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
+	       -M title="$($/NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
 $/%.html $/%.pdf $/%.dzslides: $($/BUILD)%.md | \
   $?/pandoc $?/xelatex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
-	pandoc --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
-	       -M title="$($/NAME) $*" -M author="`git log -1 --pretty=format:'%an'`" \
+	pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
+	       -M title="$$($/NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
 	       -V min-width=80%\!important -V geometry:margin=1in \
 	       --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 
@@ -562,93 +583,115 @@ $/~~~. = \\footnotesize\n~~~ {$1}
 $/~~~sh := $(call $/~~~.,.sh)
 $/~~~ := ~~~\n\\normalsize\n
 $($/BUILD)Makefile.md: project.mk
-	( echo "$($/h)## [$*]($*)" && \
+	( echo "$($/h)## [$$*]($$*)" && \
 	  echo "$(call $/~~~.,.mk)" && \
-	  cat $< && echo "$($/~~~)" ) >$@
+	  cat $$< && echo "$($/~~~)" ) > $$@
 $($/BUILD)%.md: $/%
-	( echo "$($/h)## [$*]($*)" && \
-	  echo "$(call $/~~~.,$(suffix $<))" && \
-	  cat $< && echo "$($/~~~)" ) >$@
+	( echo "$($/h)## [$$*]($$*)" && \
+	  echo "$(call $/~~~.,$$(suffix $$<))" && \
+	  cat $$< && echo "$($/~~~)" ) > $@
 $($/BUILD)%.md: $($/BUILD)%
-	( echo "$($/h)## [$*]($(_$/BUILD)$*)" && \
-	  echo "$(call $/~~~.,$(suffix $<))" && \
-	  cat $< && echo "$($/~~~)" ) >$@
+	( echo "$($/h)## [$$*]($(_$/BUILD)$$*)" && \
+	  echo "$(call $/~~~.,$$(suffix $$<))" && \
+	  cat $$< && echo "$($/~~~)" ) > $$@
 $($/BUILD)%.bringup.md: $($/BUILD)%.bringup
-	( echo "$($/h)## [$*]($(_$/BUILD)$*)" && \
+	( echo "$($/h)## [$$*]($(_$/BUILD)$$*)" && \
 	  echo "$($/~~~sh)" && \
-	  cat $< && echo "$($/~~~)" ) >$@
+	  cat $$< && echo "$($/~~~)" ) > $$@
 $($/BUILD)%.tested.md: $($/BUILD)%.tested
-	( echo "$($/h)## [$*]($(_$/BUILD)$*)" && \
+	( echo "$($/h)## [$$*]($(_$/BUILD)$$*)" && \
 	  echo "$($/~~~sh)" && \
-	  cat $< && echo "$($/~~~)" ) >$@
+	  cat $$< && echo "$($/~~~)" ) > $$@
+
+endef
+$(eval $($/META))
+define $/META
 
 # Report the project.
 $/%: $/report.%
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/BRANCH_STATUS)"
+	@echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $($/BRANCH_STATUS)"
+
+endef
+$(eval $($/META))
+define $/META
+
 $/slides: $/slides.html
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/BRANCH_STATUS)"
+	@echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $($/BRANCH_STATUS)"
 $/slides.html: $/report.dzslides
-	mv $< $@
+	mv $$< $$@
 $/report.html $/report.pdf $/report.gfm $/report.dzslides: $($/MD) $($/REPORT)
 $/file = $(foreach _,$($/$1),[\`$_\`]($_))
 $/exe = $(foreach _,$($/$1),[\`$_\`]($_))
-$/h_fixup := sed -E '/^$$|[.]{3}/d'
+$/h_fixup := sed -E '/^$$$$|[.]{3}/d'
+
+endef
+$(eval $($/META))
+define $/META
+
 $($/BUILD)report.md: $($/BUILD)report.txt
 	echo "A build-here include-from-anywhere project \
-based on [makemake](https://github.com/joakimbits/normalize)." > $@
-	echo "\n- \`make report pdf html slides review audit\`" >> $@
+based on [makemake](https://github.com/joakimbits/normalize)." > $$@
+	echo "\n- \`make report pdf html slides review audit\`" >> $$@
 ifneq ($(strip $($/EXE)),)
-	echo "- \`./$($/NAME)\`: $(subst $/,,$(call $/file,SRCS))" >> $@
+	echo "- \`./$($/NAME)\`: $(subst $/,,$(call $/file,SRCS))" >> $$@
 endif
 ifneq ($(strip $($/PY)),)
-	echo "- $(subst $/,,$(call $/exe,PY))" >> $@
+	echo "- $(subst $/,,$(call $/exe,PY))" >> $$@
 endif
-	echo "$($/h)## Installation" >> $@
-	echo "$($/~~~sh)" >> $@
-	echo "\$$ make" >> $@
-	echo "$($/~~~)" >> $@
+	echo "$($/h)## Installation" >> $$@
+	echo "$($/~~~sh)" >> $$@
+	echo "\$$$$ make" >> $$@
+	echo "$($/~~~)" >> $$@
 ifneq ($(strip $($/EXE)),)
-	echo "- Installs \`./$($/NAME)\`." >> $@
+	echo "- Installs \`./$($/NAME)\`." >> $$@
 endif
 ifneq ($(strip $($/PY)),)
-	echo "- Installs \`./venv\`." >> $@
-	echo "- Installs $(subst $/,,$(call $/exe,PY))." >> $@
+	echo "- Installs \`./venv\`." >> $$@
+	echo "- Installs $(subst $/,,$(call $/exe,PY))." >> $$@
 endif
+
+endef
+$(eval $($/META))
+define $/META
+
 ifneq ($($/EXES),)
-	echo "$($/h)## Usage" >> $@
-	echo "$($/~~~sh)" >> $@
+	echo "$($/h)## Usage" >> $$@
+	echo "$($/~~~sh)" >> $$@
 	for x in $(subst $($/PROJECT),,$($/EXES)) ; do \
-	  echo "\$$ true | ./$$x -h | $($/h_fixup)" >> $@ && \
-	  ( cd $($/PROJECT) && true | ./$$x -h ) > $@.tmp && \
-	  $($/h_fixup) $@.tmp >> $@ && rm $@.tmp ; \
+	  echo "\$$$$ true | ./$$$$x -h | $($/h_fixup)" >> $$@ && \
+	  ( cd $($/PROJECT) && true | ./$$$$x -h ) > $$@.tmp && \
+	  $($/h_fixup) $$@.tmp >> $$@ && rm $$@.tmp ; \
 	done
-	echo >> $@
-	echo "$($/~~~)" >> $@
-	echo "$($/h)## Test" >> $@
-	echo "$($/~~~sh)" >> $@
-	echo "\$$ make tested" >> $@
-	echo "$($/~~~)" >> $@
+	echo >> $$@
+	echo "$($/~~~)" >> $$@
+	echo "$($/h)## Test" >> $$@
+	echo "$($/~~~sh)" >> $$@
+	echo "\$$$$ make tested" >> $$@
+	echo "$($/~~~)" >> $$@
 endif
 ifneq (,$(strip $($/EXE)))
-	echo "- Tests \`./$($/NAME)\`." >> $@
+	echo "- Tests \`./$($/NAME)\`." >> $$@
 endif
 ifneq (,$(strip $($/PY)))
-	echo "- Verifies style and doctests in\
- $(subst $($/PROJECT),,$(call $/file,PY))." >> $@
+	echo "- Verifies style and doctests in $(subst $($/PROJECT),,$(call $/file,PY))." >> $$@
 endif
 ifneq (,$(strip $($/MD)))
-	echo "- Verifies doctests in $(subst $($/PROJECT),,$(call $/file,MD))." >> $@
+	echo "- Verifies doctests in $(subst $($/PROJECT),,$(call $/file,MD))." >> $$@
 endif
 ifneq (,$(strip $($/CODE)))
-	echo "$($/h)## Result" >> $@
-	echo "$($/~~~sh)" >> $@
-	echo "\$$ make report" >> $@
-	( cd $($/PROJECT) && $(MAKE) report --no-print-directory ) >> $@
-	echo "$($/~~~)" >> $@
-	echo "\n---\n" >> $@
+	echo "$($/h)## Result" >> $$@
+	echo "$($/~~~sh)" >> $$@
+	echo "\$$$$ make report" >> $$@
+	( cd $($/PROJECT) && $(MAKE) report --no-print-directory ) >> $$@
+	echo "$($/~~~)" >> $$@
+	echo "\n---\n" >> $$@
 $($/BUILD)report-details.md:
-	echo "$($/h)# Source code, installation and test result" >> $@
+	echo "$($/h)# Source code, installation and test result" >> $$@
 endif
+
+endef
+$(eval $($/META))
+define $/META
 
 # Build an old worktree that is shared by all projects in this git
 ifndef _OLD_WORKTREE
@@ -659,67 +702,68 @@ endif
 
 # Document last release.
 $/old: $($/OLD)report.gfm
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/BASELINE_INFO)"
+	@echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $($/BASELINE_INFO)"
 $($/OLD)report.gfm: $(_OLD_WORKTREE)
 	( cd $($/OLD) && $(MAKE) report.gfm --no-print-directory )
 
 # Use GPT for a release review.
 $/%: $($/BUILD)%.diff
-	cat $<
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/CHANGES)"
+	cat $$<
+	@echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $($/CHANGES)"
 $($/BUILD)audit.diff: $($/BUILD)prompt.diff | $($/PROJECT_PYTHON)
-	cat $< > $@
-	$($/PROJECT_PYTHON) -m makemake --prompt $< $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) >> $@
+	cat $$< > $$@
+	$($/PROJECT_PYTHON) -m makemake --prompt $$< $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) >> $$@
 $($/BUILD)prompt.diff: $($/BUILD)review.diff
-	$(PYTHON) $/makemake.py -c 'print(REVIEW)' > $@
-	echo "$$ $(MAKE) $/review" >> $@
-	cat $^ >> $@
-	echo -n "$$ " >> $@
+	$(PYTHON) $/makemake.py -c 'print(REVIEW)' > $$@
+	echo "$$$$ $(MAKE) $/review" >> $$@
+	cat $$^ >> $$@
+	echo -n "$$$$ " >> $$@
 $($/BUILD)review.diff: $($/BUILD)files.diff $($/BUILD)comments.diff $($/BUILD)report.diff
-	cat $^ > $@
+	cat $$^ > $$@
 $($/BUILD)files.diff:
-	echo "# $($/CHANGES_AUDIT)" > $@
+	echo "# $($/CHANGES_AUDIT)" > $$@
 $($/BUILD)comments.diff:
-	echo "git --no-pager log --no-merges $($/BASELINE)..HEAD $($/PROJECT)" > $@
-	git --no-pager log --no-merges $($/BASELINE)..HEAD $($/PROJECT) >> $@
+	echo "git --no-pager log --no-merges $($/BASELINE)..HEAD $($/PROJECT)" > $$@
+	git --no-pager log --no-merges $($/BASELINE)..HEAD $($/PROJECT) >> $$@
 $($/BUILD)report.diff: $($/OLD)report.gfm$/report.gfm
-	echo "diff -u -U 100000 $< $(word 2,$^) | fold-unchanged" > $@
-	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{*}' && \
+	echo "diff -u -U 100000 $$< $$(word 2,$$^) | fold-unchanged" > $$@
+	( diff -u -U 100000 $$< $$(word 2,$$^) | csplit -s - /----/ '{*}' && \
 	  parts=`ls xx**` && \
 	  changed_parts=`grep -l -e '^-' -e '^+' xx**` && \
-	  for part in $$parts ; do \
-	    if `echo "$$changed_parts" | fgrep -wq "$$part" \
-	    || test "$$(wc $$part)" = "1"` ; then \
-	      $(PYTHON) $/makemake.py --split $$part '\n \n \n' 's%02d' && \
+	  for part in $$$$parts ; do \
+	    if `echo "$$$$changed_parts" | fgrep -wq "$$$$part" \
+	    || test "$$$$(wc $$$$part)" = "1"` ; then \
+	      $(PYTHON) $/makemake.py --split $$$$part '\n \n \n' 's%02d' && \
 	      sections=`ls s**` && \
 	      changed_sections=`grep -l -e '^-' -e '^+' s**` && \
-	      for section in $$sections ; do \
-	        if `echo "$$changed_sections" | fgrep -wq "$$section" \
-	        || test "$$(wc $$section)" = "1"` ; then \
-	          $(PYTHON) $/makemake.py --split $$section '\n \n' 'p%02d' && \
+	      for section in $$$$sections ; do \
+	        if `echo "$$$$changed_sections" | fgrep -wq "$$$$section" \
+	        || test "$$$$(wc $$$$section)" = "1"` ; then \
+	          $(PYTHON) $/makemake.py --split $$$$section '\n \n' 'p%02d' && \
 	          paragraphs=`ls p**` && \
 	          changed_paragraphs=`grep -l -e '^-' -e '^+' p**` && \
-	          for paragraph in $$paragraphs ; do \
-	            if `echo "$$changed_paragraphs" | fgrep -wq "$$paragraph"` ; then \
-	              cat $$paragraph ; echo ; echo ; \
+	          for paragraph in $$$$paragraphs ; do \
+	            if `echo "$$$$changed_paragraphs" | fgrep -wq "$$$$paragraph"` ; then \
+	              cat $$$$paragraph ; echo ; echo ; \
 	            else \
-	              echo "$$(head -1 $$paragraph) ..." ; fi ; \
+	              echo "$$$$(head -1 $$$$paragraph) ..." ; fi ; \
 	            done ; \
 	          rm p** ; \
 	        else \
-	          echo "$$(head -1 $$section) ..." ; fi ; \
+	          echo "$$$$(head -1 $$$$section) ..." ; fi ; \
 	        done ; \
 	      rm s** ; \
 	    else \
-	      echo "$$(sed -n '3p' $$part) ..." ; fi ; \
+	      echo "$$$$(sed -n '3p' $$$$part) ..." ; fi ; \
 	    done ; \
-	  rm xx**; ) >> $@
+	  rm xx**; ) >> $$@
 
+endef
+$(eval $($/META))
 endif # making
 
 ## Finally attempt to include all bringup files and sub-projects
 # Note: Subprojects modify $/, so this has to be the last command using it as a prefix here.
-$/DEPS += $($/SUBPROJECTS:%=%Makefile)
 $/DEPS := $(filter-out $($/NON-DEPS),$($/DEPS))
 $(info -include $($/DEPS))
 -include $($/DEPS)
