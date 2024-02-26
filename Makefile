@@ -273,6 +273,7 @@ $/NAME := $(notdir $(realpath $($/PROJECT)))
 
 #### Find subdirectories containing at least one .md file
 
+$/NON-SUBPROJECTS += $($/BUILD)
 $/SUBDIRS := $(foreach d,$(shell find $/. -mindepth 1 -maxdepth 1),$(notdir $d))
 $/SUBPROJECTS += $(sort $(dir $(foreach d,$($/SUBDIRS),$(wildcard $/$d/*.md))))
 $/SUBPROJECTS := $(filter-out $($/NON-SUBPROJECTS),$($/SUBPROJECTS))
