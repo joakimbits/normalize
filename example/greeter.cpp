@@ -1,8 +1,9 @@
 // greeting on stdout
-#include <stdio.h>
-#include "greeter.h"
+#include<string>
 using namespace std;
 
+#include "greeter.hpp"
+
 void Greeter::greet(void) {
-    puts("Hello from greeter.cpp!");
+    std::puts("Hello from greeter.cpp!");
 }
