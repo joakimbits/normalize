@@ -1,4 +1,4 @@
-#!venv/bin/python
+#!venv/bin/python3
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
@@ -308,7 +308,7 @@ if parent_module.__name__ == '__main__':
 class Shebang(Action):
     """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
 
-    SHEBANG = '#!venv/bin/python'
+    SHEBANG = '#!venv/bin/python3'
 
     def __call__(self, parser, args, values, option_string=None):
         shebang = None
