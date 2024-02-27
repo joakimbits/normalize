@@ -28,6 +28,7 @@ To self-test a tool.py that uses makemake - while adding its dependencies into p
 
 To self-test all such tools in a directory - while adding their dependencies into a directory python venv:
 
+    $ sudo apt update && sudo apt -y upgrade && sudo apt install -y make
     $ python3 tool.py --makemake --generic > Makefile
     $ make
     <modify any source file in the same folder>
