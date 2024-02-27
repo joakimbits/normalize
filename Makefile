@@ -89,7 +89,7 @@
 
 #### Recommended dependencies
 
-# `build/*.py.bringup`: *.py is executable using a venv/bin/python next to it.
+# `build/*.py.bringup`: *.py is executable using a venv/bin/python3 next to it.
 # `build/directory-name.bringup`: ./directory-name is executable as-is.
 # `build/*.tested`: * is self-tested without failure, and the test output is here.
 # `build/*.md`: * is documented here.
@@ -118,8 +118,8 @@ $/binary_executable_shell_example:
 
 # In a Makefile:
 
-    $/greeter.txt: $/example/bin/python $/example/greeter.py $/example/build/greeter.py.bringup; $(wordlist 1,2,$^) > $@
-    $/tested-greeter.txt: $/example/bin/python $/example/greeter.py $/example/build/greeter.py.tested; $(wordlist 1,2,$^) > $@
+    $/greeter.txt: $/example/bin/python3 $/example/greeter.py $/example/build/greeter.py.bringup; $(wordlist 1,2,$^) > $@
+    $/tested-greeter.txt: $/example/bin/python3 $/example/greeter.py $/example/build/greeter.py.tested; $(wordlist 1,2,$^) > $@
 
 # In a shell:
 $/python_executable_shell_example:
@@ -133,7 +133,7 @@ $/python_executable_shell_example:
 #   * `touch __main__.py` on the complete path to it. Now you can import and use it.
 
 	touch example/__main__.py
-	venv/bin/python -c "import example; open('greeter-from-py.txt).write(example.greeter.hello())"
+	venv/bin/python3 -c "import example; open('greeter-from-py.txt).write(example.greeter.hello())"
 
 
 ## How it works
@@ -225,19 +225,53 @@ endif
 #  - or any given PYTHON.
 ifeq ($~,/home/$I)
     PYTHON ?= python3
-    VENV_PYTHON ?= bin/python
+    VENV_PYTHON ?= bin/python3
 
-    # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
     ifneq ($(shell echo $$WSL_DISTRO_NAME),)
-        SPEEDUP_WSL_DNS ?= $~/use_windows_dns.sh $?/pip
+    	# Clone Windows home git and ssh settings
+        ifndef H
+            H := $(shell wslpath `cmd.exe /C echo %USERPROFILE% | head -c -2`)
+            ~/.gitconfig: $H/.gitconfig
+	            cp $< $@
+            ~/.ssh: $H/.ssh
+	            cp -r $< $(dir $@)
+        endif
+
+        # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
+        SPEEDUP_WSL_DNS ?= $~/use_windows_dns.sh
         SPEEDUP_WSL_PIP ?= DISPLAY= #
     endif
 else
     PYTHON ?= python
     VENV_PYTHON ?= python.exe
 endif
-override PYTHON := $(shell which $(PYTHON))
 $/PROJECT_PYTHON := $/venv/$(VENV_PYTHON)
+
+# Turn PYTHON into an explicit path
+override PYTHON := $(shell which $(PYTHON))
+
+# Figure out how to install packages into a PYTHON venv $/venv/bin/python3
+ifndef PYTHON_NAME
+    PYTHON_SITE_PACKAGES_DIR := $(shell $(PYTHON) -c "import sys; print('\n'.join(sys.path))" | grep site-packages)
+    PYTHON_NAME := $(subst $~/.local/lib/%/site-packages,%,$(PYTHON_SITE_PACKAGES_DIR))
+
+    # Workaround WSL python3 not having site-packages
+    ifeq (,$(PYTHON_NAME))
+    	PYTHON_NAME := python3
+    endif
+
+    # Workaround WSL python3 venv cashing pip wheels outside ~
+    ifeq (/usr/bin/python3,$(PYTHON))
+        PYTHON_DEP = /.cache/pip
+        /.cache/pip:; sudo mkdir -p $@ && sudo chmod a+rwx $@
+        PYTHON_FINALIZE = && $(SPEEDUP_WSL_PIP)$@ -m pip install --upgrade pip setuptools && $(SPEEDUP_WSL_PIP)$@ -m venv --upgrade $(patsubst %/bin/python3,%,$@)
+
+    # Workaround Windows python not installing #!venv/bin/python3
+    else ifeq (/mnt/c/tools/miniconda3/python.exe,$(PYTHON))
+        PYTHON_FINALIZE = && mkdir -p $(dir $@) && ln -s ../Scripts/python.exe $@
+    endif
+endif
+$/PROJECT_PACKAGES := $/venv/lib/$(PYTHON_NAME)/site-packages
 
 # A package manager for the PYTHON OS
 ifndef !
@@ -256,6 +290,9 @@ ifndef !
         COUSINE ?= /usr/share/fonts/truetype/cousine
         CARLITO ?= /usr/share/fonts/truetype/crosextra
     endif
+
+    # Install a package
+    $?/%:; $! $*
 endif
 
 
@@ -294,8 +331,10 @@ $/build/review.diff: $($/ACTIVE_SUBPROJECTS:%=%build/review.diff)
 
 #### Remove all built files in all projects
 define META
-    $/clean: | $($/ACTIVE_SUBPROJECTS:%=%clean)
-	    rm -rf $/build/ $/venv/ $/.ruff_cache/
+    $/clean: $/clean_keep_venv | $($/ACTIVE_SUBPROJECTS:%=%clean)
+	    rm -rf $/venv/ $/.ruff_cache/
+    $/clean_keep_venv: | $($/ACTIVE_SUBPROJECTS:%=%clean)
+	    rm -rf $/build/
 endef
 $(eval $(META))
 
@@ -343,21 +382,21 @@ endif
 $/SOURCE :=
 $/MAKEFILE := $(shell find $/Makefile \! -type l 2>/dev/null)
 $/SOURCE += $($/MAKEFILE)
-$/S := $(shell find $/*.s \! -type l 2>/dev/null)
-$/SOURCE += $($/S)
-$/C := $(shell find $/*.c \! -type l 2>/dev/null)
-$/SOURCE += $($/C)
-$/H := $(shell find $/*.h \! -type l 2>/dev/null)
-$/SOURCE += $($/H)
-$/CPP := $(shell find $/*.cpp \! -type l 2>/dev/null)
-$/SOURCE += $($/CPP)
-$/HPP := $(shell find $/*.hpp \! -type l 2>/dev/null)
-$/SOURCE += $($/HPP)
-$/PY := $(shell find $/*.py \! -type l 2>/dev/null)
-$/PY := $(subst ./,$/,$($/PY))
-$/SOURCE += $($/PY)
-$/MD := $(shell find $/*.md \! -type l 2>/dev/null)
-$/SOURCE += $($/MD)
+$/*.s := $(shell find $/*.s \! -type l 2>/dev/null)
+$/SOURCE += $($/*.s)
+$/*.c := $(shell find $/*.c \! -type l 2>/dev/null)
+$/SOURCE += $($/*.c)
+$/*.h := $(shell find $/*.h \! -type l 2>/dev/null)
+$/SOURCE += $($/*.h)
+$/*.cpp := $(shell find $/*.cpp \! -type l 2>/dev/null)
+$/SOURCE += $($/*.cpp)
+$/*.hpp := $(shell find $/*.hpp \! -type l 2>/dev/null)
+$/SOURCE += $($/*.hpp)
+$/*.py := $(shell find $/*.py \! -type l 2>/dev/null)
+$/*.py := $(subst ./,$/,$($/*.py))
+$/SOURCE += $($/*.py)
+$/*.md := $(shell find $/*.md \! -type l 2>/dev/null)
+$/SOURCE += $($/*.md)
 
 # Find our git status
 $/BRANCH := $(shell git branch --show-current)
@@ -403,16 +442,16 @@ $/CHANGES_AUDIT += $($/MODIFIED)
 $/CHANGES_AUDIT += $($/COMMIT_INFO)
 
 # Collect code
-$/LINKABLE := $($/S)
-$/COMPILABLE := $($/C)
-$/COMPILABLE += $($/CPP)
+$/LINKABLE := $($/*.s)
+$/COMPILABLE := $($/*.c)
+$/COMPILABLE += $($/*.cpp)
 $/LINKABLE += $($/COMPILABLE)
 $/CODE := $($/SRCS)
-$/CODE += $($/PY)
+$/CODE += $($/*.py)
 
-## Prepare for compilation
-$/INC_DIRS := $($/PROJECT)
+## Prepare for clang compilation
 $/LDFLAGS := $(LDFLAGS)
+$/LDFLAGS += -mabi=aapcs-linux
 
 # A linked executable has the same name as the project
 ifneq (,$(strip $($/LINKABLE)))
@@ -421,7 +460,7 @@ ifneq (,$(strip $($/LINKABLE)))
 endif
 
 # If we got assembly source, assume it has _start code
-ifneq ($(strip $($/S)),)
+ifneq ($(strip $($/*.s)),)
     $/LDFLAGS += -nostartfiles -no-pie
 endif
 
@@ -432,19 +471,19 @@ $/CXXFLAGS += $(CXXFLAGS)
 $/CFLAGS += $(CFLAGS)
 $/COBJS := $($/COMPILABLE:$/%=$($/BUILD)%.s)
 $/DEPS += $($/COBJS:.s=.d)
-$/OBJS := $($/S)
+$/OBJS := $($/*.s)
 $/OBJS += $($/COBJS)
 $/EXES := $($/EXE)
-$/EXES += $($/PY)
+$/EXES += $($/*.py)
 
 # Collect bringup and tested targets
-$/BRINGUP := $($/PY:$/%=$($/BUILD)%.bringup)
-$/TESTED += $($/PY:$/%=$($/BUILD)%.tested)
+$/BRINGUP := $($/*.py:$/%=$($/BUILD)%.bringup)
+$/TESTED += $($/*.py:$/%=$($/BUILD)%.tested)
 $/PRETESTED := $($/TESTED)
-$/TESTED += $($/MD:$/%=$($/BUILD)%.sh-test.tested)
+$/TESTED += $($/*.md:$/%=$($/BUILD)%.sh-test.tested)
 
 # Prepare for bringup
-$/PY_MK := $($/PY:$/%=$($/BUILD)%.mk)
+$/PY_MK := $($/*.py:$/%=$($/BUILD)%.mk)
 $/DEPS += $($/PY_MK)
 
 # Prepare for reporting
@@ -470,19 +509,24 @@ $/REPORT += $($/RESULT:%=%.md)
 $/bringup: $($/EXE) $($/BRINGUP)
 $/tested: $($/TESTED)
 
+# Use the clang compiler
+$?/clang++: $?/clang
+CXX := /usr/bin/clang++
+CC := /usr/bin/clang
+
+# Use project specific compile flags
 ifneq (,$($/OBJS))
 define META
-    # build/*.c.s: Compile C
-    $($/BUILD)%.c.s: $/%.c
-	    $(CXX) $($/CFLAGS) -c $$< -o $$@
-
-    # build/*.cpp.s: Compile C++
-    $($/BUILD)%.cpp.s: $/%.cpp
+    # Compile C++
+    $($/BUILD)%.cpp.s: $/%.cpp | $(CXX)
 	    $(CXX) $($/CXXFLAGS) -c $$< -o $$@
 
+    # Compile C
+    $($/BUILD)%.c.s: $/%.c | $(CC)
+	    $(CC) $($/CFLAGS) -c $$< -o $$@
+
     # Link executable
-    $/$($/NAME): $($/OBJS)
-	    # $$@: $$^
+    $/$($/NAME): $($/OBJS) | $(CC)
 	    $(CC) $($/LDFLAGS) $$^ -o $$@
 
     # Test executable:
@@ -494,28 +538,26 @@ endif
 
 # Check Python 3.9 syntax
 $/syntax: $($/BUILD)syntax
-$($/BUILD)%.py.syntax: $($/PROJECT_PYTHON) $/%.py | $/venv/lib/python/site-packages/ruff
+$($/BUILD)%.py.syntax: $($/PROJECT_PYTHON) $/%.py | $/PROJECT_PACKAGES/ruff
 	$< -m ruff --select=E9,F63,F7,F82 --target-version=py39 $(lastword,$^) > $@ || (cat $@ && false)
 
 # Install pip package in the local python:
-$/venv/lib/python/site-packages/%: $($/PROJECT_PYTHON) $/venv/lib/python/site-packages
+$/PROJECT_PACKAGES/%: $($/PROJECT_PYTHON)
 	 $< -m pip install $*
 
-# Link to actual site-packages
-$/venv/lib/python/site-packages: $($/PROJECT_PYTHON)
-	mkdir -p $(dir $@)
-	ln -s $$(realpath --relative-to=$(dir $@) `$< -c "import sys; print(sys.path[-1])"`) $@
-
-# Workaround Windows python not installing #!venv/bin/python
-ifeq ($(PYTHON),/mnt/c/tools/miniconda3/python.exe)
-    $/PYTHON_FINALIZE ?= && mkdir -p $(dir $@) && ln -s ../Scripts/python.exe $@
-endif
-
-# Setup a local shebang python:
-$/venv/bin/python: | $(PYTHON) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
-	( cd $(patsubst %venv/bin/python,%.,$@) && $(SPEEDUP_WSL_PIP)$(PYTHON) -m venv venv ) $($/PYTHON_FINALIZE)
-	$(SPEEDUP_WSL_PIP)$@ -m pip install --upgrade pip
+# Setup a local shebang python
+$/venv/bin/python3: | $(PYTHON) $(PYTHON_DEP) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
+	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv $(patsubst %/bin/python3,%,$@) $(PYTHON_FINALIZE)
 	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m makemake --prompt
+
+# Install conda python
+ifndef CONDA
+    CONDA := ~/miniconda3/bin/cond
+    ~/miniconda3/bin/conda:
+	    curl -sL https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh > miniconda.sh
+	    bash miniconda.sh -bfup $~/miniconda3
+	    rm miniconda.sh
+endif
 
 # Install local commands before other commands
 ifndef .-ON-PATH_TARGETS
@@ -542,12 +584,6 @@ ifndef SPEEDUP_WSL_DNS_TARGET
 	    sudo sed -i '\|command=$@|d' /etc/wsl.conf
 	    echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
 	    sudo sh $@
-endif
-
-ifndef INSTALL_PIP_TARGET
-    INSTALL_PIP_TARGET = 1
-    $?/pip:
-	    $! python3.10-pip
 endif
 
 # Check Python 3.9 style
@@ -645,19 +681,19 @@ endef
 $(eval $(META))
 $/slides.html: $/report.dzslides
 	mv $< $@
-$/report.html $/report.pdf $/report.gfm $/report.dzslides: $($/MD) $($/REPORT)
+$/report.html $/report.pdf $/report.gfm $/report.dzslides: $($/*.md) $($/REPORT)
 $/file = $(foreach _,$1,[\`$_\`]($_))
 $/exe = $(foreach _,$1,[\`$_\`]($_))
 $/h_fixup := sed -E '/^$$|[.]{3}/d'
-define META
+#define META
     $($/BUILD)report.md: $($/BUILD)report.txt
 	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
-ifneq (,$(strip $($/EXE)))
+ifneq ($(strip $($/EXE)),)
 	        echo "- \`./$($/NAME)\`: $(subst $/,,$(call $/file,$($/SRCS)))" >> $$@
 endif
-ifneq (,$(strip $($/PY)))
-	echo "- $(subst $/,,$(call $/exe,$($/PY)))" >> $$@
+ifneq (,$(strip $($/*.py)))
+	echo "- $(subst $/,,$(call $/exe,$($/*.py)))" >> $$@
 endif
 	    echo "$($/h)## Installation" >> $$@
 	    echo "$($/~~~sh)" >> $$@
@@ -666,9 +702,9 @@ endif
 ifneq (,$(strip $($/EXE)))
 	    echo "- Installs \`./$($/NAME)\`." >> $$@
 endif
-ifneq (,$(strip $($/PY)))
+ifneq (,$(strip $($/*.py)))
 	    echo "- Installs \`./venv\`." >> $$@
-	    echo "- Installs $(subst $/,,$(call $/exe,$($/PY)))." >> $$@
+	    echo "- Installs $(subst $/,,$(call $/exe,$($/*.py)))." >> $$@
 endif
 ifneq (,$($/EXES))
 	    echo "$($/h)## Usage" >> $$@
@@ -688,11 +724,11 @@ endif
 ifneq (,$(strip $($/EXE)))
 	    echo "- Tests \`./$($/NAME)\`." >> $$@
 endif
-ifneq (,$(strip $($/PY)))
-	    echo "- Verifies style and doctests in $(subst $($/PROJECT),,$(call $/file,$($/PY)))." >> $$@
+ifneq (,$(strip $($/*.py)))
+	    echo "- Verifies style and doctests in $(subst $($/PROJECT),,$(call $/file,$($/*.py)))." >> $$@
 endif
-ifneq (,$(strip $($/MD)))
-	     echo "- Verifies doctests in $(subst $($/PROJECT),,$(call $/file,$($/MD)))." >> $$@
+ifneq (,$(strip $($/*.md)))
+	     echo "- Verifies doctests in $(subst $($/PROJECT),,$(call $/file,$($/*.md)))." >> $$@
 endif
 ifneq (,$(strip $($/CODE)))
 	    echo "$($/h)## Result" >> $$@
@@ -702,8 +738,8 @@ ifneq (,$(strip $($/CODE)))
 	    echo "$($/~~~)" >> $$@
 	    echo "\n---\n" >> $$@
 endif
-endef
-$(eval $(META))
+#endef
+#$(eval $(META))
 $($/BUILD)report-details.md:
 	echo "$($/h)# Source code, installation and test result" >> $@
 
