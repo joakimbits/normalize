@@ -376,7 +376,6 @@ $/_SOURCE += $($/_MAKEFILE)
 $/*.s := $(wildcard $/*.s)
 $/_SOURCE += $($/*.s)
 $/*.c := $(wildcard $/*.c)
-$(info DEBUG $/*.c = $($/*.c))
 $/_SOURCE += $($/*.c)
 $/*.h := $(shell find $/*.h \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.h)
@@ -385,8 +384,6 @@ $/_SOURCE += $($/*.cpp)
 $/*.hpp := $(shell find $/*.hpp \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.hpp)
 $/*.py := $(shell find $/*.py \! -type l 2>/dev/null)
-$(error DEBUG $/*.py = $($/*.py))
-$/*.py := ($/*.py:./%=%)
 $/_SOURCE += $($/*.py)
 $/*.md := $(shell find $/*.md \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.md)
@@ -470,7 +467,7 @@ $/_EXES := $($/_EXE)
 $/_EXES += $($/*.py)
 
 # Collect bringup and tested targets
-$/_BRINGUP := $($/*.py:$/%=$/build/%.bringup)
+$/build/*.bringup := $($/*.py:$/%=$/build/%.bringup)
 $/_TESTED += $($/*.py:$/%=$/build/%.tested)
 $/_PRETESTED := $($/_TESTED)
 $/_TESTED += $($/*.md:$/%=$/build/%.sh-test.tested)
@@ -483,7 +480,7 @@ $/_DEPS += $($/build/*.py.mk)
 $/_LOGIC := $($/_MAKEFILE)
 $/_LOGIC += $($/_CODE)
 $/_RESULT := $($/build/*.py.mk)
-$/_RESULT += $($/_BRINGUP)
+$/_RESULT += $($/build/*.bringup)
 $/_RESULT += $($/_TESTED)
 $/_REPORT := $/build/report-details.md
 $/_REPORT += $($/_LOGIC:$/%=$/build/%.md)
@@ -499,7 +496,7 @@ $/_REPORT += $($/_RESULT:%=%.md)
 
 # Convenience targets
 .PHONY: $/bringup $/tested $/clean
-$/bringup: $($/_EXE) $($/_BRINGUP)
+$/bringup: $($/_EXE) $($/build/*.bringup)
 $/tested: $($/_TESTED)
 
 # Use the clang compiler
@@ -585,7 +582,7 @@ $/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
 
 # Build a recipy for $/build/%.py.bringup
 $/build/%.py.mk: $/. $/%.py
-	rm -f $@ && ( cd $< && $(PYTHON) $*.py --generic --dep $(@:$(dir $<)%=%) ) ; [ -e $@ ] || echo "\$$build/$*.py.bringup:; touch \$$@" > $@
+	rm -f $@ && ( cd $< && $(PYTHON) $*.py --generic --dep $(@:$(dir $<)%=%) ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
 
 # Check Python and command line usage examples in .py files
 $/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $($/_EXE_TESTED) | $($/venv/bin/python3)
