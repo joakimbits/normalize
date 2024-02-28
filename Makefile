@@ -322,9 +322,9 @@ $/build/review.diff: $($/_ACTIVE_SUBPROJECTS:%=%build/review.diff)
 
 #### Remove all built files in all projects
 define META
-    $/clean: $/clean_keep_venv | $($/_ACTIVE_SUBPROJECTS:%=%clean)
+    $/clean: $/clean/keep_venv | $($/_ACTIVE_SUBPROJECTS:%=%clean)
 	    rm -rf $/venv/ $/.ruff_cache/
-    $/clean_keep_venv: | $($/_ACTIVE_SUBPROJECTS:%=%clean)
+    $/clean/keep_venv: | $($/_ACTIVE_SUBPROJECTS:%=%clean/keep_venv)
 	    rm -rf $/build/
 endef
 $(eval $(META))
@@ -581,7 +581,7 @@ $/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
 	$(word 3,$^) -m ruff --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Build a recipy for $/build/%.py.bringup
-$/build/%.py.mk: $/. $/%.py
+$/build/%.py.mk: $/. $/%.py | $/makemake.py
 	rm -f $@ && ( cd $< && $(PYTHON) $*.py --generic --dep $(@:$(dir $<)%=%) ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
 
 # Check Python and command line usage examples in .py files
