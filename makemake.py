@@ -224,7 +224,7 @@ if parent_module.__name__ == '__main__':
             python = '$/venv/$(VENV_PYTHON)'
             recipy_python = '$(dir $<)venv/$(VENV_PYTHON)'
             src_dir = '$/'
-            build_dir = '$($/BUILD)'
+            build_dir = '$/build/'
             build_dir_var_value = f"{src_dir}{build_dir}"
             generic = " --generic"
         else:
