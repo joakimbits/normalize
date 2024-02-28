@@ -633,7 +633,7 @@ $(eval $(META))
 # Make a markdown document.
 ifndef __
     _h := \n---\n\n\#
-    _. := \\\\footnotesize\n~~~ {$1}
+    _. = \\\\footnotesize\n~~~ {$1}
     _sh := $(call _.,.sh)
     __ := ~~~\n\\\\normalsize\n
 endif
