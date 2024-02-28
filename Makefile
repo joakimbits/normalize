@@ -285,6 +285,18 @@ ifndef !
         ? ?= /usr/bin
         COUSINE ?= /usr/share/fonts/truetype/cousine
         CARLITO ?= /usr/share/fonts/truetype/crosextra
+        /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
+	        # Need a more screen-readable normal font: carlito
+	        sudo apt-get install fonts-crosextra-carlito
+        /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
+	        # Need a more screen-readable fixed-size font: cousine
+	        ( sudo mkdir -p $(dir $@) && cd $(dir $@) && \
+	          fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \
+	          sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \
+	          sudo wget $$fonts/cousine/Cousine-Bold.ttf && \
+	          sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \
+	          sudo wget $$fonts/cousine/Cousine-Italic.ttf && \
+	          sudo wget $$fonts/cousine/Cousine-Regular.ttf )
     endif
 
     # Install a normal package
