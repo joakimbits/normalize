@@ -1,4 +1,7 @@
 #!venv/bin/python3
+#!venv/bin/python3
+#!venv/bin/python3
+#!venv/bin/python3
 """Programming example: Strings and numbers
 
 >>> print(" ".join(fizz3fuzz5(*range(1, 101))))
