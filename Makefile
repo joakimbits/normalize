@@ -631,31 +631,33 @@ endef
 $(eval $(META))
 
 # Make a markdown document.
-$/_h := \n---\n\n\#
-$/_~~~. = \\footnotesize\n~~~ {$1}
-$/_~~~sh := $(call $/_~~~.,.sh)
-$/_~~~ := ~~~\n\\normalsize\n
+ifndef __
+    _h := \n---\n\n\#
+    _. := \\\\footnotesize\n~~~ {$1}
+    _sh := $(call _.,.sh)
+    __ := ~~~\n\\\\normalsize\n
+endif
 define META
     $/build/Makefile.md: project.mk
-	    ( echo "$($/_h)## [$$*]($$*)" && \
-	      echo "$(call $/_~~~.,.mk)" && \
-	      cat $$< && echo "$($/_~~~)" ) > $$@
+	    ( echo "$(_h)## [$$*]($$*)" && \
+	      echo "$(call _.,.mk)" && \
+	      cat $$< && echo "$(__)" ) > $$@
     $/build/%.md: $/%
-	    ( echo "$($/_h)## [$$*]($$*)" && \
-	      echo "$(call $/_~~~.,$$(suffix $$<))" && \
-	      cat $$< && echo "$($/_~~~)" ) > $$@
+	    ( echo "$(_h)## [$$*]($$*)" && \
+	      echo "$(call _.,$$(suffix $$<))" && \
+	      cat $$< && echo "$(__)" ) > $$@
     $/build/%.md: $/build/%
-	    ( echo "$($/_h)## [$$*](build/$$*)" && \
-	      echo "$(call $/_~~~.,$$(suffix $$<))" && \
-	      cat $$< && echo "$($/_~~~)" ) > $$@
+	    ( echo "$(_h)## [$$*](build/$$*)" && \
+	      echo "$(call _.,$$(suffix $$<))" && \
+	      cat $$< && echo "$(__)" ) > $$@
     $/build/%.bringup.md: $/build/%.bringup
-	    ( echo "$($/_h)## [$$*](build/$$*)" && \
-	      echo "$($/_~~~sh)" && \
-	      cat $$< && echo "$($/_~~~)" ) > $$@
+	    ( echo "$(_h)## [$$*](build/$$*)" && \
+	      echo "$(_sh)" && \
+	      cat $$< && echo "$(__)" ) > $$@
     $/build/%.tested.md: $/build/%.tested
-	    ( echo "$($/_h)## [$$*](build/$$*)" && \
-	      echo "$($/_~~~sh)" && \
-	      cat $$< && echo "$($/_~~~)" ) > $$@
+	    ( echo "$(_h)## [$$*](build/$$*)" && \
+	      echo "$(_sh)" && \
+	      cat $$< && echo "$(__)" ) > $$@
 endef
 $(eval $(META))
 
@@ -684,10 +686,10 @@ endif
 ifneq (,$(strip $($/*.py)))
 	    echo "- $(call $/_exe,$($/*.py:$/%=%))" >> $$@
 endif
-	    echo "$($/_h)## Installation" >> $$@
-	    echo "$($/_~~~sh)" >> $$@
-	    echo "\$$ make" >> $$@
-	    echo "$($/_~~~)" >> $$@
+	    echo "$(_h)## Installation" >> $$@
+	    echo "$(_sh)" >> $$@
+	    echo "$$$$ make" >> $$@
+	    echo "$(__)" >> $$@
 ifneq (,$(strip $($/_EXE)))
 	    echo "- Installs \`./$($/_NAME)\`." >> $$@
 endif
@@ -696,19 +698,19 @@ ifneq (,$(strip $($/*.py)))
 	    echo "- Installs \`$(call $/_exe,$($/*.py:$/%=%))\`." >> $$@
 endif
 ifneq (,$($/_EXES))
-	    echo "$($/_h)## Usage" >> $$@
-	    echo "$($/_~~~sh)" >> $$@
+	    echo "$(_h)## Usage" >> $$@
+	    echo "$(_sh)" >> $$@
 	    for x in $($/_EXES:$/%=%) ; do \
 	      echo "\$$$$ true | $$$$x -h | $($/_h_fixup)" >> $$@ && \
 	      ( cd $/. && true | $$$$x -h ) > $$@.tmp && \
 	      $($/_h_fixup) $$@.tmp >> $$@ && rm $$@.tmp ; \
 	    done
 	    echo >> $$@
-	    echo "$($/_~~~)" >> $$@
-	    echo "$($/_h)## Test" >> $$@
-	    echo "$($/_~~~sh)" >> $$@
+	    echo "$(__)" >> $$@
+	    echo "$(_h)## Test" >> $$@
+	    echo "$(_sh)" >> $$@
 	    echo "\$$$$ make tested" >> $$@
-	    echo "$($/_~~~)" >> $$@
+	    echo "$(__)" >> $$@
 endif
 ifneq (,$(strip $($/_EXE)))
 	    echo "- Tests \`./$($/_NAME)\`." >> $$@
@@ -720,17 +722,17 @@ ifneq (,$(strip $($/*.md)))
 	     echo "- Verifies doctests in $(call $/_file,$($/*.md:$/%=%)))." >> $$@
 endif
 ifneq (,$(strip $($/_CODE)))
-	    echo "$($/_h)## Result" >> $$@
-	    echo "$($/_~~~sh)" >> $$@
+	    echo "$(_h)## Result" >> $$@
+	    echo "$(_sh)" >> $$@
 	    echo "\$$$$ make report" >> $$@
 	    ( cd $/. && $(MAKE) report --no-print-directory ) >> $$@
-	    echo "$($/_~~~)" >> $$@
+	    echo "$(__)" >> $$@
 	    echo "\n---\n" >> $$@
 endif
 endef
 $(eval $(META))
 $/build/report-details.md:
-	echo "$($/_h)# Source code, installation and test result" >> $@
+	echo "$(_h)# Source code, installation and test result" >> $@
 
 # Build an old worktree that is shared by all projects in this git
 ifndef _OLD_WORKTREE
