@@ -317,7 +317,7 @@ class Shebang(Action):
             shebang, src = src.split("\n", 1)
 
         if shebang != self.SHEBANG:
-            open(module_path, 'w').write(f'{self.SHEBANG}\n{src}')
+            open(module_path, 'wb').write(f'{self.SHEBANG}\n{src}'.encode())
 
         search_path = os.environ['PATH']
         search_dirs = search_path.split(os.pathsep)
