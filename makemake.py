@@ -221,8 +221,8 @@ if parent_module.__name__ == '__main__':
             pattern = '%'
             source = '$<'
             stem = '$*'
-            python = '$/venv/$(VENV_PYTHON)'
-            recipy_python = '$(dir $<)venv/$(VENV_PYTHON)'
+            python = '$/venv/bin/python3'
+            recipy_python = '$(dir $<)venv/bin/python3'
             src_dir = '$/'
             build_dir = '$/build/'
             build_dir_var_value = f"{src_dir}{build_dir}"
