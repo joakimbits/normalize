@@ -638,17 +638,17 @@ ifndef __
     __ := ~~~\n\\\\normalsize\n
 endif
 define META
-    $/build/Makefile.md: project.mk
-	    ( echo "$(_h)## [$$*]($$*)" && \
+    $/build/Makefile.md: $/Makefile
+	    ( echo "$(_h)## [Makefile](Makefile)" && \
 	      echo "$(call _.,.mk)" && \
 	      cat $$< && echo "$(__)" ) > $$@
     $/build/%.md: $/%
 	    ( echo "$(_h)## [$$*]($$*)" && \
-	      echo "$(call _.,$$(suffix $$<))" && \
+	      echo "$$(call _.,$$(suffix $$<))" && \
 	      cat $$< && echo "$(__)" ) > $$@
     $/build/%.md: $/build/%
 	    ( echo "$(_h)## [$$*](build/$$*)" && \
-	      echo "$(call _.,$$(suffix $$<))" && \
+	      echo "$$(call _.,$$(suffix $$<))" && \
 	      cat $$< && echo "$(__)" ) > $$@
     $/build/%.bringup.md: $/build/%.bringup
 	    ( echo "$(_h)## [$$*](build/$$*)" && \
