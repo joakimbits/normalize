@@ -468,9 +468,9 @@ $/_EXES += $($/*.py)
 
 # Collect bringup and tested targets
 $/build/*.bringup := $($/*.py:$/%=$/build/%.bringup)
-$/_TESTED += $($/*.py:$/%=$/build/%.tested)
-$/_PRETESTED := $($/_TESTED)
-$/_TESTED += $($/*.md:$/%=$/build/%.sh-test.tested)
+$/build/*.tested += $($/*.py:$/%=$/build/%.tested)
+$/_PRETESTED := $($/build/*.tested)
+$/build/*.tested += $($/*.md:$/%=$/build/%.sh-test.tested)
 
 # Prepare for bringup
 $/build/*.py.mk := $($/*.py:$/%=$/build/%.mk)
@@ -481,7 +481,7 @@ $/_LOGIC := $($/_MAKEFILE)
 $/_LOGIC += $($/_CODE)
 $/_RESULT := $($/build/*.py.mk)
 $/_RESULT += $($/build/*.bringup)
-$/_RESULT += $($/_TESTED)
+$/_RESULT += $($/build/*.tested)
 $/_REPORT := $/build/report-details.md
 $/_REPORT += $($/_LOGIC:$/%=$/build/%.md)
 $/_REPORT += $($/_RESULT:%=%.md)
@@ -497,7 +497,7 @@ $/_REPORT += $($/_RESULT:%=%.md)
 # Convenience targets
 .PHONY: $/bringup $/tested $/clean
 $/bringup: $($/_EXE) $($/build/*.bringup)
-$/tested: $($/_TESTED)
+$/tested: $($/build/*.tested)
 
 # Use the clang compiler
 $?/clang++: $?/clang
@@ -599,7 +599,7 @@ $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
 # Document all test results.
 $/report: $/build/report.txt
 	@cat $<
-$/build/report.txt: $($/_TESTED)
+$/build/report.txt: $($/build/*.tested)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a standalone html, pdf, gfm or dzslides document.
