@@ -1,6 +1,4 @@
 #!venv/bin/python3
-#!venv/bin/python3
-#!venv/bin/python3
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
