@@ -287,8 +287,11 @@ ifndef !
         CARLITO ?= /usr/share/fonts/truetype/crosextra
     endif
 
-    # Install a package
+    # Install a normal package
     $?/%:; $! $*
+
+    # Custom packages
+    $?/xetex:; $! texlive-xetex
 endif
 
 
@@ -602,13 +605,12 @@ $/report: $/build/report.txt
 $/build/report.txt: $($/build/*.tested)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
-# Make a standalone html, pdf, gfm or dzslides document.
+# Make a standalone gfm, html, pdf, or dzslides document.
 define META
     $/%.gfm: $/build/%.md
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
 	           -M title="$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
-    $/%.html $/%.pdf $/%.dzslides: $/build/%.md | \
-      $?/pandoc $?/xelatex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
+    $/%.html $/%.pdf $/%.dzslides: $/build/%.md | $?/pandoc $?/xetex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
 	           -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
 	           -V min-width=80%\!important -V geometry:margin=1in \
