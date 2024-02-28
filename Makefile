@@ -605,8 +605,8 @@ $/build/report.txt: $($/build/*.tested)
 # Make a standalone html, pdf, gfm or dzslides document.
 define META
     $/%.gfm: $/build/%.md
-	pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
-	       -M title="$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
+	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
+	           -M title="$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
     $/%.html $/%.pdf $/%.dzslides: $/build/%.md | \
       $?/pandoc $?/xelatex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
@@ -655,11 +655,12 @@ endef
 $(eval $(META))
 $/slides.html: $/report.dzslides
 	mv $< $@
-$/report.html $/report.pdf $/report.gfm $/report.dzslides: $($/*.md) $($/_REPORT)
+$/report.gfm: $($/*.md) $($/_REPORT)
+$/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT)
 $/_file = $(foreach _,$1,[\`$_\`]($_))
 $/_exe = $(foreach _,$1,[\`$_\`]($_))
 $/_h_fixup := sed -E '/^$$|[.]{3}/d'
-#define META
+define META
     $/build/report.md: $/build/report.txt
 	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
@@ -683,7 +684,7 @@ endif
 ifneq (,$($/_EXES))
 	    echo "$($/_h)## Usage" >> $$@
 	    echo "$($/_~~~sh)" >> $$@
-	    for x in $($/_EXES:$/%=%)) ; do \
+	    for x in $($/_EXES:$/%=%) ; do \
 	      echo "\$$$$ true | $$$$x -h | $($/_h_fixup)" >> $$@ && \
 	      ( cd $/. && true | $$$$x -h ) > $$@.tmp && \
 	      $($/_h_fixup) $$@.tmp >> $$@ && rm $$@.tmp ; \
@@ -712,8 +713,8 @@ ifneq (,$(strip $($/_CODE)))
 	    echo "$($/_~~~)" >> $$@
 	    echo "\n---\n" >> $$@
 endif
-#endef
-#$(eval $(META))
+endef
+$(eval $(META))
 $/build/report-details.md:
 	echo "$($/_h)# Source code, installation and test result" >> $@
 
