@@ -382,7 +382,7 @@ class ShTest(Action):
         except FileExistsError:
             print("Recursive usage of", lock, file=sys.stderr)
         except AssertionError as err:
-            print(err, file=sys.stderr)
+            print('{file} {err}', file=sys.stderr)
             self.err = err
 
         try:
