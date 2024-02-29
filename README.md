@@ -33,8 +33,7 @@ build/makemake.py.tested: makemake.py build/makemake.py.bringup
 build/makemake.py.bringup: makemake.py | $(PYTHON)
 	mkdir -p build/ && \
 	$(PYTHON) -m pip install requests --no-warn-script-location > $@ && \
-	$(PYTHON) makemake.py --shebang >> $@ && \
-	chmod +x $< >> $@
+	$(PYTHON) makemake.py --shebang >> $@
 
 ```
 

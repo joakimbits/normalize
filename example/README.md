@@ -31,8 +31,7 @@ $ cat build/greeter.py.mk
 $/build/greeter.py.bringup: $/greeter.py $/build/greeter.py.mk | $/venv/bin/python3
 	( cd $(dir $<). && make example --no-print-directory ) > $@ && \
 	$(dir $<)venv/bin/python3 -m pip install fire --no-warn-script-location >> $@ && \
-	$(dir $<)venv/bin/python3 $< --shebang >> $@ && \
-	chmod +x $< >> $@
+	$(dir $<)venv/bin/python3 $< --shebang >> $@
 
 $ greeter.py --help | awk '{ print "\t" $0 }'
 	usage: greeter.py [-h] [--makemake] [--generic] [--dep DEP] [-c C]
