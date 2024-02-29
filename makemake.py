@@ -1,4 +1,5 @@
 #!venv/bin/python3
+
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
@@ -305,28 +306,37 @@ if parent_module.__name__ == '__main__':
         exit(0)
 
 
+def is_executeable(path): return os.access(path, os.X_OK)
+def make_executeable(path): os.chmod(path, 0o777)
+
+
 class Shebang(Action):
     """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
 
     SHEBANG = b'#!venv/bin/python3'
+    PATHSEP_INSTALL = {
+        ':': "export PATH='.:$PATH'",
+        ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
+    }
+    match_shebang_eol_code = re.compile(rb'^((#!.*)(([\r\n]|$)+))*((.*([\r\n]|$))*)\Z').match
+    group_shebang_eol_code = (1, 2, 4)
 
     def __call__(self, parser, args, values, option_string=None):
-        shebang = None
+        # Make it have a correct shebang with both a Linux and a Windows line ending
         src = open(module_path, 'rb').read()
-        if src[:2] == b'#!':
-            shebang, src = src.split(b'\n', 1)
+        shebang, eol, code = (self.match_shebang_eol_code(src).groups()[i] for i in self.group_shebang_eol_code)
+        if shebang != self.SHEBANG or eol[0] != b'\n':
+            open(module_path, 'wb').write(self.SHEBANG + b'\n' + b'\r\n' + code)
 
-        if shebang != self.SHEBANG:
-            open(module_path, 'wb').write(self.SHEBANG + b'\n' + src)
+        # Make it an executable
+        if not is_executeable(module_path):
+            make_executeable(module_path)
 
+        # Print any commands needed to run this as a command without './' prefix
         search_path = os.environ['PATH']
         search_dirs = search_path.split(os.pathsep)
         if '.' not in search_dirs:
-            if os.pathsep == ';':
-                print("[System.Environment]::SetEnvironmentVariable('Path',"
-                      " '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')")
-            else:
-                print("export PATH='.:$PATH'")
+            print(self.PATHSEP_INSTALL[os.pathsep])
 
         exit(0)
 
