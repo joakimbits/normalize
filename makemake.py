@@ -265,7 +265,6 @@ if parent_module.__name__ == '__main__':
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
                                   pip=f"{recipy_python} -m pip")
         bringups.append(([f'{recipy_python} {source} --shebang'], [''], []))
-        bringups.append((['chmod +x $<'], [''], []))
         op = ">"
         remaining = len(bringups)
         for command_lines, comment_lines, output_lines in bringups:
@@ -325,17 +324,20 @@ class Shebang(Action):
         # Make it have a correct shebang with both a Linux and a Windows line ending
         src = open(module_path, 'rb').read()
         shebang, eol, code = (self.match_shebang_eol_code(src).groups()[i] for i in self.group_shebang_eol_code)
-        if shebang != self.SHEBANG or eol[0] != b'\n':
+        if shebang != self.SHEBANG or eol[0] != ord('\n'):
             open(module_path, 'wb').write(self.SHEBANG + b'\n' + b'\r\n' + code)
+            print(f'# {module_path} now updated with shebang {shebang}')
 
         # Make it an executable
         if not is_executeable(module_path):
             make_executeable(module_path)
+            print(f'# {module_path} is now executable with shebang {shebang}')
 
-        # Print any commands needed to run this as a command without './' prefix
+        # Print any commands needed to run it without ./ or .\ prefix
         search_path = os.environ['PATH']
         search_dirs = search_path.split(os.pathsep)
         if '.' not in search_dirs:
+            print(f'# {module_path} needs the following . on PATH configuration to use shebang {shebang}')
             print(self.PATHSEP_INSTALL[os.pathsep])
 
         exit(0)
@@ -554,8 +556,7 @@ include build/makemake.dep
 $ cat build/makemake.dep
 build/makemake.py.bringup: makemake.py build/makemake.dep | $(PYTHON)
 	$(PYTHON) -m pip install requests --no-warn-script-location > $@ && \\
-	$(PYTHON) makemake.py --shebang >> $@ && \\
-	chmod +x $< >> $@
+	$(PYTHON) makemake.py --shebang >> $@
 
 $ makemake.py --dep build/makemake.dep --makemake
 all: build/makemake.py.tested
