@@ -406,7 +406,7 @@ $/_SOURCE += $($/*.md)
 # Find our git status
 $/_BRANCH := $(shell git branch --show-current)
 $/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
-$/_KNOWN := $(addprefix $/_,$(shell cd $/. ; git ls-files . ':!:*/*'))
+$/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
 $/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
 $/_MODIFIED := $(shell cd $/. && $(PYTHON) makemake.py --git-status . M)
 $/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
