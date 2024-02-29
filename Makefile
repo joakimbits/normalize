@@ -451,7 +451,7 @@ $/_LINKABLE := $($/*.s)
 $/_COMPILABLE := $($/*.c)
 $/_COMPILABLE += $($/*.cpp)
 $/_LINKABLE += $($/_COMPILABLE)
-$/_CODE := $($/_SRCS)
+$/_CODE := $($/_LINKABLE)
 $/_CODE += $($/*.py)
 
 ## Prepare for clang compilation
@@ -681,7 +681,7 @@ define META
 	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
 ifneq ($(strip $($/_EXE)),)
-	    echo "- \`./$($/_NAME)\`: $(call $/_file,$($/_SRCS:$/%=%))" >> $$@
+	    echo "- \`./$($/_NAME)\`: $(call $/_file,$($/_LINKABLE:$/%=%))" >> $$@
 endif
 ifneq (,$(strip $($/*.py)))
 	    echo "- $(call $/_exe,$($/*.py:$/%=%))" >> $$@
@@ -694,8 +694,8 @@ ifneq (,$(strip $($/_EXE)))
 	    echo "- Installs \`./$($/_NAME)\`." >> $$@
 endif
 ifneq (,$(strip $($/*.py)))
-	    echo "- Installs \`venv\`." >> $$@
-	    echo "- Installs \`$(call $/_exe,$($/*.py:$/%=%))\`." >> $$@
+	    echo "- Installs $(call $/_exe,venv/bin/python3)." >> $$@
+	    echo "- Installs $(call $/_exe,$($/*.py:$/%=%))." >> $$@
 endif
 ifneq (,$($/_EXES))
 	    echo "$(_h)## Usage" >> $$@
