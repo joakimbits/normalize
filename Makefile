@@ -596,8 +596,8 @@ $/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
 	$(word 3,$^) -m ruff --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Build a recipy for $/build/%.py.bringup
-$/build/%.py.mk: $/. $/%.py | $/makemake.py
-	rm -f $@ && ( cd $< && $(PYTHON) $*.py --generic --dep $(@:$(dir $<)%=%) ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
+$/build/%.py.mk: $/%.py | $/makemake.py
+	rm -f $@ && ( cd $(dir $<). && $(PYTHON) $*.py --generic --dep build/$*.py.mk ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
 
 # Check Python and command line usage examples in .py files
 $/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $($/_EXE_TESTED) | $($/venv/bin/python3)
