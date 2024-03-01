@@ -411,15 +411,20 @@ $/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
 $/_MODIFIED := $(shell cd $/. && $(PYTHON) makemake.py --git-status . M)
 $/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
 
-# Figure out where to checkout an old worktree
+# Checkout a common old `$.` repo worktree
+# `$.` here needs to be a unique repo name across all projects included.
 $/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
+$/_HERE_DIR := $(dir $(shell $(PYTHON) $/makemake.py --relpath $($/_HOME_DIR) $/.))
 $/_HOME := $($/_HOME_DIR:./%=%)
-$/_HOME_NAME := $(notdir $(abspath $($/_HOME_DIR)))
-$/_GIT_DIR := $(dir $(shell git rev-parse --git-common-dir))
-$/_HERE_DIR := $(shell $(PYTHON) $/makemake.py --relpath $($/_GIT_DIR) $/.)/
-$/_HERE := $($/_HERE_DIR:%./=%)
-$/_OLD_WORKTREE := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/
-$/_OLD := $($/_OLD_WORKTREE)$($/_HERE)
+$/_HERE := $($/_HERE_DIR:./%=%)
+. := $(notdir $(abspath $($/_HOME_DIR)))
+ifndef $./OLD_WORKTREE
+    $./OLD_WORKTREE := $($/_HOME)build/$($/_BASELINE)/$./
+    $($./OLD_WORKTREE):
+	    git worktree add -d $@ $($/_TAG)
+
+endif
+$/_OLD := $($./OLD_WORKTREE)$($/_HERE)
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
@@ -733,13 +738,6 @@ endef
 $(eval $(META))
 $/build/report-details.md:
 	echo "$(_h)# Source code, installation and test result" >> $@
-
-# Build an old worktree that is shared by all projects in this git
-ifndef _OLD_WORKTREE
-    _OLD_WORKTREE := $($/_OLD_WORKTREE)
-    $(_OLD_WORKTREE):
-	    git worktree add -d $(_OLD_WORKTREE) $($/_TAG)
-endif
 
 # Document last release.
 $/old: $($/_OLD)report.gfm
