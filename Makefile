@@ -405,28 +405,31 @@ $/_SOURCE += $($/*.md)
 
 # Find our git status
 $/_BRANCH := $(shell git branch --show-current)
-$/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
 $/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
 $/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
 $/_MODIFIED := $(shell cd $/. && $(PYTHON) makemake.py --git-status . M)
 $/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
-
-# Checkout a common old version `$.` worktree as a subproject
-# `$.` needs to be a unique name across all projects included. It is set to this repo name here.
 $/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
 $/_HOME := $($/_HOME_DIR:./%=%)
-. := $(notdir $(abspath $($/_HOME_DIR)))
-ifndef $._OLD_WORKTREE
-    $(info $._TAG := $($/_TAG))
-    $._TAG := $($/_TAG)
-    $._OLD_WORKTREE := $($/_HOME)build/$($/_BASELINE)/
-    $/_SUBPROJECTS += $($._OLD_WORKTREE)
-    $($._OLD_WORKTREE)Makefile:
-	    git worktree add -d $(dir $@) $($._TAG)
-endif
+
+# Checkout a common old release of this repo as a subproject in `$($._BASELINE)`
+# Prefix `$/_HERE` is from this git project root directory to  `./`.
+# Directory `$($/_OLD)` is the old release of `./`.
 $/_HERE_DIR := $(dir $(shell $(PYTHON) $/makemake.py --relpath $($/_HOME_DIR) $/.))
 $/_HERE := $($/_HERE_DIR:./%=%)
-$/_OLD := $($._OLD_WORKTREE)$($/_HERE)
+$/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
+_ := build/$($._BASELINE)/$($/_HERE)
+$/_OLD := $($/_HOME)$_
+$(info ifneq (,$(filter %$_,$/)))
+define META
+ifndef $_
+    $_ := $($/_HOME)$_
+    $/_SUBPROJECTS += $$_
+    $$_/Makefile:
+	    git worktree add -d $$(dir $$@) $($/_BASELINE)
+endif
+endef
+$(eval $(META))
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
