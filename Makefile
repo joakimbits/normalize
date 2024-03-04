@@ -411,20 +411,22 @@ $/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
 $/_MODIFIED := $(shell cd $/. && $(PYTHON) makemake.py --git-status . M)
 $/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
 
-# Checkout a common old `$.` repo worktree
-# `$.` here needs to be a unique repo name across all projects included.
+# Checkout a common old version `$.` worktree as a subproject
+# `$.` needs to be a unique name across all projects included. It is set to this repo name here.
 $/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
-$/_HERE_DIR := $(dir $(shell $(PYTHON) $/makemake.py --relpath $($/_HOME_DIR) $/.))
 $/_HOME := $($/_HOME_DIR:./%=%)
-$/_HERE := $($/_HERE_DIR:./%=%)
 . := $(notdir $(abspath $($/_HOME_DIR)))
-ifndef $./OLD_WORKTREE
-    $./OLD_WORKTREE := $($/_HOME)build/$($/_BASELINE)/$./
-    $($./OLD_WORKTREE):
-	    git worktree add -d $@ $($/_TAG)
-
+ifndef $._OLD_WORKTREE
+    $(info $._TAG := $($/_TAG))
+    $._TAG := $($/_TAG)
+    $._OLD_WORKTREE := $($/_HOME)build/$($/_BASELINE)/
+    $/_SUBPROJECTS += $($._OLD_WORKTREE)
+    $($._OLD_WORKTREE)Makefile:
+	    git worktree add -d $(dir $@) $($._TAG)
 endif
-$/_OLD := $($./OLD_WORKTREE)$($/_HERE)
+$/_HERE_DIR := $(dir $(shell $(PYTHON) $/makemake.py --relpath $($/_HOME_DIR) $/.))
+$/_HERE := $($/_HERE_DIR:./%=%)
+$/_OLD := $($._OLD_WORKTREE)$($/_HERE)
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
@@ -742,8 +744,6 @@ $/build/report-details.md:
 # Document last release.
 $/old: $($/_OLD)report.gfm
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/_BASELINE_INFO)"
-$($/_OLD)report.gfm: $(_OLD_WORKTREE)
-	( cd $($/_OLD) && $(MAKE) report.gfm --no-print-directory )
 
 # Use GPT for a release review.
 $/%: $/build/%.diff
