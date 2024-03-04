@@ -418,15 +418,16 @@ $/_HOME := $($/_HOME_DIR:./%=%)
 $/_HERE_DIR := $(dir $(shell $(PYTHON) $/makemake.py --relpath $($/_HOME_DIR) $/.))
 $/_HERE := $($/_HERE_DIR:./%=%)
 $/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
-define META
 ifndef $($/_HOME_DIR)
-    $($/_HOME_DIR) := $($($/_HOME_DIR))
-    $/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)
-    $($/_HOME)build/$($/_BASELINE)/Makefile:
-	    git worktree add -d $$(dir $$@) $($/_BASELINE)
+    $($/_HOME_DIR) := $($/_HOME_DIR))
+    $/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)/
+    $(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
+    define META
+        $($/_HOME)build/$($/_BASELINE)/Makefile:
+	        git worktree add -d $$(dir $$@) $($/_BASELINE)
+    endef
+    $(eval $(META))
 endif
-endef
-$(eval $(META))
 $/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HERE)
 
 ## Colorize edited files by their git status
