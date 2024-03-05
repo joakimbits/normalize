@@ -403,7 +403,7 @@ $/_HERE := $($/_HERE_DIR:./%=%)
 $/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
 ifndef $($/_HOME_DIR)
     $($/_HOME_DIR) := $($/_HOME_DIR))
-    $/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)/
+    #$/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)/
     define META
         $($/_HOME)build/$($/_BASELINE)/Makefile:
 	        git worktree add -d $$(dir $$@) $($/_BASELINE)
