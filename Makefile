@@ -545,8 +545,8 @@ ifneq (,$($/_OBJS))
 	        $(CXX) $($/_CXXFLAGS) -c $$< -o $$@
 
         # Compile C
-        $/build/%.c.s: $/%.c | $(CC)
-	        $(CC) $($/_CFLAGS) -c $$< -o $$@
+        $/build/%.c.s: $/%.c | $(CXX)
+	        $(CXX) $($/_CFLAGS) -c $$< -o $$@
 
         # Link executable
         $/$($/_NAME): $($/_OBJS) | $(CC)
