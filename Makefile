@@ -502,9 +502,9 @@ ifeq (2,$(MAKE_RESTARTS))
     $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $($/venv/bin/python3))
     INCLUDED := $(MAKEFILE_LIST)
     INCLUDING := $/build/
-	ifneq (,$($/_SUBPROJECTS))
-		$(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
-	endif
+    ifneq (,$($/_SUBPROJECTS))
+        $(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
+    endif
 
     # Notify the user on abusage of make
     ifneq (0,$(MAKELEVEL))
