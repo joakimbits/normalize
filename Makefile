@@ -445,9 +445,8 @@ $/_LINKABLE += $($/_COMPILABLE)
 $/_CODE := $($/_LINKABLE)
 $/_CODE += $($/*.py)
 
-## Prepare for clang compilation
-$/_LDFLAGS := $(LDFLAGS)
-$/_LDFLAGS += -mabi=aapcs-linux
+## Prepare for compilation
+$/_LDFLAGS += $(LDFLAGS)
 
 # A linked executable has the same name as the project
 ifneq (,$(strip $($/_LINKABLE)))
