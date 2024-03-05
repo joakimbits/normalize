@@ -4,6 +4,7 @@
 
 int main() {
     puts("Hello from main.c!");
-    Greeter_greet();
+    Greeter greeter;
+    greeter.greet();
     fflush(stdout);
 }
