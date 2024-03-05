@@ -751,8 +751,8 @@ $/build/report-details.md:
 # Document last release.
 $/old: $($/_OLD)report.gfm
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/_BASELINE_INFO)"
-$($/_OLD)report.gfm: $(_OLD_WORKTREE)
-	( cd $($/_OLD) && $(MAKE) report.gfm --no-print-directory )
+$($/_OLD)report.gfm: $($/_HOME)build/$($/_BASELINE)/Makefile
+	( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory )
 
 # Use GPT for a release review.
 $/%: $/build/%.diff
