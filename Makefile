@@ -1,5 +1,3 @@
-## Generic makefile for co-developed source code and documentation
-
 ### Abstract
 
 # Defines generic make targets `bringup tested report review audit clean` for arbitrarily knitted projects.
@@ -11,10 +9,19 @@
 
 # Copy the following five lines into the head of your own Makefile, to make it compliant with this.
 
+## Generic makefile for co-developed source code and documentation
+
     # Prefixing variable names with $/_ and project files with $/ to make this Makefile usable from anywhere.
     Makefile := $(lastword $(MAKEFILE_LIST))
     / := $(patsubst ./%,%,$(subst \,/,$(subst C:\,/c/,$(dir $(Makefile)))))
     $/all: $/bringup
+
+# Define this project only once
+ifndef $/_NAME
+
+# Define the usage examples here only once
+ifndef _NAME
+_NAME := $(notdir $(realpath $/.))
 
 ### Avoid using make as a command recipy tool - it is not!
 
@@ -187,6 +194,8 @@ $/python_executable_shell_example:
 
 # You could also consider making this a sibling project to the parent project instead.
 
+endif
+$/_NAME := $(notdir $(realpath $/.))
 
 ## Parameters
 
@@ -309,11 +318,6 @@ endif
 
 ### Variables
 
-#### Define the rest here only once
-
-ifndef $/_NAME
-$/_NAME := $(notdir $(realpath $/.))
-
 #### Find subdirectories containing at least one .md file
 
 $/_NON-SUBPROJECTS += $/build/
@@ -355,7 +359,6 @@ ifeq (,$(filter .,$(PATHS)))
 endif
 
 # Setup this Makefile in each subproject
-
 $/%/Makefile: | $/Makefile $/%/makemake.py
 	ln -s ../Makefile $@
 $/%/makemake.py: | $/makemake.py
@@ -364,27 +367,7 @@ $/makemake.py:
 	curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/makemake.py -o $@
 .PRECIOUS: $/makemake.py $($/_SUBPROJECTS:%=%makemake.py)
 
-# Notify the user if new rules were built and included, and make therefore restarted
-ifeq (2,$(MAKE_RESTARTS))
-    ifndef MAKER
-        $(info # Hello $I, Welcome to makemake https://github.com/joakimbits/normalize)
-    endif
-
-    MAKER := $(shell $(MAKE) -v))
-    INCLUDING ?= $/build/
-    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $($/venv/bin/python3))
-    INCLUDED := $(MAKEFILE_LIST)
-    INCLUDING := $/build/
-
-    # Notify the user on abusage of make
-    ifneq (0,$(MAKELEVEL))
-        $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
-        $(info # https://aegis.sourceforge.net/auug97.pdf)
-        $(info # https://github.com/joakimbits/normalize/blob/main/example/Makefile)
-    endif
-endif
-
-# Find all source files, but ignore links named Makefile *.h *.hpp *.py *.md 
+# Find all source files, but ignore links named Makefile *.h *.hpp *.py *.md
 $/_SOURCE :=
 $/_MAKEFILE := $(shell find $/Makefile \! -type l 2>/dev/null)
 $/_SOURCE += $($/_MAKEFILE)
@@ -421,7 +404,6 @@ $/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
 ifndef $($/_HOME_DIR)
     $($/_HOME_DIR) := $($/_HOME_DIR))
     $/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)/
-    $(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
     define META
         $($/_HOME)build/$($/_BASELINE)/Makefile:
 	        git worktree add -d $$(dir $$@) $($/_BASELINE)
@@ -509,6 +491,30 @@ $/_RESULT += $($/build/*.tested)
 $/_REPORT := $/build/report-details.md
 $/_REPORT += $($/_LOGIC:$/%=$/build/%.md)
 $/_REPORT += $($/_RESULT:%=%.md)
+
+# Notify the user if new rules were built and included, and make therefore restarted
+ifeq (2,$(MAKE_RESTARTS))
+    ifndef MAKER
+        $(info # Hello $I, Welcome to makemake https://github.com/joakimbits/normalize)
+    endif
+
+    MAKER := $(shell $(MAKE) -v))
+    INCLUDING ?= $/build/
+    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $($/venv/bin/python3))
+    INCLUDED := $(MAKEFILE_LIST)
+    INCLUDING := $/build/
+	ifneq (,$($/_SUBPROJECTS))
+		$(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
+	endif
+
+    # Notify the user on abusage of make
+    ifneq (0,$(MAKELEVEL))
+        $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
+        $(info # https://aegis.sourceforge.net/auug97.pdf)
+        $(info # https://github.com/joakimbits/normalize/blob/main/example/Makefile)
+    endif
+endif
+
 
 ## Targets
 
