@@ -46,7 +46,7 @@ $ greeter.py --help | awk '{ print "\t" $0 }'
 	positional arguments:
 	  world              hello(world)
 	
-	options:
+	option...:
 	  -h, --help         show this help message and exit
 	  --makemake         Print Makefile for greeter.py, and exit
 	  --generic          Print generic Makefile for greeter.py, and exit
