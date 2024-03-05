@@ -384,28 +384,29 @@ pandoc-%%-1-amd64.deb:
 endif
 
 # Make a markdown document.
+_{dir}link< = [$(<:$(_{dir})%%=%%)]($(<:$(_{dir})%%=%%))
 _{dir}_h :=\\n---\\n\\n\#
 _{dir}~~~. =\\\\\\footnotesize\\n~~~ {{$1}}
 _{dir}~~~sh :=$(call _{dir}~~~.,.sh)
 _{dir}~~~ :=~~~\\n\\\\\\normalsize\\n
 $(_{dir}_BUILD)Makefile.md: $(_{dir})Makefile
-	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
+	( echo "$(_{dir}_h)## $(_{dir}link<)" && \\
 	  echo "$(call _{dir}~~~.,.mk)" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
 $(_{dir}_BUILD)%%.md: $(_{dir})%%
-	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
+	( echo "$(_{dir}_h)## $(_{dir}link<)" && \\
 	  echo "$(call _{dir}~~~.,$(suffix $<))" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
 $(_{dir}_BUILD)%%.md: $(_{dir}_BUILD)%%
-	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
+	( echo "$(_{dir}_h)## $(_{dir}link<)" && \\
 	  echo "$(call _{dir}~~~.,$(suffix $<))" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
 $(_{dir}_BUILD)%%.bringup.md: $(_{dir}_BUILD)%%.bringup
-	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
+	( echo "$(_{dir}_h)## $(_{dir}link<)" && \\
 	  echo "$(_{dir}~~~sh)" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
 $(_{dir}_BUILD)%%.tested.md: $(_{dir}_BUILD)%%.tested
-	( echo "$(_{dir}_h)## [$(subst $(_{dir}),,$<)]($<)" && \\
+	( echo "$(_{dir}_h)## $(_{dir}link<)" && \\
 	  echo "$(_{dir}~~~sh)" && \\
 	  cat $< && echo "$(_{dir}~~~)" ) >$@
 
@@ -482,7 +483,7 @@ endif
 ifndef _OLD_WORKTREE
 _OLD_WORKTREE := $(_{dir}_OLD_WORKTREE)
 $(_OLD_WORKTREE):
-	git worktree add -d $(_OLD_WORKTREE) $(_{dir}_TAG)
+	git worktree add -d $(_OLD_WORKTREE) $(_{dir}_BASELINE)
 endif
 
 # Document last release.
