@@ -326,6 +326,11 @@ $/_SUBPROJECTS += $(sort $(dir $(foreach d,$($/_SUBDIRS),$(wildcard $/$d/*.md)))
 $/_SUBPROJECTS := $(filter-out $($/_NON-SUBPROJECTS),$($/_SUBPROJECTS))
 $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMakefile)))
 
+# Define symbolic targets we might want to use to represent (all) its dependencies
+# Such a phony timestamp becomes the newest one of all its made dependencies unless explicitly touched,
+# rather than the timestamp it was maked but not touched.
+.PHONY: $/all $/tested $/report $/gfm $/pdf $/html $/slides $/old $/new $/review $/audit
+
 #### Make sub-projects before this project
 
 $/all: | $($/_ACTIVE_SUBPROJECTS:%=%all)
@@ -691,7 +696,7 @@ $/_file = $(foreach _,$1,[\`$_\`]($_))
 $/_exe = $(foreach _,$1,[\`$_\`]($_))
 $/_h_fixup := sed -E '/^$$|[.]{3}/d'
 define META
-    $/build/report.md: $/build/report.txt $($/build/*.tested)
+    $/build/report.md: $/report
 	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
 ifneq ($(strip $($/_EXE)),)
