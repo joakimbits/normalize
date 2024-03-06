@@ -28,14 +28,12 @@ There is a simpler variant:
 ```sh
 $ python3 makemake.py --makemake
 all: build/makemake.py.tested
-	
 build/makemake.py.tested: makemake.py build/makemake.py.bringup
-	python3 makemake.py --test > $@
-build/makemake.py.bringup: makemake.py
-	mkdir build/ && \
-	python3 -c 'import sys; assert sys.version_info[:2] >= (3, 7), sys.version' > $@ && \
-	python3 -m pip install requests >> $@ && \
-	chmod +x $< >> $@
+	makemake.py --test > $@
+build/makemake.py.bringup: makemake.py | $(PYTHON)
+	mkdir -p build/ && \
+	$(PYTHON) -m pip install requests --no-warn-script-location > $@ && \
+	$(PYTHON) makemake.py --shebang >> $@
 
 ```
 
