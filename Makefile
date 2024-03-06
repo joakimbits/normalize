@@ -691,7 +691,7 @@ $/_file = $(foreach _,$1,[\`$_\`]($_))
 $/_exe = $(foreach _,$1,[\`$_\`]($_))
 $/_h_fixup := sed -E '/^$$|[.]{3}/d'
 define META
-    $/build/report.md: $/build/report.txt $($/build/*.tested)
+    $/build/report.md: $/build/report.txt $/report
 	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
 ifneq ($(strip $($/_EXE)),)
