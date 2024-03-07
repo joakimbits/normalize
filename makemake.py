@@ -490,7 +490,7 @@ endif
 $(_{dir})old: $(_{dir}_OLD)report.gfm
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $(_{dir}_BASELINE_INFO)"
 $(_{dir}_OLD)report.gfm: $(_OLD_WORKTREE)
-	( cd $(_{dir}_OLD) && $(MAKE) report.gfm --no-print-directory )
+	mkdir -p $(dir $@) && ( cd $(_{dir}_OLD) && $(MAKE) report.gfm --no-print-directory ) || touch $@
 
 # Use GPT for a release review.
 $(_{dir})%%: $(_{dir}_BUILD)%%.diff
