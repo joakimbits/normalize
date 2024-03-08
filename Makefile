@@ -760,16 +760,14 @@ $/old: $($/_OLD)report.gfm
 $($/_OLD)report.gfm: $($/_HOME)build/$($/_BASELINE)/Makefile
 	-( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory )
 
-# Use GPT for a release review.
+# Print a diff audit/prompt/review/files report as a link to the analyzed text difference
 $/%: $/build/%.diff
-	cat $<
 	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/_CHANGES)"
-define META
-    $/build/audit.diff: $/build/prompt.diff | $($/venv/bin/python3)
-	    cat $$< > $$@
-	    $($/venv/bin/python3) -m makemake --prompt $$< $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) >> $$@
-endef
-$(eval $(META))
+
+# Use GPT for a release review.
+$/build/audit.diff: $/makemake.py $/build/makemake.py.bringup $/build/prompt.diff
+	cat $(word 3,$^) > $@
+	( cd $(dir $<) && makemake.py --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@
 $/build/prompt.diff: $/build/review.diff
 	$(PYTHON) $/makemake.py -c 'print(REVIEW)' > $@
 	echo "$$ $(MAKE) $/review" >> $@
