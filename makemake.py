@@ -42,6 +42,7 @@ import platform
 import sys
 import os
 import re
+import time
 from argparse import Action
 import pydoc
 
@@ -427,7 +428,14 @@ class Split(Action):
 
 class Prompt(Action):
     """Print an openai continuation from a promt file, model, temperature and bearer
-    rot13 key, and exit"""
+    rot13 key, and exit
+
+    If the model does not support the full prompt, try with the largest diff '-' chunk removed until it works, or there
+    are no more such deletions to remove.
+    """
+    code_for_too_many_tokens = 'context_length_exceeded'
+    try_again_in_seconds = re.compile(r'Please try again in ([0-9]+\.[0-9]+)s')
+    split_consecutive_removals_in_diff = re.compile(r'((^-.*\n)+)', re.MULTILINE).split
 
     def __call__(self, parser, args, values, option_string=None):
         import requests
@@ -437,23 +445,64 @@ class Prompt(Action):
         file, model, temperature, key = values
         prompt = open(file).read()
         key = codecs.decode(key, 'rot13')
-        data = {
-            "model": model,
-            "messages": [{
-                "role": "user",
-                "content": prompt}],
-            "temperature": float(temperature)
-        }
-        data = json.dumps(data).encode('UTF-8')
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept-Charset': 'UTF-8',
-            'Authorization': f"Bearer {key}"
-        }
-        url = 'https://api.openai.com/v1/chat/completions'
-        r = requests.post(url, data=data, headers=headers)
-        status = r.status_code, r.reason, r.text
-        assert status[:2] == (200, 'OK'), status
+        while True:
+            data = {
+                "model": model,
+                "messages": [{
+                    "role": "user",
+                    "content": prompt}],
+                "temperature": float(temperature)
+            }
+            data = json.dumps(data).encode('UTF-8')
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept-Charset': 'UTF-8',
+                'Authorization': f"Bearer {key}"
+            }
+            url = 'https://api.openai.com/v1/chat/completions'
+            r = requests.post(url, data=data, headers=headers)
+            status = r.status_code, r.reason, r.text
+            if status[:2] == (429, 'Too Many Requests'):
+                wait = float(self.try_again_in_seconds.findall(r.text)[0])
+                print(f'Waiting {wait}s for {model} to accept new requests')
+                time.sleep(wait)
+                continue
+
+            if status[:2] == (400, 'Bad Request'):
+                splits = self.split_consecutive_removals_in_diff(prompt)
+                adds = splits[0::3]
+                drops =  splits[1::3]
+                for changed, changes in [('dropped', drops), ('added', adds)]:
+                    lines = [s.split('\n') for s in changes]
+                    nlines = tuple(map(len, lines))
+                    candidates = [i for i, n in enumerate(nlines) if n > 5]
+                    if candidates:
+                        char_changes = [sum(map(len, lines[c][2:-2])) for c in candidates]
+                        choice = char_changes.index(max(char_changes))
+                        head = lines[choice][:2]
+                        body = f'-:(another {nlines[choice] - 6} lines {changed} here)'
+                        tail = lines[choice][-2:]
+                        changes = changes[:choice] + ['\n'.join(head + [body] + tail)] + changes[choice + 1:]
+                        if changed == 'dropped':
+                            drops = changes
+                        else:
+                            adds = changes
+
+                        prompt = ''.join(list(map(''.join, zip(adds, drops))) + splits[-1:])
+                        print(f'Retrying after compressing {body}')
+                        break
+                else:
+                    raise ValueError(f'{model} is not able to process the large {prompt},'
+                                     ' even after having tried all diff body removals possible. '
+                                     f'Please edit {prompt} and try {option_string} again.\n')
+
+                continue
+
+            break
+
+        if status[:2] != (200, 'OK'):
+            raise RuntimeError(f"{url} {model} {file}: {' '.join(map(str, status))}")
+
         c = json.loads(r.content)
         u = c['usage']
         print(c['model'], c['object'], c['id'],
