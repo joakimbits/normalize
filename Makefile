@@ -28,11 +28,10 @@ _NAME := $(notdir $(realpath $/.))
 # If $/ *is* used within a recipy, that whole recipy needs to be expanded before the rule is defined, like this:
 
     define META
-        $/meta-recipy:
-	        # $$@: $$^ - Every $$ except the $$/ in the recipy needs to be doubled now!
+        $$/meta-recipy:
+	        # $$@: $$^ - Every $$ except a wanted expansion of $$/ = $/ in the recipy needs to be doubled now!
 	        echo "Like this: $$$$$$$$PATH = $$$$PATH"
 	        # And the recipy itself needs to be be defined by`$$(eval ...)`-ing it first.
-            # This recipy will execute every `make meta-recipy` since $$@ is never done by it.
     endef
     $(eval $(META))
 
@@ -329,23 +328,16 @@ $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMake
 # Define symbolic targets we might want to use to represent (all) its dependencies
 # Such a phony timestamp becomes the newest one of all its made dependencies unless explicitly touched,
 # rather than the timestamp it was maked but not touched.
-.PHONY: $/all $/tested $/report $/gfm $/pdf $/html $/slides $/old $/new $/review $/audit
-
-#### Make sub-projects before this project
-
-$/all: | $($/_ACTIVE_SUBPROJECTS:%=%all)
-$/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
-$/report: | $($/_ACTIVE_SUBPROJECTS:%=%report)
-$/gfm: | $($/_ACTIVE_SUBPROJECTS:%=%gfm)
-$/pdf: | $($/_ACTIVE_SUBPROJECTS:%=%pdf)
-$/html: | $($/_ACTIVE_SUBPROJECTS:%=%html)
-$/slides: | $($/_ACTIVE_SUBPROJECTS:%=%slides)
-$/old: | $($/_ACTIVE_SUBPROJECTS:%=%old)
-$/new: $($/_ACTIVE_SUBPROJECTS:%=%new)
-$/build/review.diff: $($/_ACTIVE_SUBPROJECTS:%=%build/review.diff)
-
-#### Remove all built files in all projects
 define META
+    .PHONY: $/all $/bringup $/tested $/old $/new $/html $/pdf $/slides $/clean $/clean/keep_venv
+    $/all: | $($/_ACTIVE_SUBPROJECTS:%=%all)
+    $/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
+    $/report: | $($/_ACTIVE_SUBPROJECTS:%=%report)
+    $/pdf: | $($/_ACTIVE_SUBPROJECTS:%=%pdf)
+    $/slides: | $($/_ACTIVE_SUBPROJECTS:%=%slides)
+    $/old: | $($/_ACTIVE_SUBPROJECTS:%=%old)
+    $/new: $/gfm | $($/_ACTIVE_SUBPROJECTS:%=%new)
+    $/build/review.diff: $($/_ACTIVE_SUBPROJECTS:%=%build/review.diff)
     $/clean: $/clean/keep_venv | $($/_ACTIVE_SUBPROJECTS:%=%clean)
 	    rm -rf $/venv/ $/.ruff_cache/
     $/clean/keep_venv: | $($/_ACTIVE_SUBPROJECTS:%=%clean/keep_venv)
@@ -410,8 +402,8 @@ ifndef $($/_HOME_DIR)
     $($/_HOME_DIR) := $($/_HOME_DIR))
     #$/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)/
     define META
-        $($/_HOME)build/$($/_BASELINE)/Makefile:
-	        git worktree add -d $$(dir $$@) $($/_BASELINE)
+        $$($$/_HOME)build/$$($$/_BASELINE)/Makefile:
+	        git worktree add -d $$(dir $$@) $$($/_BASELINE)
     endef
     $(eval $(META))
 endif
@@ -529,9 +521,26 @@ endif
 .SUFFIXES:
 
 # Convenience targets
-.PHONY: $/bringup $/tested $/clean
-$/bringup: $($/_EXE) $($/build/*.bringup)
-$/tested: $($/build/*.tested)
+define META
+    $/bringup: $($/_EXE) $($/build/*.bringup)
+    $/tested: $($/build/*.tested)
+    $/old: $($/_OLD)report.gfm
+	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BASELINE_INFO)"
+    $/new: $/report.gfm $($/build/*.tested)
+	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
+    $/html: $/report.html $($/build/*.tested)
+	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
+    $/pdf: $/report.pdf $($/build/*.tested)
+	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
+    $/slides: $/slides.html
+	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
+    $/%: $/build/%.diff $($/build/*.tested)
+	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_CHANGES)"
+endef
+$(eval $(META))
+
+$/slides.html: $/report.dzslides
+	cp $< $@
 
 # Use the clang compiler
 $?/clang++: $?/clang
@@ -546,16 +555,16 @@ ifneq (,$($/_OBJS))
     # Use project specific compile flags
     define META
         # Compile C++
-        $/build/%.cpp.s: $/%.cpp | $(CXX)
-	        $(CXX) $($/_CXXFLAGS) -c $$< -o $$@
+        $$/build/%.cpp.s: $$/%.cpp | $$(CXX)
+	        $$(CXX) $$($/_CXXFLAGS) -c $$< -o $$@
 
         # Compile C
-        $/build/%.c.s: $/%.c | $(CXX)
-	        $(CXX) $($/_CFLAGS) -c $$< -o $$@
+        $$/build/%.c.s: $$/%.c | $$(CXX)
+	        $$(CXX) $$($/_CFLAGS) -c $$< -o $$@
 
         # Link executable
-        $/$($/_NAME): $($/_OBJS) | $(CC)
-	        $(CC) $($/_LDFLAGS) $$^ -o $$@
+        $$/$$($$/_NAME): $$($$/_OBJS) | $$(CC)
+	        $$(CC) $$($/_LDFLAGS) $$^ -o $$@
     endef
     $(eval $(META))
 endif
@@ -626,7 +635,6 @@ $/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.
 $/build/%.sh-test.tested: $/. $($/_PRETESTED) $/build/%.sh-test | $/makemake.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $< && $(PYTHON) makemake.py --timeout 60 --sh-test $(patsubst $(dir $<)%,%,$(lastword $^)) ) > $$tmp && mv $$tmp $@
-$($/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq)
 $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
 	pandoc -i $< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && truncate -s -1 $@
 
@@ -636,133 +644,101 @@ $/report: $/build/report.txt
 $/build/report.txt: $($/build/*.tested)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
+# Make a markdown document.
+ifndef __
+    _file = $(foreach _,$1,[\`$_\`]($_))
+    _exe = $(foreach _,$1,[\`$_\`]($_))
+    _help_fixup := sed -E '/^$$$$|[.]{3}/d'
+    _heading := \n---\n\n\#
+    _link = [$1]($1)
+    _. = \\\\footnotesize\n~~~ {$1}
+    _sh := $(call _.,.sh)
+    __ := ~~~\n\\\\normalsize\n
+endif
+
+$/build/Makefile.md: $/Makefile
+	( echo "$(_heading)## $(call _link,Makefile)" && echo "$(call _.,.mk)" && cat $< && echo "$(__)" ) > $@
+$/build/%.md: $/%
+	( echo "$(_heading)## $(call _link,$*)" && echo "$(call _.,$(suffix $<))" && cat $< && echo "$(__)" ) > $@
+$/build/%.md: $/build/%
+	( echo "$(_heading)## $(call _link,build/$*)" && echo "$(call _.,$(suffix $<))" && cat $< && echo "$(__)" ) > $@
+$/build/%.bringup.md: $/build/%.bringup
+	( echo "$(_heading)## $(call _link,build/$*.bringup)" && echo "$(_sh)" && cat $< && echo "$(__)" ) > $@
+$/build/%.tested.md: $/build/%.tested
+	( echo "$(_heading)## $(call _link,build/$*.tested)" && echo "$(_sh)" && cat $< && echo "$(__)" ) > $@
+
 # Make a standalone gfm, html, pdf, or dzslides document.
 define META
-    $/%.gfm: $/build/%.md
+    $$/build/report.md: | $$/tested
+	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
+	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
+ifneq ($(strip $($/_EXE)),)
+	    echo "- \`./$$($/_NAME)\`: $$(call _file,$$($/_LINKABLE:$/%=%))" >> $$@
+endif
+ifneq (,$(strip $($/*.py)))
+	    echo "- $$(call _exe,$$($/*.py:$/%=%))" >> $$@
+endif
+	    echo "$$(_heading)## Installation" >> $$@
+	    echo "$$(_sh)" >> $$@
+	    echo "$$$$ make" >> $$@
+	    echo "$$(__)" >> $$@
+ifneq (,$(strip $($/_EXE)))
+	    echo "- Installs \`./$$($/_NAME)\`." >> $$@
+endif
+ifneq (,$(strip $($/*.py)))
+	    echo "- Installs $$(call _exe,venv/bin/python3)." >> $$@
+	    echo "- Installs $$(call _exe,$$($/*.py:$/%=%))." >> $$@
+endif
+ifneq (,$($/_EXES))
+	    echo "$$(_heading)## Usage" >> $$@
+	    echo "$$(_sh)" >> $$@
+	    for x in $$($/_EXES:$/%=%) ; do \
+	      echo "\$$$$ true | $$$$x -h | $$(_help_fixup)" >> $$@ && \
+	      ( cd $/. && true | $$$$x -h ) > $$@.tmp && \
+	      $$(_help_fixup) $$@.tmp >> $$@ && rm $$@.tmp ; \
+	    done
+	    echo >> $$@
+	    echo "$$(__)" >> $$@
+	    echo "$$(_heading)## Test" >> $$@
+	    echo "$$(_sh)" >> $$@
+	    echo "\$$$$ make tested" >> $$@
+	    echo "$$(__)" >> $$@
+endif
+ifneq (,$(strip $($/_EXE)))
+	    echo "- Tests \`./$$($/_NAME)\`." >> $$@
+endif
+ifneq (,$(strip $($/*.py)))
+	    echo "- Verifies style and doctests in $$(call _file,$$($/*.py:$/%=%))." >> $$@
+endif
+ifneq (,$(strip $($/*.md)))
+	     echo "- Verifies doctests in $$(call _file,$$($/*.md:$/%=%))." >> $$@
+endif
+ifneq (,$(strip $($/_CODE)))
+	    echo "$$(_heading)## Result" >> $$@
+	    echo "$$(_sh)" >> $$@
+	    echo "\$$$$ make report" >> $$@
+	    ( cd $/. && $$(MAKE) report --no-print-directory ) >> $$@
+	    echo "$$(__)" >> $$@
+	    echo "\n---\n" >> $$@
+endif
+
+    $$/%.gfm: $/build/%.md
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
-	           -M title="$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
-    $/%.html $/%.pdf $/%.dzslides: $/build/%.md | $?/pandoc $?/xetex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
+	           -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
+    $$/%.html $$/%.pdf $$/%.dzslides: $$/build/%.md | $$?/pandoc $$?/xetex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
 	           -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
 	           -V min-width=80%\!important -V geometry:margin=1in \
 	           --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 endef
 $(eval $(META))
+$/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT)
 
-# Make a markdown document.
-ifndef __
-    _h := \n---\n\n\#
-    _. = \\\\footnotesize\n~~~ {$1}
-    _sh := $(call _.,.sh)
-    __ := ~~~\n\\\\normalsize\n
-endif
-define META
-    $/build/Makefile.md: $/Makefile
-	    ( echo "$(_h)## [Makefile](Makefile)" && \
-	      echo "$(call _.,.mk)" && \
-	      cat $$< && echo "$(__)" ) > $$@
-    $/build/%.md: $/%
-	    ( echo "$(_h)## [$$*]($$*)" && \
-	      echo "$$(call _.,$$(suffix $$<))" && \
-	      cat $$< && echo "$(__)" ) > $$@
-    $/build/%.md: $/build/%
-	    ( echo "$(_h)## [$$*](build/$$*)" && \
-	      echo "$$(call _.,$$(suffix $$<))" && \
-	      cat $$< && echo "$(__)" ) > $$@
-    $/build/%.bringup.md: $/build/%.bringup
-	    ( echo "$(_h)## [$$*](build/$$*)" && \
-	      echo "$(_sh)" && \
-	      cat $$< && echo "$(__)" ) > $$@
-    $/build/%.tested.md: $/build/%.tested
-	    ( echo "$(_h)## [$$*](build/$$*)" && \
-	      echo "$(_sh)" && \
-	      cat $$< && echo "$(__)" ) > $$@
-endef
-$(eval $(META))
-
-# Report the project.
-define META
-    $/%: $/report.%
-	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $($/_BRANCH_STATUS)"
-    $/slides: $/slides.html
-	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $($/_BRANCH_STATUS)"
-endef
-$(eval $(META))
-$/slides.html: $/report.dzslides
-	mv $< $@
-$/report.gfm: $($/*.md) $($/_REPORT)
-$/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT)
-$/_file = $(foreach _,$1,[\`$_\`]($_))
-$/_exe = $(foreach _,$1,[\`$_\`]($_))
-$/_h_fixup := sed -E '/^$$|[.]{3}/d'
-define META
-    $/build/report.md: $/report
-	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
-	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
-ifneq ($(strip $($/_EXE)),)
-	    echo "- \`./$($/_NAME)\`: $(call $/_file,$($/_LINKABLE:$/%=%))" >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- $(call $/_exe,$($/*.py:$/%=%))" >> $$@
-endif
-	    echo "$(_h)## Installation" >> $$@
-	    echo "$(_sh)" >> $$@
-	    echo "$$$$ make" >> $$@
-	    echo "$(__)" >> $$@
-ifneq (,$(strip $($/_EXE)))
-	    echo "- Installs \`./$($/_NAME)\`." >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- Installs $(call $/_exe,venv/bin/python3)." >> $$@
-	    echo "- Installs $(call $/_exe,$($/*.py:$/%=%))." >> $$@
-endif
-ifneq (,$($/_EXES))
-	    echo "$(_h)## Usage" >> $$@
-	    echo "$(_sh)" >> $$@
-	    for x in $($/_EXES:$/%=%) ; do \
-	      echo "\$$$$ true | $$$$x -h | $($/_h_fixup)" >> $$@ && \
-	      ( cd $/. && true | $$$$x -h ) > $$@.tmp && \
-	      $($/_h_fixup) $$@.tmp >> $$@ && rm $$@.tmp ; \
-	    done
-	    echo >> $$@
-	    echo "$(__)" >> $$@
-	    echo "$(_h)## Test" >> $$@
-	    echo "$(_sh)" >> $$@
-	    echo "\$$$$ make tested" >> $$@
-	    echo "$(__)" >> $$@
-endif
-ifneq (,$(strip $($/_EXE)))
-	    echo "- Tests \`./$($/_NAME)\`." >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- Verifies style and doctests in $(call $/_file,$($/*.py:$/%=%))." >> $$@
-endif
-ifneq (,$(strip $($/*.md)))
-	     echo "- Verifies doctests in $(call $/_file,$($/*.md:$/%=%))." >> $$@
-endif
-ifneq (,$(strip $($/_CODE)))
-	    echo "$(_h)## Result" >> $$@
-	    echo "$(_sh)" >> $$@
-	    echo "\$$$$ make report" >> $$@
-	    ( cd $/. && $(MAKE) report --no-print-directory ) >> $$@
-	    echo "$(__)" >> $$@
-	    echo "\n---\n" >> $$@
-endif
-endef
-$(eval $(META))
 $/build/report-details.md:
-	echo "$(_h)# Source code, installation and test result" >> $@
-
-# Document last release.
-$/old: $($/_OLD)report.gfm
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/_BASELINE_INFO)"
+	echo "$(_heading)# Source code, installation and test result" >> $@
 
 $($/_OLD)report.gfm: $($/_HOME)build/$($/_BASELINE)/Makefile
 	-( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory )
-
-# Print a diff audit/prompt/review/files report as a link to the analyzed text difference
-$/%: $/build/%.diff
-	@echo "# file://$(subst /mnt/c/,/C:/,$(realpath $<)) $($/_CHANGES)"
 
 # Use GPT for a release review.
 $/build/audit.diff: $/makemake.py $/build/makemake.py.bringup $/build/prompt.diff
@@ -777,12 +753,14 @@ $/build/review.diff: $/build/files.diff $/build/comments.diff $/build/report.dif
 	cat $^ > $@
 $/build/files.diff:
 	echo "# $($/_CHANGES_AUDIT)" > $@
+
 define META
-    $/build/comments.diff:
-	    echo "git --no-pager log --no-merges $($/_BASELINE)..HEAD $/." > $$@
-	    git --no-pager log --no-merges $($/_BASELINE)..HEAD $/. >> $$@
+    $$/build/comments.diff:
+	    echo "git --no-pager log --no-merges $$($/_BASELINE)..HEAD $/." > $$@
+	    git --no-pager log --no-merges $$($/_BASELINE)..HEAD $/. >> $$@
 endef
 $(eval $(META))
+
 $/build/report.diff: $($/_OLD)report.gfm $/report.gfm $/makemake.py
 	echo "diff -u -U 100000 $< $(word 2,$^) | fold-unchanged" > $@
 	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{*}' && \
