@@ -435,6 +435,7 @@ class Prompt(Action):
     """
     code_for_too_many_tokens = 'context_length_exceeded'
     try_again_in_seconds = re.compile(r'Please try again in ([0-9]+\.[0-9]+)s')
+    try_again_in_milliseconds = re.compile(r'Please try again in ([0-9]+)ms')
     split_consecutive_removals_in_diff = re.compile(r'((^-.*\n)+)', re.MULTILINE).split
 
     def __call__(self, parser, args, values, option_string=None):
@@ -463,7 +464,8 @@ class Prompt(Action):
             r = requests.post(url, data=data, headers=headers)
             status = r.status_code, r.reason, r.text
             if status[:2] == (429, 'Too Many Requests'):
-                wait = float(self.try_again_in_seconds.findall(r.text)[0])
+                seconds = self.try_again_in_seconds.findall(r.text)
+                wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
                 print(f'Waiting {wait}s for {model} to accept new requests')
                 time.sleep(wait)
                 continue
@@ -478,9 +480,9 @@ class Prompt(Action):
                     candidates = [i for i, n in enumerate(nlines) if n > 5]
                     if candidates:
                         char_changes = [sum(map(len, lines[c][2:-2])) for c in candidates]
-                        choice = char_changes.index(max(char_changes))
+                        choice = candidates[char_changes.index(max(char_changes))]
                         head = lines[choice][:2]
-                        body = f'-:(another {nlines[choice] - 6} lines {changed} here)'
+                        body = f'-:(another {nlines[choice] - 4} lines {changed} here)'
                         tail = lines[choice][-2:]
                         changes = changes[:choice] + ['\n'.join(head + [body] + tail)] + changes[choice + 1:]
                         if changed == 'dropped':
