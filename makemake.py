@@ -556,7 +556,7 @@ $(_{dir}_BUILD)review.diff: $(_{dir}_BUILD)files.diff $(_{dir}_BUILD)comments.di
   $(_{dir}_BUILD)report.diff
 	cat $^ > $@
 $(_{dir}_BUILD)files.diff:
-	echo "# $(_{dir}_CHANGES_AUDIT)" > $@
+	echo "# List of git comments since $(_{dir}_CHANGES_AUDIT):" > $@
 $(_{dir}_BUILD)comments.diff:
 	echo "git --no-pager log --no-merges $(_{dir}_BASELINE)..HEAD $(_{dir}_DIR)" > $@
 	git --no-pager log --no-merges $(_{dir}_BASELINE)..HEAD $(_{dir}_DIR) >> $@
