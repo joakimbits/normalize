@@ -103,16 +103,13 @@ The project report we look at changes within is organized like this:
     test results for each source code, and finally test results for the complete 
     integrated project.
 
-Here is the command you should use for releasing the software:
+You have now four goals:
 
-    $ tag=<new version> git tag -a $$tag -m "$$tag\\n\\n<release summary>")
+1. Summarize the commit comments and project changes below in a more user-friendly style as release summary.
+2. Choose a title explaining the gits of the changes as release title.   
+3. Choose a new semantic version number for the changes as new version. 
+4. Fill in the command `git tag -m "<new version> <release title>\\n\\n<release summary>" <new version>`
 
-Chose a new semantic version number that is larger than the previously released version
-for the <new version>. Summarize the commit comments and project changes I printed
-below in a more user-friendly style for the <release summary>.
-
-If you can do this well I will consider automating releases with your help. Otherwise
-I will need to wait for gpt-4. Thank you for your service.
 ---
 """
 
