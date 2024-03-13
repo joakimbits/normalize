@@ -108,7 +108,7 @@ You have now four goals:
 1. Summarize the commit comments and project changes below in a more user-friendly style as release summary.
 2. Choose a title explaining the gits of the changes as release title.   
 3. Choose a new semantic version number for the changes as new version. 
-4. Fill in the command `git tag -m "<new version> <release title>\\n\\n<release summary>" <new version>`
+4. Fill in the command `git tag -m "<new version> <release title>" <new version>`
 
 ---
 """
