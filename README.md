@@ -51,7 +51,7 @@ build/makemake.py.tested: makemake.py build/makemake.py.bringup
 	makemake.py --test > $@
 build/makemake.py.bringup: makemake.py | $(PYTHON)
 	mkdir -p build/ && \
-	$(PYTHON) -m pip install requests --no-warn-script-location > $@
+	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
 ```
 

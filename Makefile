@@ -746,9 +746,8 @@ $($/_OLD)report.gfm: $($/_HOME)build/$($/_BASELINE)/Makefile
 	mkdir -p $(dir $@) && ( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory ) || touch $@
 
 # Use GPT for a release review.
-$/build/audit.diff: $/makemake.py $/build/makemake.py.bringup $/build/prompt.diff
-	cat $(word 3,$^) > $@
-	( cd $(dir $<) && makemake.py --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@
+$/build/audit.diff: $/makemake.py $/build/prompt.diff $/build/makemake.py.bringup
+	( cd $(dir $<) && makemake.py --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
 $/build/prompt.diff: $/build/review.diff
 	$(PYTHON) $/makemake.py -c 'print(REVIEW)' > $@
 	echo "$$ $(MAKE) $/review" >> $@

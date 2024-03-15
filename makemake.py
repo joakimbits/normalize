@@ -35,7 +35,7 @@ To self-test all such tools in a directory - while adding their dependencies int
     $ make
 
 Dependencies:
-requests  # Needed for the --prompt option
+requests tiktoken # Needed for the --prompt option
 """
 
 import platform
@@ -428,15 +428,17 @@ class Prompt(Action):
     If the model does not support the full prompt, try with the largest diff '-' chunk removed until it works, or there
     are no more such deletions to remove.
     """
+    try_again_in_seconds_pattern = r'Please try again in ([0-9]+\.[0-9]+)s'
+    try_again_in_milliseconds_pattern = r'Please try again in ([0-9]+)ms'
     code_for_too_many_tokens = 'context_length_exceeded'
-    try_again_in_seconds = re.compile(r'Please try again in ([0-9]+\.[0-9]+)s')
-    try_again_in_milliseconds = re.compile(r'Please try again in ([0-9]+)ms')
-    split_consecutive_removals_in_diff = re.compile(r'((^-.*\n)+)', re.MULTILINE).split
+    maximum_tokens_pattern = r'maximum context length is ([0-9]+) tokens'
 
     def __call__(self, parser, args, values, option_string=None):
-        import requests
         import json
         import codecs
+
+        import requests
+        import tiktoken
 
         file, model, temperature, key = values
         prompt = open(file).read()
@@ -459,6 +461,10 @@ class Prompt(Action):
             r = requests.post(url, data=data, headers=headers)
             status = r.status_code, r.reason, r.text
             if status[:2] == (429, 'Too Many Requests'):
+                if not hasattr(self, 'try_again_in_seconds'):
+                    self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds = map(
+                        re.compile, (self.try_again_in_seconds_pattern, self.try_again_in_milliseconds_pattern))
+
                 seconds = self.try_again_in_seconds.findall(r.text)
                 wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
                 print(f'Waiting {wait}s for {model} to accept new requests')
@@ -466,32 +472,52 @@ class Prompt(Action):
                 continue
 
             if status[:2] == (400, 'Bad Request'):
-                splits = self.split_consecutive_removals_in_diff(prompt)
-                adds = splits[0::3]
-                drops =  splits[1::3]
-                for changed, changes in [('dropped', drops), ('added', adds)]:
-                    lines = [s.split('\n') for s in changes]
-                    nlines = tuple(map(len, lines))
-                    candidates = [i for i, n in enumerate(nlines) if n > 5]
-                    if candidates:
-                        char_changes = [sum(map(len, lines[c][2:-2])) for c in candidates]
-                        choice = candidates[char_changes.index(max(char_changes))]
-                        head = lines[choice][:2]
-                        body = f'-:(another {nlines[choice] - 4} lines {changed} here)'
-                        tail = lines[choice][-2:]
-                        changes = changes[:choice] + ['\n'.join(head + [body] + tail)] + changes[choice + 1:]
-                        if changed == 'dropped':
-                            drops = changes
-                        else:
-                            adds = changes
+                # Make both a consecutive-drops (-) and a consecutive-adds (+) diff split function.
+                # It returns non-matches in every third element immediately followed by a multiline match.
+                if not hasattr(self, 'diff_splitters'):
+                    self.__class__.diff_splitters = [
+                        (diff, re.compile(r'((^%s.*\n)+)' % sign, re.MULTILINE).split)
+                        for diff, sign in [('dropped', '-'), ('added', '\+')]]
+                    self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
+                    self.__class__.cl100k_base = tiktoken.get_encoding("cl100k_base")
 
-                        prompt = ''.join(list(map(''.join, zip(adds, drops))) + splits[-1:])
-                        print(f'Retrying after compressing {body}')
+                encoding = tiktoken.encoding_for_model(model)
+                maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
+                for diff, split in self.diff_splitters:
+                    compressible = True
+                    while compressible:
+                        splits = split(prompt)
+                        unmatched = splits[0::3]
+                        matched = splits[1::3]
+                        lines = [s.split('\n') for s in matched]
+                        nlines = tuple(map(len, lines))
+                        candidates = [i for i, n in enumerate(nlines) if n > 5]
+                        if candidates:
+                            char_changes = [sum(map(len, lines[c][2:-2])) for c in candidates]
+                            choice = candidates[char_changes.index(max(char_changes))]
+                            head = lines[choice][:2]
+                            body = f'-:(another {nlines[choice] - 4} lines {diff} here)'
+                            tail = lines[choice][-2:]
+                            matched = matched[:choice] + ['\n'.join(head + [body] + tail)] + matched[choice + 1:]
+                            prompt = ''.join(list(map(''.join, zip(unmatched, matched + ['']))))
+                            if len(encoding.encode(prompt)) < maximum_tokens:
+                                print(f'Retrying after compressing {body}')
+                                break
+
+                            print(f'Compressing {body}')
+                        else:
+                            compressible = False
+
+                    if compressible:
                         break
                 else:
-                    raise ValueError(f'{model} is not able to process the large {prompt},'
-                                     ' even after having tried all diff body removals possible. '
-                                     f'Please edit {prompt} and try {option_string} again.\n')
+                    open(file).write(prompt)
+                    too_many_tokens = len(encoding.encode(prompt)) - maximum_tokens
+                    raise ValueError(
+                        f'{model} is not able to process the large prompt {file},'
+                        ' even after having tried all diff body removals possible. '
+                        f'Please edit {file} and trim it down by at least {100 * too_many_tokens/maximum_tokens}%'
+                        f' and try {option_string} again.\n')
 
                 continue
 
@@ -610,7 +636,7 @@ include build/makemake.dep
 
 $ cat build/makemake.dep
 build/makemake.py.bringup: makemake.py build/makemake.dep | $(PYTHON)
-	$(PYTHON) -m pip install requests --no-warn-script-location > $@
+	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ makemake.py --dep build/makemake.dep --makemake
 all: build/makemake.py.tested
