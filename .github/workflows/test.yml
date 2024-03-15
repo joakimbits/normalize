@@ -13,10 +13,11 @@ jobs:
         with:
           fetch-depth: 0
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to ${{ github.workspace }} on the runner."
-      - name: Set up Python 3.7
+      - name: Set up Python 3.8
         uses: actions/setup-python@v4
         with:
-          python-version: '3.7'
+          python-version: '3.8'
+      - run: echo "." >> $GITHUB_PATH
       - run: make venv
       - run: make syntax
       - run: make style
@@ -26,12 +27,11 @@ jobs:
       - run: make example/syntax
       - run: make example/style
       - run: make example/bringup
-      - run: ( cd example && ./test.py )
+      - run: ( cd example && greeter.py )
       - run: make example/tested
       - run: make example/report
       - run: make example/gfm
       - run: make report
-      - run: make clean && make report
       - run: make old  # Building last release
       - run: make old  # Just printing last release
       - run: make new
@@ -41,5 +41,5 @@ jobs:
       - run: make prompt
       - run: make prompt
       - run: make audit
-      - run: make audit
+      - run: make clean && make audit
       - run: echo "🍏 This job's status is ${{ job.status }}."
