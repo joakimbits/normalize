@@ -476,14 +476,13 @@ class Prompt(Action):
                 # It returns non-matches in every third element immediately followed by a multiline match.
                 if not hasattr(self, 'diff_splitters'):
                     self.__class__.diff_splitters = [
-                        (diff, re.compile(r'((^%s.*\n)+)' % sign, re.MULTILINE).split)
-                        for diff, sign in [('dropped', '-'), ('added', '\+')]]
+                        (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
+                        for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
                     self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
-                    self.__class__.cl100k_base = tiktoken.get_encoding("cl100k_base")
 
                 encoding = tiktoken.encoding_for_model(model)
                 maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
-                for diff, split in self.diff_splitters:
+                for diff, sign, split in self.diff_splitters:
                     compressible = True
                     while compressible:
                         splits = split(prompt)
@@ -496,7 +495,7 @@ class Prompt(Action):
                             char_changes = [sum(map(len, lines[c][2:-2])) for c in candidates]
                             choice = candidates[char_changes.index(max(char_changes))]
                             head = lines[choice][:2]
-                            body = f'-:(another {nlines[choice] - 4} lines {diff} here)'
+                            body = f'{sign}:(another {nlines[choice] - 4} lines {diff} here)'
                             tail = lines[choice][-2:]
                             matched = matched[:choice] + ['\n'.join(head + [body] + tail)] + matched[choice + 1:]
                             prompt = ''.join(list(map(''.join, zip(unmatched, matched + ['']))))
