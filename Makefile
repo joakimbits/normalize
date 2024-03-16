@@ -338,7 +338,7 @@ define META
     $/pdf: | $($/_ACTIVE_SUBPROJECTS:%=%pdf)
     $/slides: | $($/_ACTIVE_SUBPROJECTS:%=%slides)
     $/old: | $($/_ACTIVE_SUBPROJECTS:%=%old)
-    $/new: $/gfm | $($/_ACTIVE_SUBPROJECTS:%=%new)
+    $/new: | $($/_ACTIVE_SUBPROJECTS:%=%new)
     $/build/review.diff: $($/_ACTIVE_SUBPROJECTS:%=%build/review.diff)
     $/clean: $/clean/keep_venv | $($/_ACTIVE_SUBPROJECTS:%=%clean)
 	    rm -rf $/venv/ $/.ruff_cache/
