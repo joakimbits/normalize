@@ -767,36 +767,36 @@ $(eval $(META))
 
 $/build/report.diff: $($/_OLD)report.gfm $/report.gfm $/makemake.py
 	echo "diff -u -U 100000 $< $(word 2,$^) | fold-unchanged" > $@
-	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{*}' && \
-	  parts=`ls xx**` && \
-	  changed_parts=`grep -l -e '^-' -e '^+' xx**` && \
+	( diff -u -U 100000 $< $(word 2,$^) | csplit -n 3 -s - /----/ '{72}' && \
+	  parts=`ls xx???` && \
+	  changed_parts=`grep -l -e '^-' -e '^+' xx???` && \
 	  for part in $$parts ; do \
 	    if `echo "$$changed_parts" | fgrep -wq "$$part" \
 	    || test "$$(wc $$part)" = "1"` ; then \
-	      $(PYTHON) $(word 3,$^) --split $$part '\n \n \n' 's%02d' && \
-	      sections=`ls s**` && \
-	      changed_sections=`grep -l -e '^-' -e '^+' s**` && \
+	      $(PYTHON) $(word 3,$^) --split $$part '\n \n \n' 'ss%03d' && \
+	      sections=`ls ss???` && \
+	      changed_sections=`grep -l -e '^-' -e '^+' ss???` && \
 	      for section in $$sections ; do \
 	        if `echo "$$changed_sections" | fgrep -wq "$$section" \
 	        || test "$$(wc $$section)" = "1"` ; then \
-	          $(PYTHON) $(word 3,$^) --split $$section '\n \n' 'p%02d' && \
-	          paragraphs=`ls p**` && \
-	          changed_paragraphs=`grep -l -e '^-' -e '^+' p**` && \
+	          $(PYTHON) $(word 3,$^) --split $$section '\n \n' 'pp%03d' && \
+	          paragraphs=`ls pp???` && \
+	          changed_paragraphs=`grep -l -e '^-' -e '^+' pp???` && \
 	          for paragraph in $$paragraphs ; do \
 	            if `echo "$$changed_paragraphs" | fgrep -wq "$$paragraph"` ; then \
 	              cat $$paragraph ; echo ; echo ; \
 	            else \
 	              echo "$$(head -1 $$paragraph) ..." ; fi ; \
 	            done ; \
-	          rm p** ; \
+	          rm pp??? ; \
 	        else \
 	          echo "$$(head -1 $$section) ..." ; fi ; \
 	        done ; \
-	      rm s** ; \
+	      rm ss??? ; \
 	    else \
 	      echo "$$(sed -n '3p' $$part) ..." ; fi ; \
 	    done ; \
-	  rm xx**; ) >> $@
+	  rm xx???; ) >> $@
 endif # building
 
 ## Finally attempt to include all bringup files and sub-projects
