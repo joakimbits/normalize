@@ -674,7 +674,7 @@ $/build/%.tested.md: $/build/%.tested
 
 # Make a standalone gfm, html, pdf, or dzslides document.
 define META
-    $$/build/report.md: | $$/tested
+    $$/build/report.md: $($/build/*.tested)
 	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
 ifneq ($(strip $($/_EXE)),)
@@ -755,11 +755,11 @@ $/build/prompt.diff: $/build/review.diff
 	echo -n "$$ " >> $@
 $/build/review.diff: $/build/files.diff $/build/comments.diff $/build/report.diff
 	cat $^ > $@
-$/build/files.diff:
+$/build/files.diff: $($/build/*.tested)
 	echo "# $($/_CHANGES_AUDIT)" > $@
 
 define META
-    $$/build/comments.diff:
+    $$/build/comments.diff: $($/build/*.tested)
 	    echo "git --no-pager log --no-merges $$($/_BASELINE)..HEAD $/." > $$@
 	    git --no-pager log --no-merges $$($/_BASELINE)..HEAD $/. >> $$@
 endef
