@@ -411,14 +411,78 @@ class Command(Action):
         exit(0)
 
 
-class Split(Action):
-    """Split FILE by SEPARATOR into files with PATTERN %% 0, 1 ..., and exit"""
+class Collapse(Action):
+    """Print a diff within its collapsed document structure
 
-    def __call__(self, parser, args, values, option_string=None):
-        file, escaped_separator, pattern = values
-        separator = bytes(escaped_separator, "utf-8").decode("unicode_escape")
-        for i, s in enumerate(open(file).read().split(separator)):
-            open(pattern % i, 'w').write(s)
+    Collapses unchanged lines (starting with ' ') into first lines only.
+    Each collapsed line ends with '...' if there were more.
+    """
+
+    old = r'^--- build/v2.0.1/report.gfm	2024-03-16 14:26:55$'
+    new = r'^+++ report.gfm	2024-03-16 14:30:15$'
+    span = r'^@@ -0,0 +1,1742 @@$'
+    line = '^( |(?P<touched>[+-])).+$'
+    paragraph, collapsed_paragraph = (
+        f'({line})(?P<lines>{line})*',
+        r'?(touched)\g<0>|\1?(lines)\.\.\.')
+    section, collapsed_section = (
+        f'{paragraph}(?P<paragraphs>^ ${paragraph})*',
+        f'?(touched)\g<0>|\1?(paragraphs)\.\.\.')
+    part, collapsed_part = (
+        f'{section}(?P<sections>^ $^ ${section})*',
+        r'?(touched)\g<0>|\1?(sections)\.\.\.')
+    diff, collapsed_diff = (
+        f'{old}{new}{span}{part}((?:^ $)*^ ----+$(?:^ $)*{part})*',
+        r'?(touched)\g<0>')
+
+    def __call__(self, parser, args, files, option_string=None):
+        doc = ''.join((open(file).read() for file in files))
+        key = codecs.decode(key, 'rot13')
+        while True:
+            data = {
+                "model": model,
+                "messages": [{
+                    "role": "user",
+                    "content": prompt}],
+                "temperature": float(temperature)
+            }
+            data = json.dumps(data).encode('UTF-8')
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept-Charset': 'UTF-8',
+                'Authorization': f"Bearer {key}"
+            }
+            url = 'https://api.openai.com/v1/chat/completions'
+            r = requests.post(url, data=data, headers=headers)
+            status = r.status_code, r.reason, r.text
+            if status[:2] == (429, 'Too Many Requests'):
+                if not hasattr(self, 'try_again_in_seconds'):
+                    self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds = map(
+                        re.compile, (self.try_again_in_seconds_pattern, self.try_again_in_milliseconds_pattern))
+
+                seconds = self.try_again_in_seconds.findall(r.text)
+                wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
+                print(f'Waiting {wait}s for {model} to accept new requests')
+                time.sleep(wait)
+                continue
+
+            if status[:2] == (400, 'Bad Request'):
+                # Make both a consecutive-drops (-) and a consecutive-adds (+) diff split function.
+                # It returns non-matches in every third element immediately followed by a multiline match.
+                if not hasattr(self, 'diff_splitters'):
+                    self.__class__.diff_splitters = [
+                        (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
+                        for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
+                    self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
+
+                encoding = tiktoken.encoding_for_model(model)
+                maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
+                for diff, sign, split in self.diff_splitters:
+                    compressible = True
+                    while compressible:
+                        splits = split(prompt)
+                        unmatched = splits[0::3]
+                        matched = splits[1::3]
 
 
 class Prompt(Action):
@@ -646,7 +710,7 @@ build/makemake.dep: makemake.py
 include build/makemake.dep
 """)
     add_arguments(argparser)
-    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)
+    argparser.add_argument('--collapse', nargs=argparse.REMAINDER, action=Collapse, help=Collapse.__doc__)
     argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__)
     for brief, long in Uname.OPTIONS.items():
         argparser.add_argument(brief, long, nargs=0, action=Uname, help=Uname.__doc__)
