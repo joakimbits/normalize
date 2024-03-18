@@ -409,7 +409,7 @@ ifndef $($/_HOME_DIR)
     endef
     $(eval $(META))
 endif
-$/_OLD := $($/_HOME)build/$($/_BASELINE)/$/
+$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_NAME)/$/
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
