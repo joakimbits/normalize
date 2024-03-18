@@ -401,16 +401,15 @@ $/_HOME_NAME := $(shell basename `git rev-parse --show-toplevel`)
 $/_HERE_DIR := $(dir $(shell $(PYTHON) $/makemake.py --relpath $($/_HOME_DIR) $/.))
 $/_HERE := $($/_HERE_DIR:./%=%)
 $/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
+$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/$/
 ifndef $($/_HOME_DIR)
     $($/_HOME_DIR) := $($/_HOME_DIR))
-    #$/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)/
     define META
-        $$($$/_HOME)build/$$($$/_BASELINE)/$$($$/_HOME_NAME)/Makefile:
+        $$($$/_OLD)Makefile:
 	        git worktree add -d $$(dir $$@) $$($/_BASELINE)
     endef
     $(eval $(META))
 endif
-$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/$/
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
@@ -535,11 +534,11 @@ define META
     $/style: $($/*.py:$/%=$/build/%.style)
     $/old: $($/_OLD)report.gfm
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BASELINE_INFO)"
-    $/new: $/report.gfm $($/build/*.tested)
+    $/new: $/report.gfm
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
-    $/%: $/report.% $($/build/*.tested)
+    $/%: $/report.%
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
-    $/%: $/build/%.diff $($/build/*.tested)
+    $/%: $/build/%.diff
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_CHANGES)"
 endef
 $(eval $(META))
@@ -640,7 +639,7 @@ $/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.
 	( cd $< && $*.py --test ) > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
-$/build/%.sh-test.tested: $/. $(PRETESTED) $/build/%.sh-test | $/makemake.py
+$/build/%.sh-test.tested: $/. $(PRETESTED) $/build/%.sh-test | $/makemake.py $/report
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $< && $(PYTHON) makemake.py --timeout 60 --sh-test $(patsubst $(dir $<)%,%,$(lastword $^)) ) > $$tmp && mv $$tmp $@
 $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
@@ -649,7 +648,7 @@ $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
 # Document all test results.
 $/report: $/build/report.txt
 	@cat $<
-$/build/report.txt: $($/build/*.tested)
+$/build/report.txt: $(PRETESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a markdown document.
@@ -745,7 +744,7 @@ $/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT
 $/build/report-details.md:
 	echo "$(_heading)# Source code, installation and test result" >> $@
 
-$($/_OLD)report.gfm: $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/Makefile
+$($/_OLD)report.gfm: $($/_OLD)Makefile
 	mkdir -p $(dir $@) && ( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory ) || touch $@
 
 # Use GPT for a release review.
