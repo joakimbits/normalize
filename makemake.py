@@ -466,6 +466,7 @@ class Prompt(Action):
                 if not hasattr(self, 'try_again_in_seconds'):
                     self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds = map(
                         re.compile, (self.try_again_in_seconds_pattern, self.try_again_in_milliseconds_pattern))
+                self.try_again_in_seconds, self.try_again_in_milliseconds = self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds
 
                 seconds = self.try_again_in_seconds.findall(r.text)
                 wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
@@ -481,6 +482,7 @@ class Prompt(Action):
                         (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
                         for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
                     self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
+                    self.diff_splitters, self.maximum_tokens = self.__class__.diff_splitters, self.__class__.maximum_tokens
 
                 encoding = tiktoken.encoding_for_model(model)
                 maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
