@@ -514,7 +514,6 @@ ifeq (2,$(MAKE_RESTARTS))
     ifneq (0,$(MAKELEVEL))
         $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
         $(info # https://aegis.sourceforge.net/auug97.pdf)
-        $(info # https://github.com/joakimbits/normalize/blob/main/example/Makefile)
     endif
 endif
 
