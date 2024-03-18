@@ -90,9 +90,9 @@ _Makefile := $(lastword $(MAKEFILE_LIST))
 
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
     $/project.mk: $/makemake.py
-	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/Makefile -o $@
     $/makemake.py:
-	    curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/makemake.py -o $@
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/makemake.py -o $@
 endif
 
 -include $/project.mk"""
