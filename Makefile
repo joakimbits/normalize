@@ -393,6 +393,7 @@ $/_MODIFIED := $(shell cd $/. && $(PYTHON) makemake.py --git-status . M)
 $/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
 $/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
 $/_HOME := $($/_HOME_DIR:./%=%)
+$/_HOME_NAME := $(shell basename `git rev-parse --show-toplevel`)
 
 # Checkout a common old release of this repo as a subproject in `$($._BASELINE)`
 # Prefix `$/_HERE` is from this git project root directory to  `./`.
@@ -404,12 +405,12 @@ ifndef $($/_HOME_DIR)
     $($/_HOME_DIR) := $($/_HOME_DIR))
     #$/_SUBPROJECTS += $($/_HOME)build/$($/_BASELINE)/
     define META
-        $$($$/_HOME)build/$$($$/_BASELINE)/Makefile:
+        $$($$/_HOME)build/$$($$/_BASELINE)/$$($$/_HOME_NAME)/Makefile:
 	        git worktree add -d $$(dir $$@) $$($/_BASELINE)
     endef
     $(eval $(META))
 endif
-$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_NAME)/$/
+$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/$/
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
@@ -745,7 +746,7 @@ $/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT
 $/build/report-details.md:
 	echo "$(_heading)# Source code, installation and test result" >> $@
 
-$($/_OLD)report.gfm: $($/_HOME)build/$($/_BASELINE)/Makefile
+$($/_OLD)report.gfm: $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/Makefile
 	mkdir -p $(dir $@) && ( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory ) || touch $@
 
 # Use GPT for a release review.
