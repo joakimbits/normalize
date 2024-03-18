@@ -330,7 +330,7 @@ $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMake
 # Define symbolic targets we might want to use to represent (all) its dependencies
 # Do not use such a phony as a dependency unless you also need the target rebuilt every time.
 define META
-    .PHONY: $/all $$/bringup $/tested $/old $/new $/html $/pdf $/slides $/clean $/clean/keep_venv
+    .PHONY: $/all $$/bringup $/tested $/old $/new $/slides $/clean $/clean/keep_venv
     .PHONY: $venv/ $/syntax $/style
     $/all: | $($/_ACTIVE_SUBPROJECTS:%=%all)
     $/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
@@ -474,7 +474,10 @@ $/_EXES += $($/*.py)
 $/build/*.bringup := $($/*.py:$/%=$/build/%.bringup)
 $/build/*.bringup += $($/*.py:$/%=$/build/%.shebang)
 $/build/*.tested += $($/*.py:$/%=$/build/%.tested)
-$/_PRETESTED := $($/build/*.tested)
+ifndef PRETESTED
+    PRETESTED :=
+endif
+PRETESTED += $($/build/*.tested)
 $/build/*.tested += $($/*.md:$/%=$/build/%.sh-test.tested)
 
 # Prepare for bringup
@@ -637,7 +640,7 @@ $/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.
 	( cd $< && $*.py --test ) > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
-$/build/%.sh-test.tested: $/. $($/_PRETESTED) $/build/%.sh-test | $/makemake.py
+$/build/%.sh-test.tested: $/. $(PRETESTED) $/build/%.sh-test | $/makemake.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $< && $(PYTHON) makemake.py --timeout 60 --sh-test $(patsubst $(dir $<)%,%,$(lastword $^)) ) > $$tmp && mv $$tmp $@
 $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
@@ -653,7 +656,7 @@ $/build/report.txt: $($/build/*.tested)
 ifndef __
     _file = $(foreach _,$1,[\`$_\`]($_))
     _exe = $(foreach _,$1,[\`$_\`]($_))
-    _help_fixup := sed -E '/^$$$$|[.]{3}/d'
+    _help_fixup := sed -E '/^\$$$$|[.]{3}/d'
     _heading := \n---\n\n\#
     _link = [$1]($1)
     _. = \\\\footnotesize\n~~~ {$1}
