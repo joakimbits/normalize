@@ -87,15 +87,17 @@ You have now four goals:
 GENERIC_MAKEFILE = f"""# {_}$ {" ".join(sys.argv)}
 _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
+$/all: $/bringup
 
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
     $/project.mk: $/makemake.py
-	    curl https://raw.githubusercontent.com/joakimbits/normalize/Makefile -o $@
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -o $@
     $/makemake.py:
-	    curl https://raw.githubusercontent.com/joakimbits/normalize/makemake.py -o $@
+	    curl https://raw.githubusercontent.com/joakimbits/normalize/main/makemake.py -o $@
 endif
 
 -include $/project.mk"""
+
 COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 
 
