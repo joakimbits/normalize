@@ -655,7 +655,7 @@ $/build/report.txt: $(PRETESTED)
 ifndef __
     _file = $(foreach _,$1,[\`$_\`]($_))
     _exe = $(foreach _,$1,[\`$_\`]($_))
-    _help_fixup := sed -E '/^\$$$$|[.]{3}/d'
+    _help_fixup := sed 's/^/\t/'
     _heading := \n---\n\n\#
     _link = [$1]($1)
     _. = \\\\footnotesize\n~~~ {$1}
