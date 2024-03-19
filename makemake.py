@@ -422,84 +422,81 @@ class Collapse(Action):
     old = r'^--- build/v2\.0\.1/report\.gfm	2024-03-16 14:26:55$'
     new = r'\n\+\+\+ report\.gfm	2024-03-16 14:30:15$'
     span = r'\n@@ -0,0 \+1,1742 @@$'
-    line = r'\n( .+|(?P<touched>[+-]).*)$'
-    paragraph, collapsed_paragraph = (
-        f'({line})(?P<lines>{line})*',
-        r'?(touched)\g<0>|\1?(lines)\.\.\.')
-    section, collapsed_section = (
-        f'{paragraph}(?P<paragraphs>\\n {paragraph})*',
-        r'?(touched)\g<0>|\1?(paragraphs)\.\.\.')
-    part, collapsed_part = (
-        f'{section}(?P<sections>\\n \\n {section})*',
-        r'?(touched)\g<0>|\1?(sections)\.\.\.')
-    diff, collapsed_diff = (
-        f'{old}{new}{span}{part}((?:\\n )*\\n ----+$(?:\\n )*{part})*',
-        r'?(touched)\g<0>')
-    diffs, collapsed_diffs = (
-        f'\\A({diff})+',
-        r'\g<0>')
-    _diffs = _diff = _part = _section = _paragraph = _line = None
+    def line(self, d, s, p):
+        return f'(?P<l>(?P<l{d}>(?P<l{d}{s}>(?P<l{d}{s}{p}>\\n( .+|(?P<t>(?P<t{d}>(?P<t{d}{s}>(?P<t{d}{s}{p}>[+-].*)))))$))))'
+    def paragraph(self, d, s, p):
+        return f'(?P<p>{self.line(d, s, p)}{self.line(d, s, p)}*)'
+    def section(self, d, s):
+        return f'(?P<s>{self.paragraph(d, s, 0)}((?P<l{d}{s}>\\n ){self.paragraph(d, s, 1)})*)'
+    def document(self, d):
+        return f'(?P<d>{self.section(d, 0)}((?P<l{d}>\\n ){{2}}{self.section(d, 1)})*)'
+    def diff(self):
+        return f'{self.old}{self.new}{self.span}(?P<c>{self.document(0)})((?P<l>\\n )(?P<l>\\n ---)-+$(?P<l>\\n ){self.document(1)}*)'
+
+    def collapsed_paragraph(self, d, s, p): return f'(?(t{d}{s}{p})?=p|?=l0?(l1)\\.\\.\\.)*'
+    def collapsed_section(self, d, s): return f'(?(t{d}{s})?=s|?=l0?(l1)\\.\\.\\.)*'
+    def collapsed_document(self, d): return f'(?(t{d})?=d|?=l0?(l1)\\.\\.\\.)*'
+    collapsed_diff = r'?(t)?=c'
+
+    match = None
 
     def __call__(self, parser, args, files, option_string=None):
-        import regex as re
+        if not self.match:
+            import regex
 
-        if not self._diffs:
-            for attr in 'diffs diff part section paragraph line'.split():
-                pattern = getattr(self, attr)
-                print(attr, pattern)
-                _compiled = re.compile(pattern, re.M)
-                _attr = f'_{attr}'
-                setattr(self.__class__, _attr, _compiled)
-                setattr(self, _attr, _compiled)
+            c = self.diff()
+            print(c)
+            self.__class__.match = self.match = regex.compile(c, regex.M).match
 
-        doc = ''.join((open(file).read() for file in files))
-        diffs = self._diffs.match(doc)
-        caps = diffs.capturesdict()
-        while True:
-            data = {
-                "model": model,
-                "messages": [{
-                    "role": "user",
-                    "content": prompt}],
-                "temperature": float(temperature)
-            }
-            data = json.dumps(data).encode('UTF-8')
-            headers = {
-                'Content-Type': 'application/json',
-                'Accept-Charset': 'UTF-8',
-                'Authorization': f"Bearer {key}"
-            }
-            url = 'https://api.openai.com/v1/chat/completions'
-            r = requests.post(url, data=data, headers=headers)
-            status = r.status_code, r.reason, r.text
-            if status[:2] == (429, 'Too Many Requests'):
-                if not hasattr(self, 'try_again_in_seconds'):
-                    self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds = map(
-                        re.compile, (self.try_again_in_seconds_pattern, self.try_again_in_milliseconds_pattern))
+        for file in files:
+            diff = open(file).read()
+            match = self.match(diff)
+            caps = match.capturesdict()
+            while True:
+                data = {
+                    "model": model,
+                    "messages": [{
+                        "role": "user",
+                        "content": prompt}],
+                    "temperature": float(temperature)
+                }
+                data = json.dumps(data).encode('UTF-8')
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Accept-Charset': 'UTF-8',
+                    'Authorization': f"Bearer {key}"
+                }
+                url = 'https://api.openai.com/v1/chat/completions'
+                r = requests.post(url, data=data, headers=headers)
+                status = r.status_code, r.reason, r.text
+                if status[:2] == (429, 'Too Many Requests'):
+                    if not hasattr(self, 'try_again_in_seconds'):
+                        self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds = map(
+                            re.compile, (self.try_again_in_seconds_pattern, self.try_again_in_milliseconds_pattern))
 
-                seconds = self.try_again_in_seconds.findall(r.text)
-                wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
-                print(f'Waiting {wait}s for {model} to accept new requests')
-                time.sleep(wait)
-                continue
+                    seconds = self.try_again_in_seconds.findall(r.text)
+                    wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
+                    print(f'Waiting {wait}s for {model} to accept new requests')
+                    time.sleep(wait)
+                    continue
 
-            if status[:2] == (400, 'Bad Request'):
-                # Make both a consecutive-drops (-) and a consecutive-adds (+) diff split function.
-                # It returns non-matches in every third element immediately followed by a multiline match.
-                if not hasattr(self, 'diff_splitters'):
-                    self.__class__.diff_splitters = [
-                        (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
-                        for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
-                    self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
+                if status[:2] == (400, 'Bad Request'):
+                    # Make both a consecutive-drops (-) and a consecutive-adds (+) diff split function.
+                    # It returns non-matches in every third element immediately followed by a multiline match.
+                    if not hasattr(self, 'diff_splitters'):
+                        self.__class__.diff_splitters = [
+                            (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
+                            for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
+                        self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
 
-                encoding = tiktoken.encoding_for_model(model)
-                maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
-                for diff, sign, split in self.diff_splitters:
-                    compressible = True
-                    while compressible:
-                        splits = split(prompt)
-                        unmatched = splits[0::3]
-                        matched = splits[1::3]
+                    encoding = tiktoken.encoding_for_model(model)
+                    maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
+                    for diff, sign, split in self.diff_splitters:
+                        compressible = True
+                        while compressible:
+                            splits = split(prompt)
+                            unmatched = splits[0::3]
+                            matched = splits[1::3]
 
 
 class Prompt(Action):
