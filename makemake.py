@@ -87,7 +87,7 @@ You have now four goals:
 GENERIC_MAKEFILE = f"""# {_}$ {" ".join(sys.argv)}
 _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
-$/all: $/bringup
+$/bringup:
 
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
     $/project.mk: $/makemake.py

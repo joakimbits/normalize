@@ -14,7 +14,7 @@
     # Prefixing variable names with $/_ and project files with $/ to make this Makefile usable from anywhere.
     Makefile := $(lastword $(MAKEFILE_LIST))
     / := $(patsubst ./%,%,$(subst \,/,$(subst C:\,/c/,$(dir $(Makefile)))))
-    $/all: $/bringup
+    $/bringup:
 
 # Define this project only once
 ifndef $/_NAME
@@ -176,6 +176,7 @@ $/python_executable_shell_example:
     # Prefixing variable names with $/_ and project files with $/ to make this Makefile usable from anywhere.
     _Makefile := $(lastword $(MAKEFILE_LIST))
     / := $(patsubst ./%,%,$(subst \,/,$(patsubst C:\%,/c/%,$(dir $(Makefile)))))
+    $/bringup:
 
     ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
         $/project.mk:
