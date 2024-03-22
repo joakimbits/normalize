@@ -337,6 +337,7 @@ define META
     $/bringup: | $($/_ACTIVE_SUBPROJECTS:%=%bringup)
     $/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
     $/report: | $($/_ACTIVE_SUBPROJECTS:%=%report)
+    $/html: | $($/_ACTIVE_SUBPROJECTS:%=%html)
     $/pdf: | $($/_ACTIVE_SUBPROJECTS:%=%pdf)
     $/slides: | $($/_ACTIVE_SUBPROJECTS:%=%slides)
     $/old: | $($/_ACTIVE_SUBPROJECTS:%=%old)
