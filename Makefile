@@ -7,19 +7,18 @@
 
 ### Usage
 
-# Copy the following five lines into the head of your own Makefile, to make it compliant with this.
+# Copy the following four lines into the head of your own Makefile, to make it compliant with this.
 
-## Generic makefile for co-developed source code and documentation
-
-    # Prefixing variable names with $/_ and project files with $/ to make this Makefile usable from anywhere.
+    # Prefixing project variable names with $/_ and project files with $/ to make this Makefile usable from anywhere.
     Makefile := $(lastword $(MAKEFILE_LIST))
-    / := $(patsubst ./%,%,$(subst \,/,$(subst C:\,/c/,$(dir $(Makefile)))))
+    / := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
     $/bringup:
 
 # Define this project only once
 ifndef $/_NAME
+$/make: $/build/project.mk
 
-# Define these generic examples only once
+# Define generic examples only once
 ifndef _NAME
 _NAME := $(notdir $(realpath $/.))
 
@@ -144,6 +143,10 @@ $/python_executable_shell_example:
 	venv/bin/python3 -c "import example; open('greeter-from-py.txt).write(example.greeter.hello())"
 
 
+endif # generic examples
+$/_NAME := $(notdir $(realpath $/.))
+
+
 ## How it works
 
 # All project variable names here except a special $/ "here prefix" are always unique globally.
@@ -173,19 +176,18 @@ $/python_executable_shell_example:
 # Replace the parent generic Makefile with the following customized one and then treat the parent as a sibling
 # project like above.
 
-    # Prefixing variable names with $/_ and project files with $/ to make this Makefile usable from anywhere.
-    _Makefile := $(lastword $(MAKEFILE_LIST))
-    / := $(patsubst ./%,%,$(subst \,/,$(patsubst C:\%,/c/%,$(dir $(Makefile)))))
+    # Prefixing project variable names with $/_ and project files with $/ to make this Makefile usable from anywhere
+    Makefile := $(lastword $(MAKEFILE_LIST))
+    / := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
     $/bringup:
 
-    ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
-        $/project.mk:
-	        curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/Makefile -o $@
-    endif
+    # Bringup executables from any source files here, and define 'report html pdf slides audit' targets here.
+    $/build/project.mk:
+	    mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -o $@
 
     $/_NON-SUBPROJECTS += $/this
     # $/_DEPS += $/this/Makefile
-    #-include $/project.mk
+    #-include $/build/project.mk
 
 # Replace `# $/_DEPS += $/this-project/Makefile` with this Makefile, and activate the last line `-include $/project.mk`.
 # Then this project is no longer built and reported together with the parent project, but the parent project can still
@@ -196,8 +198,6 @@ $/python_executable_shell_example:
 
 # You could also consider making this a sibling project to the parent project instead.
 
-endif
-$/_NAME := $(notdir $(realpath $/.))
 
 ## Parameters
 
@@ -333,7 +333,8 @@ $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMake
 define META
     .PHONY: $/all $$/bringup $/tested $/old $/new $/slides $/clean $/clean/keep_venv
     .PHONY: $venv/ $/syntax $/style
-    $/all: | $($/_ACTIVE_SUBPROJECTS:%=%all)
+    $/make: | $($/_ACTIVE_SUBPROJECTS:%=%make)
+    $/bringup: | $($/_ACTIVE_SUBPROJECTS:%=%bringup)
     $/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
     $/report: | $($/_ACTIVE_SUBPROJECTS:%=%report)
     $/pdf: | $($/_ACTIVE_SUBPROJECTS:%=%pdf)

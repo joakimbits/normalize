@@ -23,17 +23,11 @@ $ make pdf html slides
 $ python3 makemake.py --makemake --generic
 # normalize$ makemake.py --makemake --generic
 _Makefile := $(lastword $(MAKEFILE_LIST))
-/ := $(patsubst ./,,$(subst \,/,$(subst C:\,/c/,$(dir $(_Makefile)))))
-$/all: $/bringup
-
-ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
-    $/project.mk: $/makemake.py
-	    curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -o $@
-    $/makemake.py:
-	    curl https://raw.githubusercontent.com/joakimbits/normalize/main/makemake.py -o $@
-endif
-
--include $/project.mk
+/ := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
+$/bringup:
+$/build/project.mk:
+	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -o $@
+-include $/build/project.mk
 
 ```
 

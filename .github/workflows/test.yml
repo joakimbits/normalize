@@ -42,4 +42,6 @@ jobs:
       - run: make prompt
       - run: make audit
       - run: make clean && make audit
+      - run: ( cd template && make && ls )
+      - run: ( cd template && make clean && ls )
       - run: echo "🍏 This job's status is ${{ job.status }}."
