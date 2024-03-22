@@ -19,7 +19,7 @@
 # Define this project only once
 ifndef $/_NAME
 
-# Define the usage examples here only once
+# Define these generic examples only once
 ifndef _NAME
 _NAME := $(notdir $(realpath $/.))
 
@@ -41,7 +41,7 @@ _NAME := $(notdir $(realpath $/.))
 	    # This recipy will not execute again unless an update is actually needed, because $$/normal-target *was touched*.
     $/this-is-much-better: ; touch $@
 
-    .PHONY: $/normal-target # This is how to force the recipy to re-execute every `make` where $/normal-target is needed.
+    .PHONY: $/normal-target # This is how to force that recipy to re-execute every `make` where $/normal-target is needed.
     # Another way is to have a .PHONY target as a dependency after `:`, before any `|`.
     # A third (recommended) way is to not create and update the target in its recipy.
 
