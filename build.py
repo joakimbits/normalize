@@ -51,11 +51,17 @@ cwd = os.getcwd()
 _ = os.path.split(cwd)[1]
 module_path = os.path.relpath(os.path.abspath(sys.argv[0]))
 module_dir, module_py = os.path.split(module_path)
-makemake_py = os.path.relpath(os.path.abspath(__file__), os.path.abspath(module_dir))
-if module_dir:
+parent_dir = os.path.split(module_path)
+grandparent_dir, parent_dirname = os.path.split(module_dir)
+if parent_dirname == 'build':
+    parent_dir = grandparent_dir
+
+build_py = os.path.relpath(os.path.abspath(__file__), os.path.abspath(module_dir))
+if module_dir and module_dir != 'build':
     path = f"./{module_dir}/"
 else:
     path = './'
+
 module, ext = os.path.splitext(module_py)
 
 REVIEW = """
@@ -238,20 +244,16 @@ if parent_module.__name__ == '__main__':
             embed = "%s"
             end = ""
             rules = [
-                (f"all: {build_dir}{pattern}.py.tested",
-                 [])]
-            if dep_path:
-                rules += [
-                    ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
-                      f" {dep_file} {build_dir}{pattern}.py.bringup"),
-                     [f"{source} --test > $@"]),
-                    (f"{dep_file}: {src_dir}{pattern}.py",
-                     [f"{source} --dep $@{generic}"])]
-            else:
-                rules.append(
-                    ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
-                      f" {build_dir}{pattern}.py.bringup"),
-                     [f"{source} --test > $@"]))
+                (f"bringup: {build_dir}{pattern}.py.bringup",
+                 []),
+                (f"tested: {build_dir}{pattern}.py.tested",
+                 []),
+                ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
+                  f" {build_dir}{pattern}.py.shebang {build_dir}{pattern}.py.mk"),
+                 [f"{source} --test > $@"]),
+                (f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup",
+                 [f"{recipy_python} {source} --shebang > $@"]),
+            ]
 
         commands = []
         bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
@@ -628,20 +630,23 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=brief(),
         epilog="""Examples:
-$ makemake.py --dep build/makemake.dep
+$ build.py --dep build/makemake.dep
 include build/makemake.dep
 
 $ cat build/makemake.dep
-build/makemake.py.bringup: makemake.py build/makemake.dep | $(PYTHON)
+build/build.py.bringup: build.py build/makemake.dep | $(PYTHON)
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
-$ makemake.py --dep build/makemake.dep --makemake
-all: build/makemake.py.tested
-build/makemake.py.tested: makemake.py build/makemake.dep build/makemake.py.bringup
-	makemake.py --test > $@
-build/makemake.dep: makemake.py
-	makemake.py --dep $@
-include build/makemake.dep
+$ build.py --makemake
+bringup: build/build.py.bringup
+tested: build/build.py.tested
+build/build.py.tested: build.py build/build.py.shebang build/build.py.mk
+	build.py --test > $@
+build/build.py.shebang: build.py build/build.py.bringup
+	$(PYTHON) build.py --shebang > $@
+build/build.py.bringup: build.py | $(PYTHON)
+	mkdir -p build/ && \\
+	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 """)
     add_arguments(argparser)
     argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)

@@ -1,9 +1,18 @@
 ### Abstract
 
-# Defines generic make targets `bringup tested report review audit clean` for arbitrarily knitted projects.
-# Can be included in any other project. Will always make project files in the same location.
+# Defines generic make targets `bringup tested report review audit clean clean/keep_venv` for arbitrarily knitted projects.
+
+# Can be included in any other project.
+
+# Will always make project files in the same location.
+
 # Warns if building recursively rather than being included, but still makes the same.
-# Developed on x86 WSL1 and Arm64 MacOSX. Release-tested on GitHub, PowerShell, cmd and Git Bash.
+
+# Developed on x86 WSL1 and Arm64 MacOSX.
+
+# Release-tested on GitHub.
+
+# Work in progress: Support also review/audit on bare MacOSX and bare Windows, where a diff command is missing.
 
 ### Usage
 
@@ -121,7 +130,7 @@ $/binary_executable_shell_example:
 #### Python executables and modules
 
 # A single Python venv is made for .py code found *here*, but subprojects gets their own unique venv.
-# Python code is assumed to import makemake and will then get a Shebang that works *here* only.
+# Python code is assumed to import build and will then get a Shebang that works *here* only.
 
 # In a Makefile:
 
@@ -137,9 +146,9 @@ $/python_executable_shell_example:
 # In Python:
 
 #   * Copy its `Dependencies:` into your own .py header.
-#   * `touch __main__.py` on the complete path to it. Now you can import and use it.
+#   * `touch __init__.py` on the complete path to it. Now you can import and use it.
 
-	touch example/__main__.py
+	touch example/__init__.py
 	venv/bin/python3 -c "import example; open('greeter-from-py.txt).write(example.greeter.hello())"
 
 
@@ -282,7 +291,11 @@ $/venv/pip/ := $/venv/lib/$(PYTHON_NAME)/site-packages/
 
 # A package manager for the PYTHON OS
 ifndef !
-    UNAME ?= $(PYTHON) $/makemake.py
+    UNAME ?= $(shell which uname)
+    ifeq (,$(UNAME))
+        UNAME := $(PYTHON) -m build
+    endif
+
     CPU ?= $(shell $(UNAME) -m)
     OS ?= $(shell $(UNAME) -s)
     ifeq (MacOSX,$(OS))
@@ -331,18 +344,16 @@ $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMake
 # Define symbolic targets we might want to use to represent (all) its dependencies
 # Do not use such a phony as a dependency unless you also need the target rebuilt every time.
 define META
-    .PHONY: $/make $/list $$/bringup $/tested $/old $/new $/slides $/clean $/clean/keep_venv
-    .PHONY: $venv/ $/syntax $/style
+    .PHONY: $/bringup $/syntax $/style $/tested $/old $/new
+    .PHONY: $/make $venv $/slides $/clean $/clean/keep_venv $/list
     $/make: | $($/_ACTIVE_SUBPROJECTS:%=%make)
     $/bringup: | $($/_ACTIVE_SUBPROJECTS:%=%bringup)
     $/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
-    $/report: | $($/_ACTIVE_SUBPROJECTS:%=%report)
     $/html: | $($/_ACTIVE_SUBPROJECTS:%=%html)
     $/pdf: | $($/_ACTIVE_SUBPROJECTS:%=%pdf)
     $/slides: | $($/_ACTIVE_SUBPROJECTS:%=%slides)
     $/old: | $($/_ACTIVE_SUBPROJECTS:%=%old)
     $/new: | $($/_ACTIVE_SUBPROJECTS:%=%new)
-    $/build/review.diff: $($/_ACTIVE_SUBPROJECTS:%=%build/review.diff)
     $/clean: $/clean/keep_venv | $($/_ACTIVE_SUBPROJECTS:%=%clean)
 	    rm -rf $/venv/ $/.ruff_cache/
     $/clean/keep_venv: | $($/_ACTIVE_SUBPROJECTS:%=%clean/keep_venv)
@@ -360,14 +371,25 @@ ifeq (,$(filter .,$(PATHS)))
     .-ON-PATH := .-on-$(OS)-path
 endif
 
+# Find our git status
+$/_BRANCH := $(shell git branch --show-current)
+$/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
+$/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
+$/_MODIFIED := $(shell cd $/. && $(PYTHON) -m build --git-status . M)
+$/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
+$/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
+$/_HOME := $($/_HOME_DIR:./%=%)
+$/_HOME_NAME := $(shell basename `git rev-parse --show-toplevel`)
+
 # Setup this Makefile in each subproject
-$/%/Makefile: | $/Makefile $/%/makemake.py
+$/%/Makefile: | $/Makefile $/%/build.py
 	ln -s ../Makefile $@
-$/%/makemake.py: | $/makemake.py
-	ln -s ../makemake.py $@
-$/makemake.py:
-	curl https://raw.githubusercontent.com/joakimbits/normalize/better_mac_support/makemake.py -o $@
-.PRECIOUS: $/makemake.py $($/_SUBPROJECTS:%=%makemake.py)
+$/%/build.py: | $/build.py
+	ln -s ../build.py $@
+$/build.py:
+	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/build.py -o $@
+
+.PRECIOUS: $/build.py $($/_SUBPROJECTS:%=%build.py)
 
 # Find all source files, but ignore links named Makefile *.h *.hpp *.py *.md
 $/_SOURCE :=
@@ -387,21 +409,14 @@ $/*.py := $(shell find $/*.py \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.py)
 $/*.md := $(shell find $/*.md \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.md)
-
-# Find our git status
-$/_BRANCH := $(shell git branch --show-current)
-$/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
-$/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
-$/_MODIFIED := $(shell cd $/. && $(PYTHON) makemake.py --git-status . M)
-$/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
-$/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
-$/_HOME := $($/_HOME_DIR:./%=%)
-$/_HOME_NAME := $(shell basename `git rev-parse --show-toplevel`)
+ifneq (normalize ./,$($/_HOME_NAME) $($/_HOME_DIR))
+    $/_SOURCE := $(filter-out $/build.py,$($/_SOURCE))
+endif
 
 # Checkout a common old release of this repo as a subproject in `$($._BASELINE)`
 # Prefix `$/_HERE` is from this git project root directory to  `./`.
 # Directory `$($/_OLD)` is the old release of `./`.
-$/_HERE_DIR := $(dir $(shell $(PYTHON) $/makemake.py --relpath $($/_HOME_DIR) $/.))
+$/_HERE_DIR := $(dir $(shell $(PYTHON) $/build.py --relpath $($/_HOME_DIR) $/.))
 $/_HERE := $($/_HERE_DIR:./%=%)
 $/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
 $/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/$/
@@ -451,7 +466,7 @@ $/_CODE += $($/*.py)
 $/_LDFLAGS += $(LDFLAGS)
 
 # A linked executable has the same name as the project
-ifneq (,$(strip $($/_LINKABLE)))
+ifneq (,$($/_LINKABLE))
     $/_EXE := $/$($/_NAME)
     $/_EXE_TESTED := $/build/$($/_NAME).tested
 endif
@@ -474,18 +489,21 @@ $/_EXES := $($/_EXE)
 $/_EXES += $($/*.py)
 
 # Collect bringup and tested targets
-$/build/*.bringup := $($/*.py:$/%=$/build/%.bringup)
+$/build/*.bringup := $($/_EXES:$/%=$/build/%.bringup)
 $/build/*.bringup += $($/*.py:$/%=$/build/%.shebang)
-$/build/*.tested += $($/*.py:$/%=$/build/%.tested)
+$/build/*.tested += $($/_EXES:$/%=$/build/%.tested)
 ifndef PRETESTED
     PRETESTED :=
+    TESTED :=
 endif
 PRETESTED += $($/build/*.tested)
 $/build/*.tested += $($/*.md:$/%=$/build/%.sh-test.tested)
+TESTED += $($/build/*.tested)
 
 # Prepare for bringup
 $/build/*.py.mk := $($/*.py:$/%=$/build/%.mk)
 $/_DEPS += $($/build/*.py.mk)
+$/_DEPS += $/build/build.py.mk
 
 # Prepare for reporting
 $/_LOGIC := $($/_MAKEFILE)
@@ -500,7 +518,7 @@ $/_REPORT += $($/_RESULT:%=%.md)
 # Notify the user if new rules were built and included, and make therefore restarted
 ifeq (2,$(MAKE_RESTARTS))
     ifndef MAKER
-        $(info # Hello $I, Welcome to makemake https://github.com/joakimbits/normalize)
+        $(info # Hello $I, Welcome to generic make https://github.com/joakimbits/normalize)
     endif
 
     MAKER := $(shell $(MAKE) -v))
@@ -556,7 +574,7 @@ $?/clang++: $?/clang
 CXX := /usr/bin/clang++
 CC := /usr/bin/clang
 
-# Make executable
+# Make a linked executable
 ifneq (,$($/_OBJS))
     $/build/$($/_NAME).tested: $/$($/_NAME)
 	    true | ./$< > $@ || (cat $@ && false)
@@ -578,6 +596,18 @@ ifneq (,$($/_OBJS))
     $(eval $(META))
 endif
 
+# Build a recipy for $/build/%.py.bringup
+$/build/%.bringup: $/%
+	mkdir -p $(dir $@) && touch $@
+
+# Make a Python executable
+$/build/%.py.shebang: $($/venv/bin/python3) $/%.py
+	$^ --shebang > $@
+
+# Build a recipy for $/build/%.py.bringup
+$/build/%.py.mk: $/%.py | $/build.py
+	rm -f $@ && ( cd $(dir $<). && $(PYTHON) $*.py --generic --dep build/$*.py.mk ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
+
 # Check Python 3.9 syntax
 $/build/%.py.syntax: $($/venv/bin/python3) $/%.py | $($/venv/pip/)ruff
 	$< -m ruff check --select=E9,F63,F7,F82 --target-version=py39 $(lastword,$^) > $@ || (cat $@ && false)
@@ -589,7 +619,7 @@ $($/venv/pip/)%: $($/venv/bin/python3)
 # Setup a local shebang python
 $/venv/bin/python3: | $(PYTHON) $(PYTHON_DEP) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
 	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv $(@:%/bin/python3=%) $(PYTHON_FINALIZE)
-	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m makemake --prompt
+	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m build --prompt
 
 # Install conda python
 ifndef CONDA
@@ -631,29 +661,21 @@ endif
 $/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
 	$(word 3,$^) -m ruff check --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
-# Build a recipy for $/build/%.py.bringup
-$/build/%.py.mk: $/%.py | $/makemake.py
-	rm -f $@ && ( cd $(dir $<). && $(PYTHON) $*.py --generic --dep build/$*.py.mk ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
-
-# Make a .py file executable
-$/build/%.py.shebang: $($/venv/bin/python3) $/%.py
-	$^ --shebang > $@
-
 # Check Python and command line usage examples in .py files
 $/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $($/venv/bin/python3)
 	( cd $< && $*.py --test ) > $@ || (cat $@ && false)
 
 # Check command line usage examples in .md files
-$/build/%.sh-test.tested: $/. $(PRETESTED) $/build/%.sh-test | $/makemake.py $/report
+$/build/%.sh-test.tested: $/. $(PRETESTED) $/build/%.sh-test | $/build.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
-	( cd $< && $(PYTHON) makemake.py --timeout 60 --sh-test $(patsubst $(dir $<)%,%,$(lastword $^)) ) > $$tmp && mv $$tmp $@
+	( cd $< && $(PYTHON) -m build --timeout 60 --sh-test $(patsubst $(dir $<)%,%,$(lastword $^)) ) > $$tmp && mv $$tmp $@
 $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
-	pandoc -i $< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && truncate -s -1 $@
+	mkdir -p $(dir $@) && pandoc -i $< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && truncate -s -1 $@
 
 # Document all test results.
 $/report: $/build/report.txt
 	@cat $<
-$/build/report.txt: $(PRETESTED)
+$/build/report.txt: $(TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a markdown document.
@@ -682,7 +704,7 @@ $/build/%.tested.md: $/build/%.tested
 # Make a standalone gfm, html, pdf, or dzslides document.
 define META
     $$/build/report.md: $($/build/*.tested)
-	    echo "A build-here include-from-anywhere project based on [makemake](https://github.com/joakimbits/normalize)." > $$@
+	    echo "A build-here include-from-anywhere project based on [normalize](https://github.com/joakimbits/normalize)." > $$@
 	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
 ifneq ($(strip $($/_EXE)),)
 	    echo "- \`./$$($/_NAME)\`: $$(call _file,$$($/_LINKABLE:$/%=%))" >> $$@
@@ -753,10 +775,10 @@ $($/_OLD)report.gfm: $($/_OLD)Makefile
 	mkdir -p $(dir $@) && ( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory ) || touch $@
 
 # Use GPT for a release review.
-$/build/audit.diff: $/makemake.py $/build/prompt.diff $/build/makemake.py.bringup
-	( cd $(dir $<) && makemake.py --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
+$/build/audit.diff: $/build.py $/build/prompt.diff $/build/build.py.bringup
+	( cd $(dir $<) && venv/bin/python3 -m build --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
 $/build/prompt.diff: $/build/review.diff
-	$(PYTHON) $/makemake.py -c 'print(REVIEW)' > $@
+	$(PYTHON) -m build -c 'print(REVIEW)' > $@
 	echo "$$ $(MAKE) $/review" >> $@
 	cat $^ >> $@
 	echo -n "$$ " >> $@
@@ -772,7 +794,7 @@ define META
 endef
 $(eval $(META))
 
-$/build/report.diff: $($/_OLD)report.gfm $/report.gfm $/makemake.py
+$/build/report.diff: $($/_OLD)report.gfm $/report.gfm $/build.py
 	echo "diff -u -U 100000 $< $(word 2,$^) | fold-unchanged" > $@
 	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{*}' && \
 	  parts=`ls xx**` && \
