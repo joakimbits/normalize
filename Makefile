@@ -331,7 +331,7 @@ $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMake
 # Define symbolic targets we might want to use to represent (all) its dependencies
 # Do not use such a phony as a dependency unless you also need the target rebuilt every time.
 define META
-    .PHONY: $/all $$/bringup $/tested $/old $/new $/slides $/clean $/clean/keep_venv
+    .PHONY: $/make $/list $$/bringup $/tested $/old $/new $/slides $/clean $/clean/keep_venv
     .PHONY: $venv/ $/syntax $/style
     $/make: | $($/_ACTIVE_SUBPROJECTS:%=%make)
     $/bringup: | $($/_ACTIVE_SUBPROJECTS:%=%bringup)
@@ -805,6 +805,10 @@ $/build/report.diff: $($/_OLD)report.gfm $/report.gfm $/makemake.py
 	    done ; \
 	  rm xx**; ) >> $@
 endif # building
+
+# List all targets that needs rebuilding and stop
+$/list: $($/Makefile)
+	make -f $< -dn MAKE=: $(filter-out $@,$(MAKECMDGOALS)) | sed -rn "s/^ *Must remake target '(.*)'\.$$/\1/p" && false
 
 ## Finally attempt to include all bringup files and sub-projects
 # Note: Subprojects modify $/, so this has to be the last command using it as a prefix here.
