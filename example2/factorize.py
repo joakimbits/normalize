@@ -9,7 +9,7 @@ fire
 """
 import argparse
 
-import makemake
+import build
 import fire
 
 def fizz3fuzz5(*numbers):
@@ -35,9 +35,9 @@ Buzz
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=makemake.brief(),
+        description=build.brief(),
         epilog=f"Examples:{EXAMPLES}")
-    makemake.add_arguments(argparser)
+    build.add_arguments(argparser)
     argparser.add_argument('number', nargs=argparse.REMAINDER, help=fizz3fuzz5.__doc__)
     args = argparser.parse_args()
     fire.Fire(fizz3fuzz5)
