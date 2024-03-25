@@ -278,7 +278,7 @@ ifndef PYTHON_NAME
         PYTHON_FINALIZE = && mkdir -p $(dir $@) && ln -s ../Scripts/python.exe $@
     endif
 endif
-$/venv/pip/ := $/venv/lib/$(PYTHON_NAME)/site-packages
+$/venv/pip/ := $/venv/lib/$(PYTHON_NAME)/site-packages/
 
 # A package manager for the PYTHON OS
 ifndef !
