@@ -246,7 +246,7 @@ ifeq ($~,/home/$I)
     ifneq ($(shell echo $$WSL_DISTRO_NAME),)
     	# Clone Windows home git and ssh settings
         ifndef H
-            H := $(shell wslpath `cmd.exe /C echo "%USERPROFILE%" | head -c -2`)
+            H := $(shell wslpath "$(cmd.exe /C echo '%USERPROFILE%' | head -c -2)")
             ~/.gitconfig: $H/.gitconfig
 	            cp $< $@
             ~/.ssh: $H/.ssh
