@@ -280,7 +280,9 @@ ifndef PYTHON_NAME
     ifeq (/usr/bin/python3,$(PYTHON))
         PYTHON_DEP = /.cache/pip
         /.cache/pip:; sudo mkdir -p $@ && sudo chmod a+rwx $@
-        PYTHON_FINALIZE = && $(SPEEDUP_WSL_PIP)$@ -m pip install --upgrade pip setuptools && $(SPEEDUP_WSL_PIP)$@ -m venv --upgrade $(patsubst %/bin/python3,%,$@)
+        PYTHON_FINALIZE = && $(SPEEDUP_WSL_PIP)$@ -m pip install --upgrade setuptools
+        PYTHON_FINALIZE += && $(SPEEDUP_WSL_PIP)$@ -m venv --upgrade $(@:%/bin/python3=%)
+        PYTHON_FINALIZE += && $(SPEEDUP_WSL_PIP)$@ -m pip install --upgrade pip
 
     # Workaround Windows python not installing #!venv/bin/python3
     else ifeq (/mnt/c/tools/miniconda3/python.exe,$(PYTHON))
