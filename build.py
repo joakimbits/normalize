@@ -428,6 +428,7 @@ class Prompt(Action):
     """
     try_again_in_seconds_pattern = r'Please try again in ([0-9]+\.[0-9]+)s'
     try_again_in_milliseconds_pattern = r'Please try again in ([0-9]+)ms'
+    limit_requested_pattern = r'Limit ([0-9]+), Requested ([0-9]+)'
     code_for_too_many_tokens = 'context_length_exceeded'
     maximum_tokens_pattern = r'maximum context length is ([0-9]+) tokens'
 
@@ -441,7 +442,9 @@ class Prompt(Action):
         file, model, temperature, key = values
         prompt = open(file).read()
         key = codecs.decode(key, 'rot13')
+        encoding = tiktoken.encoding_for_model(model)
         while True:
+            maximum_tokens = None
             data = {
                 "model": model,
                 "messages": [{
@@ -460,28 +463,44 @@ class Prompt(Action):
             status = r.status_code, r.reason, r.text
             if status[:2] == (429, 'Too Many Requests'):
                 if not hasattr(self, 'try_again_in_seconds'):
-                    self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds = map(
-                        re.compile, (self.try_again_in_seconds_pattern, self.try_again_in_milliseconds_pattern))
-                self.try_again_in_seconds, self.try_again_in_milliseconds = self.__class__.try_again_in_seconds, self.__class__.try_again_in_milliseconds
+                    self.try_again_in_seconds = self.__class__.try_again_in_seconds = re.compile(
+                        self.try_again_in_seconds_pattern)
+                    self.try_again_in_milliseconds = self.__class__.try_again_in_milliseconds = re.compile(
+                        self.try_again_in_milliseconds_pattern)
+                    self.limit_requested = self.__class__.limit_requested = re.compile(
+                        self.limit_requested_pattern)
 
+                wait_seconds = 0.
                 seconds = self.try_again_in_seconds.findall(r.text)
-                wait = float(seconds[0]) if seconds else int(self.try_again_in_milliseconds.findall(r.text)[0]) / 1000.
-                print(f'Waiting {wait}s for {model} to accept new requests')
-                time.sleep(wait)
-                continue
+                if seconds:
+                    wait_seconds = float(seconds[0])
+                else:
+                    milliseconds = self.try_again_in_milliseconds.findall(r.text)
+                    if milliseconds:
+                        wait_seconds = int(milliseconds[0]) / 1000.
+
+                if wait_seconds:
+                    print(f'Waiting {wait_seconds}s for {model} to accept new requests')
+                    time.sleep(wait_seconds)
+                    continue
+                else:
+                    limit, requested = map(int, self.limit_requested.findall(r.text)[0])
+                    maximum_tokens = int(limit * len(encoding.encode(prompt)) / requested)
 
             if status[:2] == (400, 'Bad Request'):
+                if not hasattr(self, 'maximum_tokens'):
+                    self.maximum_tokens = self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
+
+                maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
+
+            if maximum_tokens:
                 # Make both a consecutive-drops (-) and a consecutive-adds (+) diff split function.
                 # It returns non-matches in every third element immediately followed by a multiline match.
                 if not hasattr(self, 'diff_splitters'):
-                    self.__class__.diff_splitters = [
+                    self.diff_splitters = self.__class__.diff_splitters = [
                         (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
                         for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
-                    self.__class__.maximum_tokens = re.compile(self.maximum_tokens_pattern)
-                    self.diff_splitters, self.maximum_tokens = self.__class__.diff_splitters, self.__class__.maximum_tokens
 
-                encoding = tiktoken.encoding_for_model(model)
-                maximum_tokens = int(self.maximum_tokens.findall(r.text)[0])
                 for diff, sign, split in self.diff_splitters:
                     compressible = True
                     while compressible:
@@ -510,12 +529,13 @@ class Prompt(Action):
                     if compressible:
                         break
                 else:
-                    open(file).write(prompt)
+                    open(file, 'w').write(prompt)
                     too_many_tokens = len(encoding.encode(prompt)) - maximum_tokens
                     raise ValueError(
-                        f'{model} is not able to process the large prompt {file},'
+                        f'{model} is not able to process the large prompt {file}'
+                        f' to {maximum_tokens} {encoding.name} tokens,'
                         ' even after having tried all diff body removals possible. '
-                        f'Please edit {file} and trim it down by at least {100 * too_many_tokens/maximum_tokens}%'
+                        f'Please edit {file} and trim it down by at least {int(100 * too_many_tokens/maximum_tokens)}%'
                         f' and try {option_string} again.\n')
 
                 continue
