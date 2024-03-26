@@ -406,12 +406,13 @@ $/_SOURCE += $($/*.cpp)
 $/*.hpp := $(shell find $/*.hpp \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.hpp)
 $/*.py := $(shell find $/*.py \! -type l 2>/dev/null)
+ifneq (normalize ./,$($/_HOME_NAME) $($/_HOME_DIR))
+    $/*.py := $(filter-out $/build.py,$($/_SOURCE))
+	$/_DEPS += $/build/build.py.mk
+endif
 $/_SOURCE += $($/*.py)
 $/*.md := $(shell find $/*.md \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.md)
-ifneq (normalize ./,$($/_HOME_NAME) $($/_HOME_DIR))
-    $/_SOURCE := $(filter-out $/build.py,$($/_SOURCE))
-endif
 
 # Checkout a common old release of this repo as a subproject in `$($._BASELINE)`
 # Prefix `$/_HERE` is from this git project root directory to  `./`.
@@ -503,7 +504,6 @@ TESTED += $($/build/*.tested)
 # Prepare for bringup
 $/build/*.py.mk := $($/*.py:$/%=$/build/%.mk)
 $/_DEPS += $($/build/*.py.mk)
-$/_DEPS += $/build/build.py.mk
 
 # Prepare for reporting
 $/_LOGIC := $($/_MAKEFILE)
