@@ -330,6 +330,8 @@ ifndef !
 
     # Custom packages
     $?/xetex:; $! texlive-xetex
+
+    .PRECIOUS: $?/jq $?/pandoc $?/xetex
 endif
 
 
