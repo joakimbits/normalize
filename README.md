@@ -2,26 +2,34 @@
 
 ---
 
+Run this in your project directory:
+
 ```
-$ GH="https://raw.githubusercontent.com"; curl $GH/joakimbits/normalize/main/template/Makefile -o Makefile && make
+GH="https://raw.githubusercontent.com"; curl $GH/joakimbits/normalize/main/template/Makefile -o Makefile && make
 ```
 
-- Create executables from all source files.
+- Creates executables from all source files.
 - Recursively also in sub-directories with a README.md file, or any other .md file.
 
+---
+
+Test and document your project:
+
 ```
-$ make pdf html slides
+make pdf html slides
 ```
 
 - Tests all usage examples, and generates project reports if they all PASS.
 
 ---
 
+Changes since your last release, with release notes:
+
 ```
-$ make old new review audit
+make old new review audit
 ```
 
-- Analyze changes and use GPT to generate release notes.
+- Analyze changes and use GPT to audit them.
 
 ---
 
