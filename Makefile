@@ -387,7 +387,7 @@ $/%/Makefile: | $/Makefile $/%/build.py
 $/%/build.py: | $/build.py
 	ln -s ../build.py $@
 $/build.py:
-	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/build.py -o $@
+	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/build.py -o $@
 
 .PRECIOUS: $/build.py $($/_SUBPROJECTS:%=%build.py)
 
