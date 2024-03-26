@@ -407,7 +407,7 @@ $/*.hpp := $(shell find $/*.hpp \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.hpp)
 $/*.py := $(shell find $/*.py \! -type l 2>/dev/null)
 ifneq (normalize ./,$($/_HOME_NAME) $($/_HOME_DIR))
-    $/*.py := $(filter-out $/build.py,$($/_SOURCE))
+    $/*.py := $(filter-out $/build.py,$($/*.py))
 	$/_DEPS += $/build/build.py.mk
 endif
 $/_SOURCE += $($/*.py)
