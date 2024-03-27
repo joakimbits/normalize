@@ -406,6 +406,7 @@ $/_SOURCE += $($/*.c)
 $/*.h := $(shell find $/*.h \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.h)
 $/*.cpp := $(wildcard $/*.cpp)
+$/*.cpp += $(wildcard $/*.cc)
 $/_SOURCE += $($/*.cpp)
 $/*.hpp := $(shell find $/*.hpp \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.hpp)
@@ -586,7 +587,7 @@ ifneq (,$($/_OBJS))
     # Use project specific compile flags
     define META
         # Compile C++
-        $$/build/%.cpp.s: $$/%.cpp | $$(CXX)
+        $$/build/%.s: $$/% | $$(CXX)
 	        $$(CXX) $$($/_CXXFLAGS) -c $$< -o $$@
 
         # Compile C
