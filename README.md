@@ -13,23 +13,17 @@ GH="https://raw.githubusercontent.com"; curl $GH/joakimbits/normalize/main/templ
 
 ---
 
-Test and document your project:
+Test and document:
 
 ```
 make pdf html slides
 ```
 
-- Tests all usage examples, and generates project reports if they all PASS.
-
----
-
-Changes since your last release, with release notes:
+Analyze changes since your last release:
 
 ```
 make old new review audit
 ```
-
-- Analyze changes and use GPT to audit them.
 
 ---
 
