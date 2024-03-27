@@ -783,7 +783,7 @@ $/build/audit.diff: $/build.py $/build/prompt.diff $/build/build.py.bringup
 	( cd $(dir $<) && venv/bin/python3 -m build --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
 $/build/prompt.diff: $/build/review.diff
 	$(PYTHON) -m build -c 'print(REVIEW)' > $@
-	echo "$$ $(MAKE) $/review" >> $@
+	echo "$$ $(MAKE) $(@:%build/prompt.diff=%)review" >> $@
 	cat $^ >> $@
 	echo -n "$$ " >> $@
 $/build/review.diff: $/build/files.diff $/build/comments.diff $/build/report.diff
