@@ -21,9 +21,8 @@ Hello world!
 
 ### How it works
 
-- Makefile includes build.mk.
-- build.mk includes test.py.mk.
-- makemake builds both.
+- Makefile includes make.mk.
+- make.mk includes test.py.mk.
 
 \footnotesize
 ~~~ {.sh}

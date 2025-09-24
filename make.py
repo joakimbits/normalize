@@ -56,7 +56,7 @@ grandparent_dir, parent_dirname = os.path.split(module_dir)
 if parent_dirname == 'build':
     parent_dir = grandparent_dir
 
-build_py = os.path.relpath(os.path.abspath(__file__), os.path.abspath(module_dir))
+make_py = os.path.relpath(os.path.abspath(__file__), os.path.abspath(module_dir))
 if module_dir and module_dir != 'build':
     path = f"./{module_dir}/"
 else:
@@ -94,9 +94,16 @@ GENERIC_MAKEFILE = fr"""# {_}$ {" ".join(sys.argv)}
 _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
 $/bringup:
-$/build/project.mk:
-	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -o $@
--include $/build/project.mk"""
+
+# Bringup executables and define 'tested report html pdf slides audit' targets for .md .py .cpp .c .s sources here.
+$/make.mk:
+	if [ -e "$(dir $@)../make.mk" ]; then \
+	  ln -sf ../make.mk "$@"; \
+	else \
+	  curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.mk -o $@; \
+	fi
+
+-include $/make.mk"""
 
 COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 
@@ -650,21 +657,21 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=brief(),
         epilog="""Examples:
-$ build.py --dep build/makemake.dep
+$ make.py --dep build/makemake.dep
 include build/makemake.dep
 
 $ cat build/makemake.dep
-build/build.py.bringup: build.py build/makemake.dep | $(PYTHON)
+build/make.py.bringup: make.py build/makemake.dep | $(PYTHON)
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
-$ build.py --makemake
-bringup: build/build.py.bringup
-tested: build/build.py.tested
-build/build.py.tested: build.py build/build.py.shebang build/build.py.mk
-	build.py --test > $@
-build/build.py.shebang: build.py build/build.py.bringup
-	$(PYTHON) build.py --shebang > $@
-build/build.py.bringup: build.py | $(PYTHON)
+$ make.py --makemake
+bringup: build/make.py.bringup
+tested: build/make.py.tested
+build/make.py.tested: make.py build/make.py.shebang build/make.py.mk
+	make.py --test > $@
+build/make.py.shebang: make.py build/make.py.bringup
+	$(PYTHON) make.py --shebang > $@
+build/make.py.bringup: make.py | $(PYTHON)
 	mkdir -p build/ && \\
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 """)
