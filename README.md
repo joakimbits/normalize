@@ -30,14 +30,14 @@ make old new review audit
 Standalone variant:
 
 ```sh
-$ build.py --makemake
-bringup: build/build.py.bringup
-tested: build/build.py.tested
-build/build.py.tested: build.py build/build.py.shebang build/build.py.mk
-	build.py --test > $@
-build/build.py.shebang: build.py build/build.py.bringup
-	$(PYTHON) build.py --shebang > $@
-build/build.py.bringup: build.py | $(PYTHON)
+$ make.py --make
+bringup: build/make.py.bringup
+tested: build/make.py.tested
+build/make.py.tested: make.py build/make.py.shebang build/make.py.mk
+	make.py --test > $@
+build/make.py.shebang: make.py build/make.py.bringup
+	$(PYTHON) make.py --shebang > $@
+build/make.py.bringup: make.py | $(PYTHON)
 	mkdir -p build/ && \
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
