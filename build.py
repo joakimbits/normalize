@@ -90,7 +90,7 @@ You have now four goals:
 ---
 """
 
-GENERIC_MAKEFILE = f"""# {_}$ {" ".join(sys.argv)}
+GENERIC_MAKEFILE = fr"""# {_}$ {" ".join(sys.argv)}
 _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
 $/bringup:
@@ -499,7 +499,7 @@ class Prompt(Action):
                 if not hasattr(self, 'diff_splitters'):
                     self.diff_splitters = self.__class__.diff_splitters = [
                         (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
-                        for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
+                        for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', r'\+')]]
 
                 for diff, sign, split in self.diff_splitters:
                     compressible = True
