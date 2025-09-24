@@ -5,7 +5,7 @@
 Run this in your project directory:
 
 ```
-GH="https://raw.githubusercontent.com"; curl $GH/joakimbits/normalize/main/template/Makefile -o Makefile && make
+curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -O && make
 ```
 
 - Creates executables from all source files.
