@@ -3,7 +3,7 @@
 
 Adds the following command line options to the main module:
 
---makemake: Print a Makefile for bringup and test of the parent module.
+--make: Print a Makefile for bringup and test of the parent module.
 --generic: Generalize it to make everything that is makeable within the parent module directory, and from anywhere.
 --dep <file>: Create a separate Makefile for bringup of the parent module, and set the build directory to its parent
   directory.
@@ -19,17 +19,17 @@ Makes it easy to add the following command line options to the parent module:
 
 USER MANUAL
 
-To integrate a tool.py module that uses makemake, check the Dependencies section in its
+To integrate a tool.py module that uses make, check the Dependencies section in its
 header. Dependencies can include pip installation lines as well as bash commands.
 
-To self-test a tool.py that uses makemake - while adding its dependencies into python3:
+To self-test a tool.py that uses make - while adding its dependencies into python3:
 
-    $ python3 tool.py --makemake > tool.mk && make -f tool.mk
+    $ python3 tool.py --make > tool.mk && make -f tool.mk
 
 To self-test all such tools in a directory - while adding their dependencies into a directory python venv:
 
     $ sudo apt update && sudo apt -y upgrade && sudo apt install -y make
-    $ python3 tool.py --makemake --generic > Makefile
+    $ python3 tool.py --make --generic > Makefile
     $ make
     <modify any source file in the same folder>
     $ make
@@ -56,7 +56,7 @@ grandparent_dir, parent_dirname = os.path.split(module_dir)
 if parent_dirname == 'build':
     parent_dir = grandparent_dir
 
-build_py = os.path.relpath(os.path.abspath(__file__), os.path.abspath(module_dir))
+make_py = os.path.relpath(os.path.abspath(__file__), os.path.abspath(module_dir))
 if module_dir and module_dir != 'build':
     path = f"./{module_dir}/"
 else:
@@ -90,13 +90,20 @@ You have now four goals:
 ---
 """
 
-GENERIC_MAKEFILE = f"""# {_}$ {" ".join(sys.argv)}
+GENERIC_MAKEFILE = fr"""# {_}$ {" ".join(sys.argv)}
 _Makefile := $(lastword $(MAKEFILE_LIST))
 / := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
 $/bringup:
-$/build/project.mk:
-	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -o $@
--include $/build/project.mk"""
+
+# Bringup executables and define 'tested report html pdf slides audit' targets for .md .py .cpp .c .s sources here.
+$/make.mk:
+	if [ -e "$(dir $@)../make.mk" ]; then \
+	  ln -sf ../make.mk "$@"; \
+	else \
+	  curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.mk -o $@; \
+	fi
+
+-include $/make.mk"""
 
 COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
 
@@ -190,7 +197,7 @@ def run_command_examples(commands, timeout=3):
 
 
 if parent_module.__name__ == '__main__':
-    dependencies = '--makemake' in sys.argv[1:]
+    dependencies = '--make' in sys.argv[1:]
     generic_dependencies = '--generic' in sys.argv[1:]
     dep_path = '--dep' in sys.argv[1:]
     if dependencies or generic_dependencies or dep_path:
@@ -499,7 +506,7 @@ class Prompt(Action):
                 if not hasattr(self, 'diff_splitters'):
                     self.diff_splitters = self.__class__.diff_splitters = [
                         (diff, sign, re.compile(r'((^%s.*\n)+)' % compilable_sign, re.MULTILINE).split)
-                        for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', '\+')]]
+                        for diff, sign, compilable_sign in [('dropped', '-', '-'), ('added', '+', r'\+')]]
 
                 for diff, sign, split in self.diff_splitters:
                     compressible = True
@@ -597,9 +604,8 @@ class Relpath(Action):
     """Print a relative path and exit"""
 
     def __call__(self, parser, args, values, option_string=None):
-        relative_to = os.path.abspath(values[0])
-        for path in values[1:]:
-            print(os.path.relpath(os.path.abspath(path), relative_to).replace('\\', '/') + '/')
+        relative_to, path = map(os.path.abspath, values)
+        print(os.path.relpath(path, relative_to).replace('\\', '/') + '/')
 
 
 def brief(*callables):
@@ -629,7 +635,7 @@ def brief(*callables):
 
 
 def add_arguments(argparser):
-    argparser.add_argument('--makemake', action='store_true', help=(
+    argparser.add_argument('--make', action='store_true', help=(
         f"Print Makefile for {module_path}, and exit"))
     argparser.add_argument('--generic', action='store_true', help=(
         f"Print generic Makefile for {module_path}, and exit"))
@@ -650,30 +656,33 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=brief(),
         epilog="""Examples:
-$ build.py --dep build/makemake.dep
-include build/makemake.dep
+$ make.py --dep build/make.dep
+include build/make.dep
 
-$ cat build/makemake.dep
-build/build.py.bringup: build.py build/makemake.dep | $(PYTHON)
+$ cat build/make.dep
+build/make.py.bringup: make.py build/make.dep | $(PYTHON)
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
-$ build.py --makemake
-bringup: build/build.py.bringup
-tested: build/build.py.tested
-build/build.py.tested: build.py build/build.py.shebang build/build.py.mk
-	build.py --test > $@
-build/build.py.shebang: build.py build/build.py.bringup
-	$(PYTHON) build.py --shebang > $@
-build/build.py.bringup: build.py | $(PYTHON)
+$ make.py --make
+bringup: build/make.py.bringup
+tested: build/make.py.tested
+build/make.py.tested: make.py build/make.py.shebang build/make.py.mk
+	make.py --test > $@
+build/make.py.shebang: make.py build/make.py.bringup
+	$(PYTHON) make.py --shebang > $@
+build/make.py.bringup: make.py | $(PYTHON)
 	mkdir -p build/ && \\
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 """)
     add_arguments(argparser)
-    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)
-    argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__)
+    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__, metavar=(
+        "FILE", "SEPARATOR", "PATTERN"))
+    argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__, metavar=(
+        "FILE", "MODEL", "TEMPERATURE", "KEY"))
     for brief, long in Uname.OPTIONS.items():
         argparser.add_argument(brief, long, nargs=0, action=Uname, help=Uname.__doc__)
-    argparser.add_argument('--git-status', nargs=2, metavar=('directory', 'wanted_status'), default=('.', 'M'),
-                           action=GitStatus, help=GitStatus.__doc__)
-    argparser.add_argument('--relpath', nargs=2, action=Relpath, help=Relpath.__doc__)
+    argparser.add_argument('--git-status', nargs=2, action=GitStatus, help=GitStatus.__doc__, metavar=(
+        'DIRECTORY', 'WANTED_STATUS'), default=('.', 'M'))
+    argparser.add_argument('--relpath', nargs=2, action=Relpath, help=Relpath.__doc__, metavar=(
+        'RELATIVE_TO', 'PATH'))
     args = argparser.parse_args()

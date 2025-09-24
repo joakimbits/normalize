@@ -21,9 +21,8 @@ Hello world!
 
 ### How it works
 
-- Makefile includes build.mk.
-- build.mk includes test.py.mk.
-- makemake builds both.
+- Makefile includes make.mk.
+- make.mk includes test.py.mk.
 
 \footnotesize
 ~~~ {.sh}
@@ -33,7 +32,7 @@ $/build/greeter.py.bringup: $/greeter.py $/build/greeter.py.mk | $/venv/bin/pyth
 	$(dir $<)venv/bin/python3 -m pip install fire --no-warn-script-location >> $@
 
 $ greeter.py --help | awk '{ print "\t" $0 }'
-	usage: greeter.py [-h] [--makemake] [--generic] [--dep DEP] [-c C]
+	usage: greeter.py [-h] [--make] [--generic] [--dep DEP] [-c C]
 	                  [--timeout TIMEOUT] [--test] [--sh-test SH_TEST] [--shebang]
 	                  ...
 	
@@ -47,7 +46,7 @@ $ greeter.py --help | awk '{ print "\t" $0 }'
 	
 	option...:
 	  -h, --help         show this help message and exit
-	  --makemake         Print Makefile for greeter.py, and exit
+	  --make             Print Makefile for greeter.py, and exit
 	  --generic          Print generic Makefile for greeter.py, and exit
 	  --dep DEP          Build a greeter.dep target, print its Makefile include
 	                     statement, and exit

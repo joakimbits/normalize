@@ -8,7 +8,7 @@ fire
 import subprocess
 import argparse
 
-import build
+import make
 import fire
 
 def run(cmd):
@@ -32,7 +32,7 @@ def hello(*world):
         print(f"Hello {' '.join(world)}!")
     else:
         print("Hello from greeter.py!")
-        print(run(f"{build.path}example"))
+        print(run(f"{make.path}example"))
 
 EXAMPLES = """
 $ ./greeter.py
@@ -47,10 +47,10 @@ Hello world!
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=build.brief(),
+        description=make.brief(),
         epilog=f"Examples:{EXAMPLES}")
     argparser.add_argument('world', nargs=argparse.REMAINDER, help=(
         "hello(world)"))
-    build.add_arguments(argparser)
+    make.add_arguments(argparser)
     args = argparser.parse_args()
     fire.Fire(hello)
