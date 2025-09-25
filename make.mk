@@ -254,9 +254,6 @@ ifndef PYTHON_NAME
     ifeq (/usr/bin/python3,$(PYTHON))
         PYTHON_DEP = /.cache/pip
         /.cache/pip:; sudo mkdir -p $@ && sudo chmod a+rwx $@
-        PYTHON_FINALIZE = && $(SPEEDUP_WSL_PIP)$@ -m pip install --upgrade setuptools
-        PYTHON_FINALIZE += && $(SPEEDUP_WSL_PIP)$@ -m venv --upgrade $(@:%/bin/python3=%)
-        PYTHON_FINALIZE += && $(SPEEDUP_WSL_PIP)$@ -m pip install --upgrade pip
 
     # Workaround Windows python not installing #!venv/bin/python3
     else ifeq (/mnt/c/tools/miniconda3/python.exe,$(PYTHON))
@@ -598,19 +595,20 @@ $/build/%.py.syntax: $($/venv/bin/python3) $/%.py | $($/venv/pip/)ruff
 
 # Install pip package in the local python:
 $($/venv/pip/)%: $($/venv/bin/python3)
-	 $< -m pip install $*
+	 $< -m pip install --prefer-binary $*
 
 # Setup a local shebang python
 $/venv/bin/python3: | $(PYTHON) $(PYTHON_DEP) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
-	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv $(@:%/bin/python3=%) $(PYTHON_FINALIZE)
+	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $(@:%/bin/python3=%) && \
 	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m make --prompt
 
 # Install conda python
 ifndef CONDA
-    CONDA := ~/miniconda3/bin/cond
-    ~/miniconda3/bin/conda:
-	    curl -sL https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh > miniconda.sh
+    CONDA := ~/miniconda3/bin/conda
+    $~/miniconda3/bin/conda:
+	    curl -sL "https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh" -o miniconda.sh
 	    bash miniconda.sh -bfup $~/miniconda3
+	    echo 'TODO: $~/miniconda3/bin/conda init | grep modified | (read _ rc && echo "TODO: source $$rc && conda activate")'
 	    rm miniconda.sh
 endif
 

@@ -43,6 +43,6 @@ build/make.py.bringup: make.py | $(PYTHON)
 
 ```
 
-- Python version 3.8 or later is required.
+- Python version 3.9 or later is required.
 
 [example/README.md](example/README.md)
