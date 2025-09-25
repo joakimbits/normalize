@@ -463,7 +463,7 @@ endif
 
 $/_CXXFLAGS := $($/_LDFLAGS)
 $/_CXXFLAGS += -S $(addprefix -I,$($/_INC_DIRS)) -MMD -MP
-$/_CFLAGS := $($/_CXXFLAGS)
+$/_CFLAGS := -Wno-deprecated $($/_CXXFLAGS)
 $/_CXXFLAGS += $(CXXFLAGS)
 $/_CFLAGS += $(CFLAGS)
 $/_COBJS := $($/_COMPILABLE:$/%=$/build/%.s)
