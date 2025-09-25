@@ -600,8 +600,8 @@ $/venv/bin/python3: | $(PYTHON) $(PYTHON_DEP) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
 # Install conda python
 ifndef CONDA
     CONDA := ~/miniconda3/bin/cond
-    ~/miniconda3/bin/conda:
-	    curl -sL https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh > miniconda.sh
+    $~/miniconda3/bin/conda:
+	    curl -sL "https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh" -o miniconda.sh
 	    bash miniconda.sh -bfup $~/miniconda3
 	    rm miniconda.sh
 endif
