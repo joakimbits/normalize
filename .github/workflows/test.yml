@@ -13,10 +13,10 @@ jobs:
         with:
           fetch-depth: 0
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to ${{ github.workspace }} on the runner."
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
+          python-version: '3.9'
       - run: echo "." >> $GITHUB_PATH
       - run: make venv
       - run: make syntax
