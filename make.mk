@@ -609,7 +609,7 @@ $($/venv/pip/)%: $($/venv/bin/python3)
 
 # Setup a local shebang python
 $/venv/bin/python3: | $(PYTHON) $(PYTHON_DEP) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
-	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $(@:%/bin/python3=%)
+	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $(@:%/bin/python3=%) && \
 	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m make --prompt
 
 # Install conda python
