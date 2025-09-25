@@ -65,8 +65,6 @@ else:
 module, ext = os.path.splitext(module_py)
 
 REVIEW = """
-This prompt requires gpt-4 but we prototype it here gpt-3.5
-
 I want you to act as a software developer with the task to release software that
 I will describe to you below. Take a look at what I have inspected already
 after the (first) --- below. There I used the command `$ make review` which prints 
@@ -491,7 +489,19 @@ class Prompt(Action):
                     time.sleep(wait_seconds)
                     continue
                 else:
-                    limit, requested = map(int, self.limit_requested.findall(r.text)[0])
+                    try:
+                        limit, requested = map(int, self.limit_requested.findall(r.text)[0])
+                    except IndexError as e:
+                        #import json, traceback
+                        raise RuntimeError(
+                            f"Failed to parse 429 Too Many Requests\n"
+                            f"URL: {url}\nReq headers: {headers}\n"
+                            f"Status: {status[0]} {status[1]}\n"
+                            f"Resp headers: {dict(r.headers)}\n"
+                            f"Body:\n{status[2]}"
+                            f"Request: \n{r}"
+                        ) from e
+
                     maximum_tokens = int(limit * len(encoding.encode(prompt)) / requested)
 
             if status[:2] == (400, 'Bad Request'):
