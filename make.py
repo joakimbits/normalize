@@ -491,7 +491,19 @@ class Prompt(Action):
                     time.sleep(wait_seconds)
                     continue
                 else:
-                    limit, requested = map(int, self.limit_requested.findall(r.text)[0])
+                    try:
+                        limit, requested = map(int, self.limit_requested.findall(r.text)[0])
+                    except IndexError as e:
+                        #import json, traceback
+                        raise RuntimeError(
+                            f"Failed to parse 429 Too Many Requests\n"
+                            f"URL: {url}\nReq headers: {headers}\n"
+                            f"Status: {status[0]} {status[1]}\n"
+                            f"Resp headers: {dict(r.headers)}\n"
+                            f"Body:\n{status[2]}"
+                            f"Request: \n{r}"
+                        ) from e
+
                     maximum_tokens = int(limit * len(encoding.encode(prompt)) / requested)
 
             if status[:2] == (400, 'Bad Request'):
