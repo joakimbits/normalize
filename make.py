@@ -65,8 +65,6 @@ else:
 module, ext = os.path.splitext(module_py)
 
 REVIEW = """
-This prompt requires gpt-4 but we prototype it here gpt-3.5
-
 I want you to act as a software developer with the task to release software that
 I will describe to you below. Take a look at what I have inspected already
 after the (first) --- below. There I used the command `$ make review` which prints 
