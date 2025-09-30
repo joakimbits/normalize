@@ -393,18 +393,23 @@ $/_SOURCE += $($/*.py)
 $/*.md := $(shell find $/*.md \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.md)
 
-# Checkout a common old release of this repo as a subproject in `$($._BASELINE)`
+# Checkout the last release of this repo into a build sub-directory.
 # Prefix `$/_HERE` is from this git project root directory to  `./`.
 # Directory `$($/_OLD)` is the old release of `./`.
 $/_HERE_DIR := $(dir $(shell $(PYTHON) $/make.py --relpath $($/_HOME_DIR) $/.))
 $/_HERE := $($/_HERE_DIR:./%=%)
+$/_THERE_DIR := $(dir $(shell $(PYTHON) $/make.py --relpath $/. $($/_HOME_DIR)))
+$/_THERE := $($/_THERE_DIR:./%=%)
 $/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
-$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/$/
+$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/$($/_HERE)
 ifndef $($/_HOME_DIR)
     $($/_HOME_DIR) := $($/_HOME_DIR))
     define META
-        $$($$/_OLD)Makefile:
-	        git worktree add -d $$(dir $$@) $$($/_BASELINE)
+        $($/_OLD)Makefile:
+	        ( cd $($/_THERE_DIR) && \
+	          old_dir=build/$($/_BASELINE)/$($/_HOME_NAME)/ && \
+	          git worktree add -d $$$$old_dir $($/_BASELINE) && \
+	          cd $$$$old_dir && make make )
     endef
     $(eval $(META))
 endif
