@@ -188,9 +188,9 @@ $/_NAME := $(notdir $(realpath $/.))
 #  - A large-context openai model suitable for code review
 #  - A rot13 encoded openai Bearer key for its GPT session.
 #  - A temperature for its openai continuation.
-GPT_MODEL ?= gpt-3.5-turbo-16k
+GPT_MODEL ?= o3
+GPT_TEMPERATURE ?= 1
 GPT_BEARER_rot13 ?= fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
-GPT_TEMPERATURE ?= 0.7
 
 # The maker's home directory and name
 ~ := $(shell echo ~)
