@@ -35,23 +35,23 @@ _NAME := $(notdir $(realpath $/.))
 
 # If $/ *is* used within a recipy, that whole recipy needs to be expanded before the rule is defined, like this:
 
-    define META
-        $$/meta-recipy:
-	        # $$@: $$^ - Every $$ except a wanted expansion of $$/ = $/ in the recipy needs to be doubled now!
-	        echo "Like this: $$$$$$$$PATH = $$$$PATH"
-	        # And the recipy itself needs to be be defined by`$$(eval ...)`-ing it first.
-    endef
-    $(eval $(META))
-
-    $/normal-target: $/this-is-much-better
-	    # $@: $^ - This rule expansion from $$/ is available in recipy variables $$@: $$^.
-	    touch $@
-	    # This recipy will not execute again unless an update is actually needed, because $$/normal-target *was touched*.
-    $/this-is-much-better: ; touch $@
-
-    .PHONY: $/normal-target # This is how to force that recipy to re-execute every `make` where $/normal-target is needed.
-    # Another way is to have a .PHONY target as a dependency after `:`, before any `|`.
-    # A third (recommended) way is to not create and update the target in its recipy.
+#    define META
+#        $$/meta-recipy:
+#	        # $$@: $$^ - Every $$ except a wanted expansion of $$/ = $/ in the recipy needs to be doubled now!
+#	        echo "Like this: $$$$$$$$PATH = $$$$PATH"
+#	        # And the recipy itself needs to be be defined by`$$(eval ...)`-ing it first.
+#    endef
+#    $(eval $(META))
+#
+#    $/normal-target: $/this-is-much-better
+#	    # $@: $^ - This rule expansion from $$/ is available in recipy variables $$@: $$^.
+#	    touch $@
+#	    # This recipy will not execute again unless an update is actually needed, because $$/normal-target *was touched*.
+#    $/this-is-much-better: ; touch $@
+#
+#    .PHONY: $/normal-target # This is how to force that recipy to re-execute every `make` where $/normal-target is needed.
+#    # Another way is to have a .PHONY target as a dependency after `:`, before any `|`.
+#    # A third (recommended) way is to not create and update the target in its recipy.
 
 ### How to make make know both what to make, when, using what, and how
 
@@ -189,8 +189,8 @@ $/_NAME := $(notdir $(realpath $/.))
 #  - A rot13 encoded openai Bearer key for its GPT session.
 #  - A temperature for its openai continuation.
 GPT_MODEL ?= gpt-3.5-turbo-16k
-GPT_BEARER_rot13 ?= fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
 GPT_TEMPERATURE ?= 0.7
+GPT_BEARER_rot13 ?= fx-cebw-LUDW6EOL36f4nMd366w2jb3z9dCbxRynB2ghDINOF7AHLDqaimwzAzR_PzI8JuXEjp0XqIsfvoG3OyoxSWsx7T7nu9NMUOBjAKomQhdbjKieFAQTTw27saxz9lACnDzOLq0K3HA5t6m9W7UFYVEINnBJ1u0N
 
 # The maker's home directory and name
 ~ := $(shell echo ~)
@@ -316,22 +316,19 @@ $/_SUBPROJECTS += $(sort $(dir $(foreach d,$($/_SUBDIRS),$(wildcard $/$d/*.md)))
 $/_SUBPROJECTS := $(filter-out $($/_NON-SUBPROJECTS),$($/_SUBPROJECTS))
 $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMakefile)))
 
-# Define symbolic targets we might want to use to represent (all) its dependencies
-# Do not use such a phony as a dependency unless you also need the target rebuilt every time.
+# Define symbolic targets we might want to use to represent dependencies
+define n
+
+
+endef
 define META
-    .PHONY: $/bringup $/syntax $/style $/tested $/old $/new
-    .PHONY: $/make $venv $/slides $/clean $/clean/keep_venv $/list
-    $/make: | $($/_ACTIVE_SUBPROJECTS:%=%make)
-    $/bringup: | $($/_ACTIVE_SUBPROJECTS:%=%bringup)
-    $/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
-    $/html: | $($/_ACTIVE_SUBPROJECTS:%=%html)
-    $/pdf: | $($/_ACTIVE_SUBPROJECTS:%=%pdf)
-    $/slides: | $($/_ACTIVE_SUBPROJECTS:%=%slides)
-    $/old: | $($/_ACTIVE_SUBPROJECTS:%=%old)
-    $/new: | $($/_ACTIVE_SUBPROJECTS:%=%new)
-    $/clean: $/clean/keep_venv | $($/_ACTIVE_SUBPROJECTS:%=%clean)
+    .PHONY: $/make $/help $/list $/venv $/bringup $/syntax $/style $/tested $/old $/new $/html $/pdf $/slides
+    .PHONY: $/clean $/clean/keep_venv
+    $(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
+      $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
+    $/clean: $/clean/keep_venv
 	    rm -rf $/venv/ $/.ruff_cache/
-    $/clean/keep_venv: | $($/_ACTIVE_SUBPROJECTS:%=%clean/keep_venv)
+    $/clean/keep_venv:
 	    rm -rf $/build/
 endef
 $(eval $(META))
@@ -529,6 +526,14 @@ endif
 
 # Convenience targets
 define META
+    $/help:
+	    @echo "Available convenience (phony) targets:"
+	    @make -qp \
+	      | awk '/^[[:space:]]*\.PHONY:/{for(i=2;i<=NF && $$$$i!="#"; i++) print $$$$i}' \
+	      | sed 's/^[[:space:]]*//; s/[[:space:]]*$$$$//' \
+	      | grep -v '^[[:space:]]*$$$$' \
+	      | grep '^$/' \
+	      | sed 's/^/  /'
     $/venv: $/venv/bin/python3
     $/bringup: $($/_EXE) $($/build/*.bringup)
     $/tested: $($/build/*.tested)
