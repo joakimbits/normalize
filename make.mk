@@ -319,8 +319,9 @@ $/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMake
 # Define symbolic targets we might want to use to represent (all) its dependencies
 # Do not use such a phony as a dependency unless you also need the target rebuilt every time.
 define META
-    .PHONY: $/bringup $/syntax $/style $/tested $/old $/new
+    .PHONY: $/help $/bringup $/syntax $/style $/tested $/old $/new
     .PHONY: $/make $venv $/slides $/clean $/clean/keep_venv $/list
+    $/help: | $($/_ACTIVE_SUBPROJECTS:%=%help)
     $/make: | $($/_ACTIVE_SUBPROJECTS:%=%make)
     $/bringup: | $($/_ACTIVE_SUBPROJECTS:%=%bringup)
     $/tested: | $($/_ACTIVE_SUBPROJECTS:%=%tested)
@@ -529,6 +530,15 @@ endif
 
 # Convenience targets
 define META
+    $/help:
+	    @echo "Available convenience (phony) targets:"
+	    @make -qp \
+	      | awk '/^[[:space:]]*\.PHONY:/{for(i=2;i<=NF && $$$$i!="#"; i++) print $$$$i}' \
+	      | sed 's/^[[:space:]]*//; s/[[:space:]]*$$$$//' \
+	      | grep -v '^[[:space:]]*$$$$' \
+	      | grep '^$/' \
+	      | sort -u \
+	      | sed 's/^/  /'
     $/venv: $/venv/bin/python3
     $/bringup: $($/_EXE) $($/build/*.bringup)
     $/tested: $($/build/*.tested)
