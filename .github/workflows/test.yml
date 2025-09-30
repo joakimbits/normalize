@@ -18,11 +18,8 @@ jobs:
         with:
           python-version: '3.9'
       - run: echo "." >> $GITHUB_PATH
-      - run: make venv
-      - run: make syntax
-      - run: make style
-      - run: make
-      - run: make tested
+      - run: make make help  # Bootstrap all projects and obtain help on them
+      - run: make example/help
       - run: make example/venv
       - run: make example/syntax
       - run: make example/style
