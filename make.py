@@ -687,11 +687,14 @@ build/make.py.bringup: make.py | $(PYTHON)
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 """)
     add_arguments(argparser)
-    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__)
-    argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__)
+    argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__, metavar=(
+        "FILE", "SEPARATOR", "PATTERN"))
+    argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__, metavar=(
+        "FILE", "MODEL", "TEMPERATURE", "KEY"))
     for brief, long in Uname.OPTIONS.items():
         argparser.add_argument(brief, long, nargs=0, action=Uname, help=Uname.__doc__)
-    argparser.add_argument('--git-status', nargs=2, metavar=('directory', 'wanted_status'), default=('.', 'M'),
-                           action=GitStatus, help=GitStatus.__doc__)
-    argparser.add_argument('--relpath', nargs=2, action=Relpath, help=Relpath.__doc__)
+    argparser.add_argument('--git-status', nargs=2, action=GitStatus, help=GitStatus.__doc__, metavar=(
+        'DIRECTORY', 'WANTED_STATUS'), default=('.', 'M'))
+    argparser.add_argument('--relpath', nargs=2, action=Relpath, help=Relpath.__doc__, metavar=(
+        'RELATIVE_TO', 'PATH'))
     args = argparser.parse_args()
