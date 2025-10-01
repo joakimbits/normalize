@@ -26,9 +26,9 @@ jobs:
       - run: make example/bringup
       - run: ( cd example && greeter.py )
       - run: make example/tested
-      - run: make example/report
+      - run: make example/result
       - run: make example/gfm
-      - run: make report
+      - run: make result
       - run: make old  # Building last release
       - run: make old  # Just printing last release
       - run: make new

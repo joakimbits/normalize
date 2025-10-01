@@ -322,7 +322,7 @@ define n
 
 endef
 define META
-    .PHONY: $/make $/help $/list $/venv $/bringup $/syntax $/style $/tested $/old $/new $/html $/pdf $/slides
+    .PHONY: $/make $/help $/list $/venv $/bringup $/syntax $/style $/tested $/result $/old $/new $/html $/pdf $/slides
     .PHONY: $/clean $/clean/keep_venv
     $(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
       $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
@@ -537,6 +537,8 @@ define META
     $/venv: $/venv/bin/python3
     $/bringup: $($/_EXE) $($/build/*.bringup)
     $/tested: $($/build/*.tested)
+    $/result: $/build/result.txt
+	    @cat $$<
     $/syntax: $($/*.py:$/%=$/build/%.syntax)
     $/style: $($/*.py:$/%=$/build/%.style)
     $/old: $($/_OLD)report.gfm
@@ -648,21 +650,22 @@ endif
 $/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
 	$(word 3,$^) -m ruff check --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
-# Check Python and command line usage examples in .py files
-$/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $($/venv/bin/python3)
-	( cd $< && $*.py --test ) > $@ || (cat $@ && false)
+define META
+    # Check Python and command line usage examples in .py files
+    $/build/%.py.tested: $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $($/venv/bin/python3)
+	    ( cd $/. && $$*.py --test ) > $$@ || (cat $$@ && false)
 
-# Check command line usage examples in .md files
-$/build/%.sh-test.tested: $/. $(PRETESTED) $/build/%.sh-test | $/make.py
-	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
-	( cd $< && $(PYTHON) -m make --timeout 60 --sh-test $(patsubst $(dir $<)%,%,$(lastword $^)) ) > $$tmp && mv $$tmp $@
-$/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
-	mkdir -p $(dir $@) && pandoc -i $< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && truncate -s -1 $@
+    # Check command line usage examples in .md files
+    $/build/%.sh-test.tested: $(PRETESTED) $/build/%.sh-test | $/make.py
+	    tmp=$$@-$$$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
+	    ( cd $/. && $(PYTHON) -m make --timeout 60 --sh-test build/$$*.sh-test ) > $$$$tmp && mv $$$$tmp $$@
+    $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
+	    mkdir -p $$(dir $$@) && pandoc -i $$< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $$@ && truncate -s -1 $$@
+endef
+$(eval $(META))
 
 # Document all test results.
-$/report: $/build/report.txt
-	@cat $<
-$/build/report.txt: $(TESTED)
+$/build/result.txt: $(TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a markdown document.
@@ -689,60 +692,10 @@ $/build/%.tested.md: $/build/%.tested
 	( echo "$(_heading)## $(call _link,build/$*.tested)" && echo "$(_sh)" && cat $< && echo "$(__)" ) > $@
 
 # Make a standalone gfm, html, pdf, or dzslides document.
-define META
-    $$/build/report.md: $($/build/*.tested)
-	    echo "A build-here include-from-anywhere project based on [normalize](https://github.com/joakimbits/normalize)." > $$@
-	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
-ifneq ($(strip $($/_EXE)),)
-	    echo "- \`./$$($/_NAME)\`: $$(call _file,$$($/_LINKABLE:$/%=%))" >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- $$(call _exe,$$($/*.py:$/%=%))" >> $$@
-endif
-	    echo "$$(_heading)## Installation" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    echo "$$$$ make" >> $$@
-	    echo "$$(__)" >> $$@
-ifneq (,$(strip $($/_EXE)))
-	    echo "- Installs \`./$$($/_NAME)\`." >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- Installs $$(call _exe,venv/bin/python3)." >> $$@
-	    echo "- Installs $$(call _exe,$$($/*.py:$/%=%))." >> $$@
-endif
-ifneq (,$($/_EXES))
-	    echo "$$(_heading)## Usage" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    for x in $$($/_EXES:$/%=%) ; do \
-	      echo "\$$$$ true | $$$$x -h | $$(_help_fixup)" >> $$@ && \
-	      ( cd $/. && true | $$$$x -h ) > $$@.tmp && \
-	      $$(_help_fixup) $$@.tmp >> $$@ && rm $$@.tmp ; \
-	    done
-	    echo >> $$@
-	    echo "$$(__)" >> $$@
-	    echo "$$(_heading)## Test" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    echo "\$$$$ make tested" >> $$@
-	    echo "$$(__)" >> $$@
-endif
-ifneq (,$(strip $($/_EXE)))
-	    echo "- Tests \`./$$($/_NAME)\`." >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- Verifies style and doctests in $$(call _file,$$($/*.py:$/%=%))." >> $$@
-endif
-ifneq (,$(strip $($/*.md)))
-	     echo "- Verifies doctests in $$(call _file,$$($/*.md:$/%=%))." >> $$@
-endif
-ifneq (,$(strip $($/_CODE)))
-	    echo "$$(_heading)## Result" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    echo "\$$$$ make report" >> $$@
-	    ( cd $/. && $$(MAKE) report --no-print-directory ) >> $$@
-	    echo "$$(__)" >> $$@
-	    echo "\n---\n" >> $$@
-endif
+$/build/report.md: $/build/result.txt $($/*.md) $($/_EXES)
+	make.py --report $($/_NAME) $< "$($/*.md:$/%=%)" "$($/_LINKABLE:$/%=%)" "$($/_EXE:$/%=%)" "$($/*.py:$/%=%)" > $@
 
+define META
     $$/%.gfm: $/build/%.md
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
 	           -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
