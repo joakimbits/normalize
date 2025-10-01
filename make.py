@@ -41,6 +41,7 @@ requests tiktoken # Needed for the --prompt option
 import platform
 import sys
 import os
+import subprocess
 import re
 import time
 from argparse import Action
@@ -618,6 +619,93 @@ class Relpath(Action):
         print(os.path.relpath(path, relative_to).replace('\\', '/') + '/')
 
 
+class Report(Action):
+    """Print a report.md"""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        (name, result, md, linkable, exe, py) = values
+        linkables = linkable.split() if linkable else []
+        pys = py.split() if py else []
+        exes = [exe] if exe else []
+        exes += pys
+
+        def heading(title):
+            print("\n---\n\n## " + title)
+
+        def codeblock(lang="sh"):
+            print(f"```{lang}")
+
+        def endblock():
+            print("```")
+
+        # Intro
+        print("A build-here include-from-anywhere project based on "
+              "[normalize](https://github.com/joakimbits/normalize).")
+        print("\n- `make report pdf html slides review audit`")
+
+        if exe:
+            print(f'- `./{exe}`: {" ".join(f"[`{linkable}`]({linkable})" for linkable in linkables)}')
+
+        if pys:
+            for p in pys:
+                print(f"- `{p}`")
+
+        # Installation
+        heading("Installation")
+        codeblock("sh")
+        print("make")
+        endblock()
+        if exe:
+            print(f"- Installs `./{exe}`.")
+        if pys:
+            print("- Installs `venv/bin/python3`.")
+            for p in pys:
+                print(f"- Installs `{p}`.")
+
+        # Usage
+        if exes:
+            heading("Usage")
+            codeblock("sh")
+            for x in exes:
+                print(f"true | {x} -h")
+                # capture help output and indent it
+                try:
+                    out = subprocess.check_output([x, "-h"], cwd=".", text=True)
+                    for line in out.splitlines():
+                        print("\t" + line)
+                except Exception as e:
+                    print(f"\t(could not run {x} -h: {e})")
+            endblock()
+
+            heading("Test")
+            codeblock("sh")
+            print("make tested")
+            endblock()
+
+        if exe:
+            print(f"- Tests `./{exe}`.")
+        if pys:
+            for p in pys:
+                print(f"- Verifies style and doctests in [`{p}`]({p}).")
+        if md:
+            for m in md.split():
+                print(f"- Verifies doctests in [`{m}`]({m}).")
+
+        # Result section
+        if result:
+            heading("Result")
+            codeblock("sh")
+            print("make report")
+            endblock()
+            if os.path.exists(result):
+                try:
+                    with open(result) as f:
+                        print(f.read())
+                except Exception as e:
+                    print(f"(Could not read result file {result}: {e})")
+            print("\n---")
+
+
 def brief(*callables):
     """Return a summary of all callables"""
     usage = (parent_module.__doc__ or '').split('\nDependencies:\n')[0]
@@ -685,6 +773,8 @@ build/make.py.bringup: make.py | $(PYTHON)
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 """)
     add_arguments(argparser)
+    argparser.add_argument('--report', nargs=6, action=Report, help=Report.__doc__, metavar=(
+        "NAME", "RESULT", "MD", "LINKABLE", "EXE", "PY"))
     argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__, metavar=(
         "FILE", "SEPARATOR", "PATTERN"))
     argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__, metavar=(
