@@ -616,9 +616,8 @@ class Relpath(Action):
     """Print a relative path and exit"""
 
     def __call__(self, parser, args, values, option_string=None):
-        relative_to = os.path.abspath(values[0])
-        for path in values[1:]:
-            print(os.path.relpath(os.path.abspath(path), relative_to).replace('\\', '/') + '/')
+        relative_to, path = map(os.path.abspath, values)
+        print(os.path.relpath(path, relative_to).replace('\\', '/') + '/')
 
 
 def brief(*callables):
