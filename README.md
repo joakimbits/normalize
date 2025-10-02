@@ -33,13 +33,29 @@ Standalone variant:
 $ make.py --make
 bringup: build/make.py.bringup
 tested: build/make.py.tested
-build/make.py.tested: make.py build/make.py.shebang build/make.py.mk
+build/make.py.tested: make.py build/make.py.shebang
 	make.py --test > $@
 build/make.py.shebang: make.py build/make.py.bringup
 	$(PYTHON) make.py --shebang > $@
 build/make.py.bringup: make.py | $(PYTHON)
 	mkdir -p build/ && \
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
+
+```
+
+Standalone variant with dynamic bringup:
+
+```sh
+$ make.py --make --dep build/make.py.mk
+bringup: build/make.py.bringup
+tested: build/make.py.tested
+build/make.py.tested: make.py build/make.py.shebang build/make.py.mk
+	make.py --test > $@
+build/make.py.shebang: make.py build/make.py.bringup
+	$(PYTHON) make.py --shebang > $@
+build/make.py.mk: make.py | $(PYTHON)
+	$(PYTHON) make.py --dep $@ > /dev/null
+-include build/make.py.mk
 
 ```
 
