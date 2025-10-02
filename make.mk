@@ -660,9 +660,9 @@ $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
 	mkdir -p $(dir $@) && pandoc -i $< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && truncate -s -1 $@
 
 # Document all test results.
-$/report: $/build/report.txt
+$/result: $/build/result.txt
 	@cat $<
-$/build/report.txt: $(TESTED)
+$/build/result.txt: $(TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a markdown document.
@@ -689,60 +689,10 @@ $/build/%.tested.md: $/build/%.tested
 	( echo "$(_heading)## $(call _link,build/$*.tested)" && echo "$(_sh)" && cat $< && echo "$(__)" ) > $@
 
 # Make a standalone gfm, html, pdf, or dzslides document.
-define META
-    $$/build/report.md: $($/build/*.tested)
-	    echo "A build-here include-from-anywhere project based on [normalize](https://github.com/joakimbits/normalize)." > $$@
-	    echo "\n- \`make report pdf html slides review audit\`" >> $$@
-ifneq ($(strip $($/_EXE)),)
-	    echo "- \`./$$($/_NAME)\`: $$(call _file,$$($/_LINKABLE:$/%=%))" >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- $$(call _exe,$$($/*.py:$/%=%))" >> $$@
-endif
-	    echo "$$(_heading)## Installation" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    echo "$$$$ make" >> $$@
-	    echo "$$(__)" >> $$@
-ifneq (,$(strip $($/_EXE)))
-	    echo "- Installs \`./$$($/_NAME)\`." >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- Installs $$(call _exe,venv/bin/python3)." >> $$@
-	    echo "- Installs $$(call _exe,$$($/*.py:$/%=%))." >> $$@
-endif
-ifneq (,$($/_EXES))
-	    echo "$$(_heading)## Usage" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    for x in $$($/_EXES:$/%=%) ; do \
-	      echo "\$$$$ true | $$$$x -h | $$(_help_fixup)" >> $$@ && \
-	      ( cd $/. && true | $$$$x -h ) > $$@.tmp && \
-	      $$(_help_fixup) $$@.tmp >> $$@ && rm $$@.tmp ; \
-	    done
-	    echo >> $$@
-	    echo "$$(__)" >> $$@
-	    echo "$$(_heading)## Test" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    echo "\$$$$ make tested" >> $$@
-	    echo "$$(__)" >> $$@
-endif
-ifneq (,$(strip $($/_EXE)))
-	    echo "- Tests \`./$$($/_NAME)\`." >> $$@
-endif
-ifneq (,$(strip $($/*.py)))
-	    echo "- Verifies style and doctests in $$(call _file,$$($/*.py:$/%=%))." >> $$@
-endif
-ifneq (,$(strip $($/*.md)))
-	     echo "- Verifies doctests in $$(call _file,$$($/*.md:$/%=%))." >> $$@
-endif
-ifneq (,$(strip $($/_CODE)))
-	    echo "$$(_heading)## Result" >> $$@
-	    echo "$$(_sh)" >> $$@
-	    echo "\$$$$ make report" >> $$@
-	    ( cd $/. && $$(MAKE) report --no-print-directory ) >> $$@
-	    echo "$$(__)" >> $$@
-	    echo "\n---\n" >> $$@
-endif
+$/build/report.md: $/build/result.txt $($/*.md) $($/_EXES)
+	make.py --report $($/_NAME) $< "$($/*.md:$/%=%)" "$($/_LINKABLE:$/%=%)" "$($/_EXE:$/%=%)" "$($/*.py:$/%=%)" > $@
 
+define META
     $$/%.gfm: $/build/%.md
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
 	           -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
@@ -753,7 +703,7 @@ endif
 	           --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 endef
 $(eval $(META))
-$/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT)
+$/result.gfm $/result.html $/result.pdf $/result.dzslides: $($/*.md) $($/_REPORT)
 
 $/build/report-details.md:
 	echo "$(_heading)# Source code, installation and test result" >> $@
