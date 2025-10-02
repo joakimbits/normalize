@@ -197,113 +197,126 @@ def run_command_examples(commands, timeout=3):
             f"{received}")
 
 
-if parent_module.__name__ == '__main__':
-    dependencies = '--make' in sys.argv[1:]
-    generic_dependencies = '--generic' in sys.argv[1:]
-    dep_path = '--dep' in sys.argv[1:]
-    if dependencies or generic_dependencies or dep_path:
-        assert len(sys.argv) == sum([1, dependencies, generic_dependencies,
-                                     dep_path * 2]), (
-            sys.argv, [1, dependencies, generic_dependencies,
-                       dep_path * 2])
+def make(make=False, generic=False, dep=None):
+    """
+    Generate Makefile or depfile.
+    Args:
+        make: Print a Makefile (plain or generic).
+        generic: If True, use generic Makefile/dep output.
+        dep: Path to dependency file to generate.
+    """
+    # Determine build dir + dep file
+    if dep:
+        # user provided --dep FILE
+        assert not dep.startswith("__"), dep
+        build_dir, dep_filename = os.path.split(dep)
+        dep_dir_now = build_dir
+        if build_dir:
+            prefix = "_/"
+            build_dir = build_dir + "/"
+            if build_dir.startswith(prefix):
+                build_dir = build_dir[len(prefix):]
+    elif generic:
+        # generic mode, but no explicit dep: setup default depfile
+        dep_dir_now = build_dir = "build/"
+        dep_filename = f"{module}.py.mk"
+        dep = f"build/{module}.py.mk"
+    else:
+        # plain --make: no depfile at all
+        dep = None
+        dep_dir_now = build_dir = "build/"
+        dep_filename = None
 
-        if dep_path:
-            dep_file = sys.argv[sys.argv.index('--dep', 1) + 1]
-            assert dep_file[:2] != "__", sys.argv
-            build_dir, dep_filename = os.path.split(dep_file)
-            dep_dir_now = build_dir
-            if build_dir:
-                prefix = _ + "/"
-                build_dir = build_dir + "/"
-                if build_dir.startswith(prefix):
-                    build_dir = build_dir[len(prefix):]
-        else:
-            dep_dir_now = build_dir = 'build/'
-            dep_filename = f'{module_py}.mk'
-            dep_file = f'build/{module_py}.mk'
+    # Generic vs specific rules
+    if generic:
+        if make:
+            print(GENERIC_MAKEFILE)
+        pattern = "%"
+        source = "$<"
+        stem = "$*"
+        python = "$/venv/bin/python3"
+        recipy_python = "$(dir $<)venv/bin/python3"
+        src_dir = "$/"
+        build_dir = "$/build/"
+    else:
+        pattern = module
+        source = module_path
+        stem = module
+        python = "$(PYTHON)"
+        recipy_python = python
+        src_dir = ""
+        build_dir = build_dir
 
-        if generic_dependencies:
-            if dependencies:
-                print(GENERIC_MAKEFILE)
-            pattern = '%'
-            source = '$<'
-            stem = '$*'
-            python = '$/venv/bin/python3'
-            recipy_python = '$(dir $<)venv/bin/python3'
-            src_dir = '$/'
-            build_dir = '$/build/'
-            build_dir_var_value = f"{src_dir}{build_dir}"
-            generic = " --generic"
-        else:
-            pattern = module
-            source = module_path
-            stem = module
-            python = '$(PYTHON)'
-            recipy_python = python
-            src_dir = ""
-            build_dir = build_dir
-            generic = ""
+    if generic:
+        embed = "( cd $(dir $<). && %s"
+        end = " )"
+        rules = []  # generic rules already printed
+    else:
+        embed = "%s"
+        end = ""
+        rules = [
+            (f"bringup: {build_dir}{pattern}.py.bringup", []),
+            (f"tested: {build_dir}{pattern}.py.tested", []),
+            ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
+              f" {build_dir}{pattern}.py.shebang {build_dir}{pattern}.py.mk"),
+             [f"{source} --test > $@"]),
+            (f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup",
+             [f"{recipy_python} {source} --shebang > $@"]),
+        ]
 
-        if generic_dependencies:
-            embed = "( cd $(dir $<). && %s"
-            end = " )"
-            rules = []  # The generic rules are already printed
-        else:
-            embed = "%s"
-            end = ""
-            rules = [
-                (f"bringup: {build_dir}{pattern}.py.bringup",
-                 []),
-                (f"tested: {build_dir}{pattern}.py.tested",
-                 []),
-                ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
-                  f" {build_dir}{pattern}.py.shebang {build_dir}{pattern}.py.mk"),
-                 [f"{source} --test > $@"]),
-                (f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup",
-                 [f"{recipy_python} {source} --shebang > $@"]),
-            ]
+    # Commands for bringup (requires your existing build_commands + make_rule helpers)
+    commands = []
+    bringups = build_commands(parent_module.__doc__, "\nDependencies:", embed, end,
+                              pip=f"{recipy_python} -m pip")
+    op = ">"
+    remaining = len(bringups)
+    for command_lines, comment_lines, output_lines in bringups:
+        remaining -= 1
+        glue = " &&" if remaining else ""
+        commands += command_lines[:-1]
+        commands.append(f"{command_lines[-1]} {op} $@{glue}")
+        op = ">>"
 
-        commands = []
-        bringups = build_commands(parent_module.__doc__, '\nDependencies:', embed, end,
-                                  pip=f"{recipy_python} -m pip")
-        op = ">"
-        remaining = len(bringups)
-        for command_lines, comment_lines, output_lines in bringups:
-            remaining -= 1
-            glue = " &&" if remaining else ""
-            commands += command_lines[:-1]
-            commands.append(f'{command_lines[-1]} {op} $@{glue}')
-            op = '>>'
+    if generic or dep:
+        dep_target = f"{build_dir}{dep_filename} "
+    else:
+        dep_target = ""
+        commands = [f"mkdir -p {build_dir}" + (" &&" if commands else "")] + commands
 
-        if generic_dependencies or dep_path:
-            dep = f"{build_dir}{dep_filename} "
-        else:
-            dep = ""
-            commands = [f"mkdir -p {build_dir}" + (" &&" if commands else "")] + commands
+    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {dep_target}| {python}"
+    rules.append((bringup_rule, commands))
 
-        bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {dep}| {python}"
-        rules.append(
-            (bringup_rule,
-             commands))
+    if not commands:
+        commands += ["touch $@"]
 
-        if not commands:
-            commands += ["touch $@"]
+    for rule, commands in rules:
+        if rule == bringup_rule and (dep or generic):
+            if not generic:
+                print(f"include {build_dir}{dep_filename}")
 
-        for rule, commands in rules:
-            if rule == bringup_rule and (dep_path or generic_dependencies):
-                if not generic_dependencies:
-                    print(f"include {build_dir}{dep_filename}")
+            if build_dir and dep_dir_now and not os.path.exists(dep_dir_now):
+                os.makedirs(dep_dir_now)
 
-                if build_dir and not os.path.exists(dep_dir_now):
-                    os.makedirs(dep_dir_now)
+            if dep:
+                with open(dep, "w+") as dep_out:
+                    make_rule(rule, commands, file=dep_out)
+        elif make:
+            make_rule(rule, commands)
 
-                if dep_path:
-                    with open(dep_file, 'w+') as dep:
-                        make_rule(rule, commands, file=dep)
-            elif dependencies:
-                make_rule(rule, commands)
 
-        exit(0)
+if parent_module.__name__ == "__main__":
+    args = sys.argv[1:]
+    if any(opt in args for opt in ("--make", "--generic", "--dep")):
+        dep_file = None
+        if "--dep" in args:
+            i = args.index("--dep")
+            if i + 1 < len(args):
+                dep_file = args[i+1]
+        make(make="--make" in args,
+             generic="--generic" in args,
+             dep=dep_file)
+
+        sys.exit(0)
 
 
 def is_executable(path):
