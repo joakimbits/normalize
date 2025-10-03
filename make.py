@@ -776,10 +776,10 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=brief(),
         epilog="""Examples:
-$ make.py --generic --dep build/make.py.mk
+$ make.py --generic --dep build/my-bringup.mk
 
-$ cat build/make.py.mk
-$/build/make.py.bringup: $/make.py $/build/make.py.mk | $/venv/bin/python3
+$ cat build/my-bringup.mk
+$/build/make.py.bringup: $/make.py $/build/my-bringup.mk | $/venv/bin/python3
 	$(dir $<)venv/bin/python3 -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --dep make.py.mk
