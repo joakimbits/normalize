@@ -46,6 +46,7 @@ import re
 import time
 from argparse import Action
 import pydoc
+import difflib
 
 parent_module = sys.modules['.'.join(__name__.split('.')[:-1]) or '__main__']
 cwd = os.getcwd()
@@ -177,7 +178,7 @@ def run_command_examples(commands, timeout=3):
         if module_dir:
             command = f"( cd {module_dir} && {command} )"
 
-        output = "\n".join(output_lines)
+        expected = "\n".join(output_lines)
         result = subprocess.run(command, shell=True, capture_output=True, text=True,
                                 timeout=timeout, env=my_env)
         assert not result.returncode, (
@@ -186,13 +187,18 @@ def run_command_examples(commands, timeout=3):
             f"stderr: {result.stderr}")
 
         received = result.stdout or ""
-        pattern = '.*'.join(map(re.escape, output.split('...')))
-        assert re.fullmatch(pattern, received), (
-            f"Example {i + 1}: $ {command}\n"
-            f"Expected: {repr(output)}\n"
-            f"{output}\n"
-            f"Received: {repr(received)}\n"
-            f"{received}")
+        pattern = '.*'.join(map(re.escape, expected.split('...')))
+        try:
+            assert re.fullmatch(pattern, received)
+        except AssertionError as e:
+            diff = '\n'.join(difflib.unified_diff(
+                expected.splitlines(keepends=True), received.splitlines(keepends=True),
+                fromfile="expected", tofile="received", lineterm=''))
+            raise AssertionError(
+                f"Example {i + 1}: $ {command}\n"
+                f"Expected: {repr(expected)}\n"
+                f"Received: {repr(received)}\n"
+                f"{diff}") from e
 
 
 def make(make=False, generic=False, dep=None):
