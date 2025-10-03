@@ -648,16 +648,19 @@ endif
 $/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
 	$(word 3,$^) -m ruff check --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
-# Check Python and command line usage examples in .py files
-$/build/%.py.tested: $/. $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $($/venv/bin/python3)
-	( cd $< && $*.py --test ) > $@ || (cat $@ && false)
+define META
+    # Check Python and command line usage examples in .py files
+    $/build/%.py.tested: $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $($/venv/bin/python3)
+	    ( cd $/. && $$*.py --test ) > $$@ || (cat $$@ && false)
 
-# Check command line usage examples in .md files
-$/build/%.sh-test.tested: $/. $(PRETESTED) $/build/%.sh-test | $/make.py
-	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
-	( cd $< && $(PYTHON) -m make --timeout 60 --sh-test $(patsubst $(dir $<)%,%,$(lastword $^)) ) > $$tmp && mv $$tmp $@
-$/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
-	mkdir -p $(dir $@) && pandoc -i $< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $@ && truncate -s -1 $@
+    # Check command line usage examples in .md files
+    $/build/%.sh-test.tested: $(PRETESTED) $/build/%.sh-test | $/make.py
+	    tmp=$$@-$$$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
+	    ( cd $/. && $(PYTHON) -m make --timeout 60 --sh-test build/$$*.sh-test ) > $$$$tmp && mv $$$$tmp $$@
+    $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
+	    mkdir -p $$(dir $$@) && pandoc -i $$< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $$@ && truncate -s -1 $$@
+endef
+$(eval $(META))
 
 # Document all test results.
 $/result: $/build/result.txt
