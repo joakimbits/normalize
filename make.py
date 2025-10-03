@@ -233,7 +233,6 @@ def make(make=False, generic=False, dep=None):
             print(GENERIC_MAKEFILE)
         pattern = "%"
         source = "$<"
-        stem = "$*"
         python = "$/venv/bin/python3"
         recipy_python = "$(dir $<)venv/bin/python3"
         src_dir = "$/"
@@ -241,7 +240,6 @@ def make(make=False, generic=False, dep=None):
     else:
         pattern = module
         source = module_path
-        stem = module
         python = "$(PYTHON)"
         recipy_python = python
         src_dir = ""
@@ -254,15 +252,20 @@ def make(make=False, generic=False, dep=None):
     else:
         embed = "%s"
         end = ""
+        mk_dep = f" {build_dir}{pattern}.py.mk" if dep else ""
         rules = [
             (f"bringup: {build_dir}{pattern}.py.bringup", []),
             (f"tested: {build_dir}{pattern}.py.tested", []),
-            ((f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py"
-              f" {build_dir}{pattern}.py.shebang {build_dir}{pattern}.py.mk"),
+            (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {build_dir}{pattern}.py.shebang{mk_dep}",
              [f"{source} --test > $@"]),
             (f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup",
              [f"{recipy_python} {source} --shebang > $@"]),
-        ]
+        ] if make else []
+        if dep:
+            rules.append(
+                (f"{build_dir}{dep_filename}: {src_dir}{pattern}.py | {python}",
+                 [f"{python} {source} --dep $@ > /dev/null"])
+            )
 
     # Commands for bringup (requires your existing build_commands + make_rule helpers)
     commands = []
@@ -292,7 +295,7 @@ def make(make=False, generic=False, dep=None):
     for rule, commands in rules:
         if rule == bringup_rule and (dep or generic):
             if not generic:
-                print(f"include {build_dir}{dep_filename}")
+                print(f"-include {build_dir}{dep_filename}")
 
             if build_dir and dep_dir_now and not os.path.exists(dep_dir_now):
                 os.makedirs(dep_dir_now)
@@ -300,7 +303,7 @@ def make(make=False, generic=False, dep=None):
             if dep:
                 with open(dep, "w+") as dep_out:
                     make_rule(rule, commands, file=dep_out)
-        elif make:
+        else:
             make_rule(rule, commands)
 
 
@@ -769,17 +772,36 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=brief(),
         epilog="""Examples:
-$ make.py --dep build/make.dep
-include build/make.dep
+$ make.py --generic --dep build/make.py.mk
 
-$ cat build/make.dep
-build/make.py.bringup: make.py build/make.dep | $(PYTHON)
+$ cat build/make.py.mk
+$/build/make.py.bringup: $/make.py $/build/make.py.mk | $/venv/bin/python3
+	$(dir $<)venv/bin/python3 -m pip install requests tiktoken --no-warn-script-location > $@
+
+$ make.py --dep make.py.mk
+make.py.mk: make.py | $(PYTHON)
+	$(PYTHON) make.py --dep $@ > /dev/null
+-include make.py.mk
+
+$ cat make.py.mk
+make.py.bringup: make.py make.py.mk | $(PYTHON)
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
+
+$ make.py --make --dep make.py.mk
+bringup: make.py.bringup
+tested: make.py.tested
+make.py.tested: make.py make.py.shebang make.py.mk
+	make.py --test > $@
+make.py.shebang: make.py make.py.bringup
+	$(PYTHON) make.py --shebang > $@
+make.py.mk: make.py | $(PYTHON)
+	$(PYTHON) make.py --dep $@ > /dev/null
+-include make.py.mk
 
 $ make.py --make
 bringup: build/make.py.bringup
 tested: build/make.py.tested
-build/make.py.tested: make.py build/make.py.shebang build/make.py.mk
+build/make.py.tested: make.py build/make.py.shebang
 	make.py --test > $@
 build/make.py.shebang: make.py build/make.py.bringup
 	$(PYTHON) make.py --shebang > $@
