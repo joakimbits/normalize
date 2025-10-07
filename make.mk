@@ -153,7 +153,6 @@ $/python_executable_shell_example:
 
 
 endif # generic examples
-$/_NAME := $(notdir $(realpath $/.))
 
 
 ## How it works
@@ -308,60 +307,18 @@ endif
 
 ### Variables
 
-#### Find subdirectories containing at least one .md file
-
-$/_NON-SUBPROJECTS += $/build/
-$/_SUBDIRS := $(foreach d,$(shell find $/. -mindepth 1 -maxdepth 1),$(notdir $d))
-$/_SUBPROJECTS += $(sort $(dir $(foreach d,$($/_SUBDIRS),$(wildcard $/$d/*.md))))
-$/_SUBPROJECTS := $(filter-out $($/_NON-SUBPROJECTS),$($/_SUBPROJECTS))
-$/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMakefile)))
-
-# Define symbolic targets we might want to use to represent dependencies
-define n
-
-
-endef
-define META
-    .PHONY: $/make $/help $/list $/venv $/bringup $/syntax $/style $/tested $/result $/old $/new $/html $/pdf $/slides
-    .PHONY: $/clean $/clean/keep_venv
-    $(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
-      $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
-    $/clean: $/clean/keep_venv
-	    rm -rf $/venv/ $/.ruff_cache/
-    $/clean/keep_venv:
-	    rm -rf $/build/
-endef
-$(eval $(META))
-
-#### Define targets, rules and recipies, but only when actually building
-
-ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
-
-# Make local commands available
-PATHS := $(subst ;, ,$(subst :, ,$(PATH)))
-ifeq (,$(filter .,$(PATHS)))
-    .-ON-PATH := .-on-$(OS)-path
-endif
-
-# Find our git status
-$/_BRANCH := $(shell git branch --show-current)
-$/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
-$/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
-$/_MODIFIED := $(shell cd $/. && $(PYTHON) -m make --git-status . M)
-$/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
+# $($/_OLD) is a $/_BASELINE worktree of $./ in the same git at $/_HOME_DIR.
+$/_NAME := $(notdir $(realpath $/.))
 $/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
 $/_HOME := $($/_HOME_DIR:./%=%)
 $/_HOME_NAME := $(shell basename `git rev-parse --show-toplevel`)
-
-# Setup this Makefile in each subproject
-$/%/Makefile: | $/Makefile $/%/make.py
-	ln -s ../Makefile $@
-$/%/make.py: | $/make.py
-	ln -s ../make.py $@
-$/make.py:
-	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.py -o $@
-
-.PRECIOUS: $/make.py $($/_SUBPROJECTS:%=%make.py)
+$/_HERE_DIR := $(dir $(shell $(PYTHON) $/make.py --relpath $($/_HOME_DIR) $/.))
+$/_HERE := $($/_HERE_DIR:./%=%)
+$/_THERE_DIR := $(dir $(shell $(PYTHON) $/make.py --relpath $/. $($/_HOME_DIR)))
+$/_THERE := $($/_THERE_DIR:./%=%)
+$/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
+$/_BASELINE_DIR := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/
+$/_OLD := $($/_BASELINE_DIR)$($/_HERE)
 
 # Find all source files, but ignore links named Makefile *.h *.hpp *.py *.md
 $/_SOURCE :=
@@ -387,26 +344,12 @@ $/_SOURCE += $($/*.py)
 $/*.md := $(shell find $/*.md \! -type l 2>/dev/null)
 $/_SOURCE += $($/*.md)
 
-# Checkout the last release of this repo into a build sub-directory.
-# Prefix `$/_HERE` is from this git project root directory to  `./`.
-# Directory `$($/_OLD)` is the old release of `./`.
-$/_HERE_DIR := $(dir $(shell $(PYTHON) $/make.py --relpath $($/_HOME_DIR) $/.))
-$/_HERE := $($/_HERE_DIR:./%=%)
-$/_THERE_DIR := $(dir $(shell $(PYTHON) $/make.py --relpath $/. $($/_HOME_DIR)))
-$/_THERE := $($/_THERE_DIR:./%=%)
-$/_BASELINE := $(shell git describe --match=v[0-9]* --always --tags --abbrev=0)
-$/_OLD := $($/_HOME)build/$($/_BASELINE)/$($/_HOME_NAME)/$($/_HERE)
-ifndef $($/_HOME_DIR)
-    $($/_HOME_DIR) := $($/_HOME_DIR))
-    define META
-        $($/_OLD)Makefile:
-	        ( cd $($/_THERE_DIR) && \
-	          old_dir=build/$($/_BASELINE)/$($/_HOME_NAME)/ && \
-	          git worktree add -d $$$$old_dir $($/_BASELINE) && \
-	          cd $$$$old_dir && make make )
-    endef
-    $(eval $(META))
-endif
+# Find our git status
+$/_BRANCH := $(shell git branch --show-current)
+$/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
+$/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
+$/_MODIFIED := $(shell cd $/. && $(PYTHON) -m make --git-status . M)
+$/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
@@ -420,7 +363,6 @@ $/_BRANCH_STATUS += $(if $($/_MODIFIED),$(BLUE)$($/_MODIFIED)$(NORMAL))
 $/_BRANCH_STATUS += $(if $($/_REMOVE),$(REVERSED)$($/_REMOVE)$(NORMAL))
 $/_COMMIT_INFO := $(shell git log -1 --oneline $/.)
 $/_BRANCH_STATUS += $($/_COMMIT_INFO)
-
 ifeq ($(filter v%,$($/_BASELINE)),)
     $/_BASELINE_INFO := $(shell git show --oneline -s $($/_BASELINE))
 else
@@ -432,6 +374,41 @@ $/_CHANGES_AUDIT := $($/_BASELINE_INFO) -->
 $/_CHANGES_AUDIT += $($/_ADD)
 $/_CHANGES_AUDIT += $($/_MODIFIED)
 $/_CHANGES_AUDIT += $($/_COMMIT_INFO)
+
+#### Find subdirectories containing at least one .md file
+$/_NON-SUBPROJECTS += $/build/
+$/_SUBDIRS := $(foreach d,$(shell find $/. -mindepth 1 -maxdepth 1),$(notdir $d))
+$/_SUBPROJECTS += $(sort $(dir $(foreach d,$($/_SUBDIRS),$(wildcard $/$d/*.md))))
+$/_SUBPROJECTS := $(filter-out $($/_NON-SUBPROJECTS),$($/_SUBPROJECTS))
+$/_ACTIVE_SUBPROJECTS := $(dir $(foreach d,$($/_SUBPROJECTS),$(wildcard $/$dMakefile)))
+
+# Define symbolic targets we might want to use to represent dependencies
+define n
+
+
+endef
+define META
+    .PHONY: $/make $/help $/list $/venv $/bringup $/syntax $/style $/tested $/result $/old $/new $/html $/pdf $/slides
+    .PHONY: $/clean $/clean/keep_venv
+    $(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
+      $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
+    $/clean: $/clean/keep_venv
+	    rm -rf $/venv/ $/.ruff_cache/
+    $/clean/keep_venv:
+	    rm -rf $/build/
+endef
+$(eval $(META))
+
+
+#### Define targets, rules and recipies, but only when actually building
+
+ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
+
+# Make local commands available
+PATHS := $(subst ;, ,$(subst :, ,$(PATH)))
+ifeq (,$(filter .,$(PATHS)))
+    .-ON-PATH := .-on-$(OS)-path
+endif
 
 # Collect code
 $/_LINKABLE := $($/*.s)
@@ -515,6 +492,11 @@ ifeq (2,$(MAKE_RESTARTS))
     endif
 endif
 
+# Use the clang compiler
+$?/clang++: $?/clang
+CXX := /usr/bin/clang++
+CC := /usr/bin/clang
+
 
 ## Targets
 
@@ -523,6 +505,16 @@ endif
 
 # Do not use any built-in rules
 .SUFFIXES:
+
+# Setup this Makefile in each subproject
+$/%/Makefile: | $/Makefile $/%/make.py
+	ln -s ../Makefile $@
+$/%/make.py: | $/make.py
+	ln -s ../make.py $@
+$/make.py:
+	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.py -o $@
+
+.PRECIOUS: $/make.py $($/_SUBPROJECTS:%=%make.py)
 
 # Convenience targets
 define META
@@ -556,11 +548,6 @@ $(eval $(META))
 
 $/slides.html: $/report.dzslides
 	cp $< $@
-
-# Use the clang compiler
-$?/clang++: $?/clang
-CXX := /usr/bin/clang++
-CC := /usr/bin/clang
 
 # Make a linked executable
 ifneq (,$($/_OBJS))
