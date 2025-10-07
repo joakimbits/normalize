@@ -506,11 +506,18 @@ CC := /usr/bin/clang
 # Do not use any built-in rules
 .SUFFIXES:
 
+# The old worktree
+ifndef $($/_BASELINE_DIR)
+    $($/_BASELINE_DIR) = $($/_BASELINE_DIR)
+    $($/_HOME)build/%/$($/_HOME_NAME)/Makefile: $($/_HOME)Makefile
+	    ( cd $(dir $<) && git worktree prune && git worktree add -d $(dir $@) $* )
+endif
+
 # Setup this Makefile in each subproject
 $/%/Makefile: | $/Makefile $/%/make.py
-	ln -s ../Makefile $@
+	ln -s `$(PYTHON) -m make --relpath $* .`Makefile $@
 $/%/make.py: | $/make.py
-	ln -s ../make.py $@
+	ln -s `$(PYTHON) -m make --relpath $* .`make.py $@
 $/make.py:
 	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.py -o $@
 
@@ -698,9 +705,6 @@ $/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT
 $/build/report-details.md:
 	echo "$(_heading)# Source code, installation and test result" >> $@
 
-$($/_OLD)report.gfm: $($/_OLD)Makefile
-	mkdir -p $(dir $@) && ( cd $(dir $@) && $(MAKE) report.gfm --no-print-directory ) || touch $@
-
 # Use GPT for a release review.
 $/build/audit.diff: $/make.py $/build/prompt.diff $/build/make.py.bringup
 	( cd $(dir $<) && venv/bin/python3 -m make --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
@@ -761,6 +765,10 @@ $/list: $($/Makefile)
 
 ## Finally attempt to include all bringup files and sub-projects
 # Note: Subprojects modify $/, so this has to be the last command using it as a prefix here.
+ifndef $($/_BASELINE_DIR)_ALREADY_SUBPROJECT
+    $($/_BASELINE_DIR)_ALREADY_SUBPROJECT = 1
+    $/_SUBPROJECTS += $($/_BASELINE_DIR)
+endif
 $/_DEPS += $($/_SUBPROJECTS:%=%Makefile)
 $/_DEPS := $(filter-out $($/_NON-DEPS),$($/_DEPS))
 -include $($/_DEPS)
