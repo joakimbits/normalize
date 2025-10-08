@@ -238,28 +238,8 @@ $/venv/bin/python3 := $/venv/$(VENV_PYTHON)
 
 # Turn PYTHON into an explicit path
 override PYTHON := $(shell which $(PYTHON))
-
-# Figure out how to install packages into a PYTHON venv $/venv/bin/python3
-ifndef PYTHON_NAME
-    PYTHON_SITE_PACKAGES_DIR := $(shell $(PYTHON) -c "import sys; print('\n'.join(sys.path))" | grep site-packages)
-    PYTHON_NAME := $(subst $~/.local/lib/%/site-packages,%,$(PYTHON_SITE_PACKAGES_DIR))
-
-    # Workaround WSL python3 not having site-packages
-    ifeq (,$(PYTHON_NAME))
-    	PYTHON_NAME := python3
-    endif
-
-    # Workaround WSL python3 venv cashing pip wheels outside ~
-    ifeq (/usr/bin/python3,$(PYTHON))
-        PYTHON_DEP = /.cache/pip
-        /.cache/pip:; sudo mkdir -p $@ && sudo chmod a+rwx $@
-
-    # Workaround Windows python not installing #!venv/bin/python3
-    else ifeq (/mnt/c/tools/miniconda3/python.exe,$(PYTHON))
-        PYTHON_FINALIZE = && mkdir -p $(dir $@) && ln -s ../Scripts/python.exe $@
-    endif
-endif
-$/venv/pip/ := $/venv/lib/$(PYTHON_NAME)/site-packages/
+PIPS = $(shell $(PYTHON) -m make --pips)
+$/venv/pip/ := $/venv/$(PIPS)
 
 # A package manager for the PYTHON OS
 ifndef !

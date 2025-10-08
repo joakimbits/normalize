@@ -335,6 +335,15 @@ def make_executable(path):
     os.chmod(path, 0o777)
 
 
+class Pips(Action):
+    """Print the path to pips within a python environment, and exit"""
+
+    def __call__(self, parser, args, values, option_string=None):
+        pip_path = re.compile(r'(?i)(?:^|[\\/])((?:lib|lib64)[\\/](?:[^\\/]+[\\/])?(?:site|dist)-packages)')
+        print(next((m for p in sys.path if (m := pip_path.search(p))), None).group(1) + os.sep)
+        exit(0)
+
+
 class Shebang(Action):
     """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
 
@@ -761,6 +770,7 @@ def add_arguments(argparser):
         f"Print generic Makefile for {module_path}, and exit"))
     argparser.add_argument('--dep', action='store', help=(
         f"Build a {module}.dep target, print its Makefile include statement, and exit"))
+    argparser.add_argument('--pips', nargs=0, action=Pips, help=Pips.__doc__)
     argparser.add_argument('-c', nargs=1, action=Command, help=Command.__doc__)
     argparser.add_argument('--timeout', type=int, default=3, help=(
         "Test timeout in seconds (3)"))
