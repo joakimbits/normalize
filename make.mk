@@ -745,9 +745,11 @@ $/list: $($/Makefile)
 
 ## Finally attempt to include all bringup files and sub-projects
 # Note: Subprojects modify $/, so this has to be the last command using it as a prefix here.
-ifndef $($/_BASELINE_DIR)_ALREADY_SUBPROJECT
-    $($/_BASELINE_DIR)_ALREADY_SUBPROJECT = 1
-    $/_SUBPROJECTS += $($/_BASELINE_DIR)
+ifeq (old,$(findstring old,$(MAKECMDGOALS)))
+    ifndef $($/_BASELINE_DIR)_ALREADY_SUBPROJECT
+        $($/_BASELINE_DIR)_ALREADY_SUBPROJECT = 1
+        $/_SUBPROJECTS += $($/_BASELINE_DIR)
+    endif
 endif
 $/_DEPS += $($/_SUBPROJECTS:%=%Makefile)
 $/_DEPS := $(filter-out $($/_NON-DEPS),$($/_DEPS))
