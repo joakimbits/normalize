@@ -202,6 +202,14 @@ ifneq ($(words $I),1)
     I := $(lastword $I)
 endif
 
+# Workaround Windows feature: Organization name in whoami
+I := $(subst +, ,$I)
+ifneq ($(words $I),1)
+    ORGANIZATION := $(firstword $(WHOAMI))
+    I := $(lastword $I)
+endif
+
+
 # Workaround Windows WSL1 bug: Recursive make shell believes it is git bash on Windows
 ifeq ($~,/Users/$I)
     ~ := /home/$I
@@ -213,10 +221,12 @@ endif
 #  - `python` on Windows.
 #  - or any given PYTHON.
 ifeq ($~,/home/$I)
+    SHELL ?= Linux
     PYTHON ?= python3
     VENV_PYTHON ?= bin/python3
 
-    ifneq ($(shell echo $$WSL_DISTRO_NAME),)
+    ifneq (,$(shell echo $$WSL_DISTRO_NAME))
+        SHELL := WSL
     	# Clone Windows home git and ssh settings
         ifndef H
             H := $(shell wslpath "$(cmd.exe /C echo '%USERPROFILE%' | head -c -2)")
@@ -230,7 +240,12 @@ ifeq ($~,/home/$I)
         SPEEDUP_WSL_DNS ?= $~/use_windows_dns.sh
         SPEEDUP_WSL_PIP ?= DISPLAY= #
     endif
+else ifeq ($~,/c/Users/$I)
+    SHELL ?= Git Bash
+    PYTHON ?= python.exe
+    VENV_PYTHON ?= python.exe
 else
+    SHELL ?= cmd
     PYTHON ?= python
     VENV_PYTHON ?= python.exe
 endif
@@ -250,7 +265,11 @@ ifndef !
 
     CPU ?= $(shell $(UNAME) -m)
     OS ?= $(shell $(UNAME) -s)
-    ifeq (MacOSX,$(OS))
+    WINDOWS_OS := $(filter Windows_NT MINGW% MSYS%,$(OS)
+    ifneq (,$(WINDOWS_OS))
+        ! ?= choco install -y
+        ? ?= $(or $(ChocolateyInstall),C:/ProgramData/Chocolatey)/bin
+    else ifeq (MacOSX,$(OS))
         ! ?= brew install
         ? ?= /opt/homebrew/bin
         FONTS ?= ~/Library/Fonts
@@ -279,7 +298,11 @@ ifndef !
     $?/%:; $! $*
 
     # Custom packages
-    $?/xetex:; $! texlive-xetex
+    ifneq (,$(WINDOWS_OS))
+        $?/xetex:; $! miktex
+    else
+        $?/xetex:; $! texlive-xetex
+    endif
 
     .PRECIOUS: $?/jq $?/pandoc $?/xetex
 endif
