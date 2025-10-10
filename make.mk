@@ -243,13 +243,12 @@ ifeq ($~,/home/$I)
 else ifeq ($~,/c/Users/$I)
     SHELL ?= Git Bash
     PYTHON ?= python.exe
-    VENV_PYTHON ?= python.exe
+    VENV_PYTHON ?= Scripts/python.exe
 else
     SHELL ?= cmd
     PYTHON ?= python
     VENV_PYTHON ?= python.exe
 endif
-$/venv/bin/python3 := $/venv/$(VENV_PYTHON)
 
 # Turn PYTHON into an explicit path
 override PYTHON := $(shell which $(PYTHON))
@@ -265,17 +264,21 @@ ifndef !
 
     CPU ?= $(shell $(UNAME) -m)
     OS ?= $(shell $(UNAME) -s)
-    WINDOWS_OS := $(filter Windows_NT MINGW% MSYS%,$(OS)
+    WINDOWS_OS := $(filter Windows_NT MINGW% MSYS%,$(OS))
     ifneq (,$(WINDOWS_OS))
+        # Expand $($(PYTHON)) to a Windows mixed-mode path when used as a dependency
+        $(PYTHON) := $(shell cygpath -m $(PYTHON))
         ! ?= choco install -y
         ? ?= $(or $(ChocolateyInstall),C:/ProgramData/Chocolatey)/bin
     else ifeq (MacOSX,$(OS))
+        $(PYTHON) = $(PYTHON)
         ! ?= brew install
         ? ?= /opt/homebrew/bin
         FONTS ?= ~/Library/Fonts
         COUSINE := $(FONTS)
         CARLITO := $(FONTS)
     else
+        $(PYTHON) = $(PYTHON)
         ! ?= sudo apt update && sudo apt install -y
         ? ?= /usr/bin
         COUSINE ?= /usr/share/fonts/truetype/cousine
@@ -393,8 +396,8 @@ endef
 define META
     .PHONY: $/make $/help $/list $/venv $/bringup $/syntax $/style $/tested $/result $/old $/new $/html $/pdf $/slides
     .PHONY: $/clean $/clean/keep_venv
-    $(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
-      $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
+    #$(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
+    #  $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
     $/clean: $/clean/keep_venv
 	    rm -rf $/venv/ $/.ruff_cache/
     $/clean/keep_venv:
@@ -406,12 +409,6 @@ $(eval $(META))
 #### Define targets, rules and recipies, but only when actually building
 
 ifneq (clean,$(findstring clean,$(MAKECMDGOALS)))
-
-# Make local commands available
-PATHS := $(subst ;, ,$(subst :, ,$(PATH)))
-ifeq (,$(filter .,$(PATHS)))
-    .-ON-PATH := .-on-$(OS)-path
-endif
 
 # Collect code
 $/_LINKABLE := $($/*.s)
@@ -536,7 +533,7 @@ define META
 	      | grep -v '^[[:space:]]*$$$$' \
 	      | grep '^$/' \
 	      | sed 's/^/  /'
-    $/venv: $/venv/bin/python3
+    $/venv: $/venv/$(VENV_PYTHON)
     $/bringup: $($/_EXE) $($/build/*.bringup)
     $/tested: $($/build/*.tested)
     $/result: $/build/result.txt
@@ -602,8 +599,8 @@ $($/venv/pip/)%: $($/venv/bin/python3)
 	 $< -m pip install --prefer-binary $*
 
 # Setup a local shebang python
-$/venv/bin/python3: | $(PYTHON) $(PYTHON_DEP) $(.-ON-PATH) $(SPEEDUP_WSL_DNS)
-	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $(@:%/bin/python3=%) && \
+$/%/$(VENV_PYTHON): | $($(PYTHON)) $(PYTHON_DEP) $(SPEEDUP_WSL_DNS)
+	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $* && \
 	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m make --prompt
 
 # Install conda python
@@ -625,7 +622,7 @@ ifndef .-ON-PATH_TARGETS
     %-on-MacOSX-path: ~/.zshrc
 	    echo 'export PATH="$*:$$PATH"' >> $<
 	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
-    %-on-Windows-path:
+    %-on-Windows_NT-path:
 	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
 endif
 
@@ -776,6 +773,6 @@ ifeq (old,$(findstring old,$(MAKECMDGOALS)))
 endif
 $/_DEPS += $($/_SUBPROJECTS:%=%Makefile)
 $/_DEPS := $(filter-out $($/_NON-DEPS),$($/_DEPS))
--include $($/_DEPS)
+#-include $($/_DEPS)
 
 endif # first time
