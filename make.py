@@ -39,6 +39,7 @@ requests tiktoken # Needed for the --prompt option
 """
 
 import platform
+import sysconfig
 import sys
 import os
 import subprocess
@@ -340,7 +341,7 @@ class Pips(Action):
 
     def __call__(self, parser, args, values, option_string=None):
         pip_path = re.compile(r'(?i)(?:^|[\\/])((?:lib|lib64)[\\/](?:[^\\/]+[\\/])?(?:site|dist)-packages)')
-        print(next((m for p in sys.path if (m := pip_path.search(p))), None).group(1) + os.sep)
+        print(pip_path.search(sysconfig.get_path("purelib")).group(1) + os.sep)
         exit(0)
 
 
