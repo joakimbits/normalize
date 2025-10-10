@@ -347,7 +347,7 @@ class Pips(Action):
 class Shebang(Action):
     """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
 
-    SHEBANG = b'#!venv/bin/python3'
+    SHEBANG, EOL = (b'#!venv/Scripts/python.exe', b'\r\n') if os.name == 'nt' else (b'#!venv/bin/python3', b'\n')
     PATHSEP_INSTALL = {
         ':': "export PATH='.:$PATH'",
         ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
@@ -359,8 +359,8 @@ class Shebang(Action):
         # Make it have a correct shebang with both a Linux and a Windows line ending
         src = open(module_path, 'rb').read()
         shebang, eol, code = (self.match_shebang_eol_code(src).groups()[i] for i in self.group_shebang_eol_code)
-        if shebang != self.SHEBANG or eol != b'\n':
-            open(module_path, 'wb').write(self.SHEBANG + b'\n' + code)
+        if shebang != self.SHEBANG:
+            open(module_path, 'wb').write(self.SHEBANG + self.EOL + code)
             print(f'# {module_path} now updated with shebang {shebang}')
 
         # Print any command needed to disable Windows-style crlf checkouts
