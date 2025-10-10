@@ -1,4 +1,4 @@
-#!venv/bin/python3
+#!venv/Scripts/python.exe
 """Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
@@ -352,13 +352,12 @@ class Shebang(Action):
         ':': "export PATH='.:$PATH'",
         ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
     }
-    match_shebang_eol_code = re.compile(rb'^((#!.*)(([\r\n]|$)+))*((.*([\r\n]|$))*)\Z').match
-    group_shebang_eol_code = (1, 2, 4)
+    match_shebang_eol_code = re.compile(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z').match
 
     def __call__(self, parser, args, values, option_string=None):
         # Make it have a correct shebang with both a Linux and a Windows line ending
         src = open(module_path, 'rb').read()
-        shebang, eol, code = (self.match_shebang_eol_code(src).groups()[i] for i in self.group_shebang_eol_code)
+        shebang, eol, code = self.match_shebang_eol_code(src).groups()
         if shebang != self.SHEBANG:
             open(module_path, 'wb').write(self.SHEBANG + self.EOL + code)
             print(f'# {module_path} now updated with shebang {shebang}')
