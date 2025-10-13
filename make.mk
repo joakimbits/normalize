@@ -27,7 +27,7 @@
 ifndef $/_NAME
 $/make: $/make.mk
 
-# Define generic examples only once
+# Define generics only once
 ifndef _NAME
 _NAME := $(notdir $(realpath $/.))
 
@@ -152,35 +152,6 @@ $/python_executable_shell_example:
 	venv/bin/python3 -c "import example; open('greeter-from-py.txt).write(example.greeter.hello())"
 
 
-endif # generic examples
-
-
-## How it works
-
-# All project variable names here except a special $/ "here prefix" are always unique globally.
-# This is achieved by using $/ as prefix in the *name* of each project-unique variable.
-# Any subdirectory with at least one documentation file (.md suffix) is detected as a subproject.
-# A link to this Makefile is created in all those subdirectories, and by them further into all project leaves.
-# Every $/ here is expanded before these subproject Makefiles are included, so their $/ is theirs only.
-# The main subproject targets are nested as dependencies to corresponding targets here.
-# The innermost projects therefore gets made first.
-
-### Daughter project dependencies
-
-# If you #include daughter .h files in your source code, or have daughter Dependencies in your .py header, all is fine.
-# You may need to create links to sibling source code or sibling documentation needed here though.
-
-### Sibling project dependencies
-
-# If you #include sibling .h files in your source code, or have sibling Dependencies in your .py header, all is fine
-# as long as you make from the parent project level or `make DEPS=../sibling/Makefile` from here.
-# You may need to create links to sibling source code or sibling documentation needed here though.
-
-# You could also consider making this the parent project instead, or creating a customized Makefile here like below
-# (as if it was already a parent project) but without `$/_NON-SUBPROJECTS`.
-
-
-
 ## Parameters
 
 # Configure a GPT model to use for `audit`
@@ -208,7 +179,6 @@ ifneq ($(words $I),1)
     ORGANIZATION := $(firstword $(WHOAMI))
     I := $(lastword $I)
 endif
-
 
 # Workaround Windows WSL1 bug: Recursive make shell believes it is git bash on Windows
 ifeq ($~,/Users/$I)
@@ -279,6 +249,8 @@ ifndef !
         CARLITO := $(FONTS)
     else
         $(PYTHON) = $(PYTHON)
+        CXX := /usr/bin/clang++
+        CC := /usr/bin/clang
         ! ?= sudo apt update && sudo apt install -y
         ? ?= /usr/bin
         COUSINE ?= /usr/share/fonts/truetype/cousine
@@ -301,6 +273,7 @@ ifndef !
     $?/%:; $! $*
 
     # Custom packages
+    $?/clang++: $?/clang
     ifneq (,$(WINDOWS_OS))
         $?/xetex:; $! miktex
     else
@@ -308,7 +281,94 @@ ifndef !
     endif
 
     .PRECIOUS: $?/jq $?/pandoc $?/xetex
+
+# Notify the user if new rules were built and included, and make therefore restarted
+ifeq (2,$(MAKE_RESTARTS))
+    ifndef MAKER
+        $(info # Hello $I, Welcome to generic make https://github.com/joakimbits/normalize)
+    endif
+
+    MAKER := $(shell $(MAKE) -v))
+    INCLUDING ?= $/build/
+    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $($/venv/bin/python3))
+    INCLUDED := $(MAKEFILE_LIST)
+    INCLUDING := $/build/
+    ifneq (,$($/_SUBPROJECTS))
+        $(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
+    endif
+
+    # Notify the user on abusage of make
+    ifneq (0,$(MAKELEVEL))
+        $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
+        $(info # https://aegis.sourceforge.net/auug97.pdf)
+    endif
 endif
+
+# Install conda python
+ifndef CONDA
+    CONDA := ~/miniconda3/bin/conda
+    $~/miniconda3/bin/conda:
+	    curl -sL "https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh" -o miniconda.sh
+	    bash miniconda.sh -bfup $~/miniconda3
+	    echo 'TODO: $~/miniconda3/bin/conda init | grep modified | (read _ rc && echo "TODO: source $$rc && conda activate")'
+	    rm miniconda.sh
+endif
+
+# Install local commands before other commands
+ifndef .-ON-PATH_TARGETS
+    .-ON-PATH_TARGETS = 1
+    %-on-Linux-path: ~/.profile
+	    echo 'export PATH="$*:$$PATH"' >> $<
+	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+    %-on-MacOSX-path: ~/.zshrc
+	    echo 'export PATH="$*:$$PATH"' >> $<
+	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+    %-on-Windows_NT-path:
+	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
+endif
+
+ifndef SPEEDUP_WSL_DNS_TARGET
+    SPEEDUP_WSL_DNS_TARGET = 1
+    $~/use_windows_dns.sh:
+	    echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@
+	    echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
+	    echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
+	    echo -n   "'(Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | " >> $@
+	    echo -n    "ForEach-Object { \"nameserver \$$_\" }' | tr -d '\\r' | " >> $@
+	    echo "tee -a /etc/resolv.conf > /dev/null" >> $@
+	    sudo sed -i '\|command=$@|d' /etc/wsl.conf
+	    echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
+	    sudo sh $@
+endif
+
+endif ### Generics ###
+
+
+### Project specifics ##################################################################################################
+
+## How it works
+
+# All project variable names here except a special $/ "here prefix" are always unique globally.
+# This is achieved by using $/ as prefix in the *name* of each project-unique variable.
+# Any subdirectory with at least one documentation file (.md suffix) is detected as a subproject.
+# A link to this Makefile is created in all those subdirectories, and by them further into all project leaves.
+# Every $/ here is expanded before these subproject Makefiles are included, so their $/ is theirs only.
+# The main subproject targets are nested as dependencies to corresponding targets here.
+# The innermost projects therefore gets made first.
+
+### Daughter project dependencies
+
+# If you #include daughter .h files in your source code, or have daughter Dependencies in your .py header, all is fine.
+# You may need to create links to sibling source code or sibling documentation needed here though.
+
+### Sibling project dependencies
+
+# If you #include sibling .h files in your source code, or have sibling Dependencies in your .py header, all is fine
+# as long as you make from the parent project level or `make DEPS=../sibling/Makefile` from here.
+# You may need to create links to sibling source code or sibling documentation needed here though.
+
+# You could also consider making this the parent project instead, or creating a customized Makefile here like below
+# (as if it was already a parent project) but without `$/_NON-SUBPROJECTS`.
 
 
 ### Variables
@@ -470,33 +530,6 @@ $/_REPORT := $/build/report-details.md
 $/_REPORT += $($/_LOGIC:$/%=$/build/%.md)
 $/_REPORT += $($/_RESULT:%=%.md)
 
-# Notify the user if new rules were built and included, and make therefore restarted
-ifeq (2,$(MAKE_RESTARTS))
-    ifndef MAKER
-        $(info # Hello $I, Welcome to generic make https://github.com/joakimbits/normalize)
-    endif
-
-    MAKER := $(shell $(MAKE) -v))
-    INCLUDING ?= $/build/
-    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $($/venv/bin/python3))
-    INCLUDED := $(MAKEFILE_LIST)
-    INCLUDING := $/build/
-    ifneq (,$($/_SUBPROJECTS))
-        $(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
-    endif
-
-    # Notify the user on abusage of make
-    ifneq (0,$(MAKELEVEL))
-        $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
-        $(info # https://aegis.sourceforge.net/auug97.pdf)
-    endif
-endif
-
-# Use the clang compiler
-$?/clang++: $?/clang
-CXX := /usr/bin/clang++
-CC := /usr/bin/clang
-
 
 ## Targets
 
@@ -603,42 +636,6 @@ $/%/$(VENV_PYTHON): | $($(PYTHON)) $(PYTHON_DEP) $(SPEEDUP_WSL_DNS)
 	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $* && \
 	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m make --prompt
 
-# Install conda python
-ifndef CONDA
-    CONDA := ~/miniconda3/bin/conda
-    $~/miniconda3/bin/conda:
-	    curl -sL "https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh" -o miniconda.sh
-	    bash miniconda.sh -bfup $~/miniconda3
-	    echo 'TODO: $~/miniconda3/bin/conda init | grep modified | (read _ rc && echo "TODO: source $$rc && conda activate")'
-	    rm miniconda.sh
-endif
-
-# Install local commands before other commands
-ifndef .-ON-PATH_TARGETS
-    .-ON-PATH_TARGETS = 1
-    %-on-Linux-path: ~/.profile
-	    echo 'export PATH="$*:$$PATH"' >> $<
-	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
-    %-on-MacOSX-path: ~/.zshrc
-	    echo 'export PATH="$*:$$PATH"' >> $<
-	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
-    %-on-Windows_NT-path:
-	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
-endif
-
-ifndef SPEEDUP_WSL_DNS_TARGET
-    SPEEDUP_WSL_DNS_TARGET = 1
-    $~/use_windows_dns.sh:
-	    echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@
-	    echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
-	    echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
-	    echo -n   "'(Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | " >> $@
-	    echo -n    "ForEach-Object { \"nameserver \$$_\" }' | tr -d '\\r' | " >> $@
-	    echo "tee -a /etc/resolv.conf > /dev/null" >> $@
-	    sudo sed -i '\|command=$@|d' /etc/wsl.conf
-	    echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
-	    sudo sh $@
-endif
 
 # Check Python 3.9 style
 $/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
