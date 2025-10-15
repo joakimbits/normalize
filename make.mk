@@ -104,8 +104,8 @@ _NAME := $(notdir $(realpath $/.))
 #### Recommended dependencies
 
 # `bringup`: All code in the project is executable as bare shell commands, including .py files.
-# `build/*.py.bringup`: *.py is executable by the venv/bin/python3 next to it.
-# `build/*.py.shebang`: *.py has the local python shebang #!venv/bin/python3
+# `build/*.py.bringup`: *.py is executable by the venv python next to it.
+# `build/*.py.shebang`: *.py has a local shebang suitable for the OS (#!venv/bin/python3 or #!venv/Scripts/python.exe)
 # `build/directory-name.bringup`: directory-name is an executable that contains all compilable sources.
 # `build/*.tested`: * is self-tested without failure, and the test output is here.
 # `build/*.md`: * is documented here. Make *.gfm *.pdf *.html to translate it to your desired pandoc format.
@@ -149,7 +149,6 @@ $/python_executable_shell_example:
 #   * `touch __init__.py` on the complete path to it. Now you can import and use it.
 
 	touch example/__init__.py
-	venv/bin/python3 -c "import example; open('greeter-from-py.txt).write(example.greeter.hello())"
 
 
 ## Parameters
@@ -185,18 +184,16 @@ ifeq ($~,/Users/$I)
     ~ := /home/$I
 endif
 
-# A base PYTHON to use. It can be one of:
-#  - `python3` on Ubuntu or Mac,
-#  - `python.exe` in Windows from WSL Ubuntu, or
-#  - `python` on Windows.
-#  - or any given PYTHON.
-ifeq ($~,/home/$I)
-    SHELL ?= Linux
-    PYTHON ?= python3
-    VENV_PYTHON ?= bin/python3
+# A base PYTHON & OS manager. It can be one of:
+#  - python3 & apt on Ubuntu
+#  - python & choco in Windows
+#  - python3 & brew on MacOS
+#  - or any given PYTHON=python-interpreter !=OS-install-command ?=OS-install-directory
+ifeq ($~,/home/$I)  # Probably Bash on Ubuntu
+    CPU = $(shell uname -m)
+    ifneq (,$(shell echo $$WSL_DISTRO_NAME))  # Probably Bash on Windows WSL Ubuntu
+        OS ?= WSL
 
-    ifneq (,$(shell echo $$WSL_DISTRO_NAME))
-        SHELL := WSL
     	# Clone Windows home git and ssh settings
         ifndef H
             H := $(shell wslpath "$(cmd.exe /C echo '%USERPROFILE%' | head -c -2)")
@@ -209,78 +206,140 @@ ifeq ($~,/home/$I)
         # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
         SPEEDUP_WSL_DNS ?= $~/use_windows_dns.sh
         SPEEDUP_WSL_PIP ?= DISPLAY= #
+        $~/use_windows_dns.sh:
+	        echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@
+	        echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
+	        echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
+	        echo -n   "'(Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | " >> $@
+	        echo -n    "ForEach-Object { \"nameserver \$$_\" }' | tr -d '\\r' | " >> $@
+	        echo "tee -a /etc/resolv.conf > /dev/null" >> $@
+	        sudo sed -i '\|command=$@|d' /etc/wsl.conf
+	        echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
+	        sudo sh $@
+    else
+        OS ?= Linux
     endif
-else ifeq ($~,/c/Users/$I)
-    SHELL ?= Git Bash
-    PYTHON ?= python.exe
+    %-on-Linux-path: ~/.profile
+	    echo 'export PATH="$*:$$PATH"' >> $<
+	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+
+    # Default to an installable Conda python interpreter
+    CONDA_DIR ?= ~/miniconda3/
+    PYTHON ?= $(CONDA_DIR)bin/python3
+    VENV_PYTHON ?= bin/python3
+
+    # Default to an existing Apt package manager
+    ! ?= sudo apt update && sudo apt install -y
+    ? ?= /usr/bin
+
+    # Default to installable Pandoc fonts
+    COUSINE ?= /usr/share/fonts/truetype/cousine
+    CARLITO ?= /usr/share/fonts/truetype/crosextra
+
+    # Installable python interpreter, document compiler and fonts on Ubuntu
+    $(CONDA_DIR)bin/python3: Miniconda3-latest-Linux-$(CPU).sh | $(CONDA_DIR)
+	    bash $< -bfup $| && \
+	    rm $<
+    $?/xetex:
+	    # Need a document compiler: Texlive
+	    $! texlive-xetex
+    /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
+	    # Need a more screen-readable normal font: Carlito
+	    sudo apt-get install fonts-crosextra-carlito
+    /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
+	    # Need a more screen-readable fixed-size font: Cousine
+	    ( sudo mkdir -p $(dir $@) && cd $(dir $@) && \
+	      fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \
+	      sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \
+	      sudo wget $$fonts/cousine/Cousine-Bold.ttf && \
+	      sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \
+	      sudo wget $$fonts/cousine/Cousine-Italic.ttf && \
+	      sudo wget $$fonts/cousine/Cousine-Regular.ttf )
+
+else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
+    OS ?= Windows
+    CPU ?= $(shell echo $$PROCESSOR_ARCHITECTURE)
+    ifeq (AMD64,$(CPU))
+        CPU := x86_64
+    endif
+    %-on-Windows_NT-path:
+	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
+
+    # Default to an installable Conda python interpreter
+    CONDA_DIR ?= $~/AppData/Local/Miniconda/
+    $(info 1 $(PYTHON))
+    PYTHON ?= $(CONDA_DIR)python.exe
     VENV_PYTHON ?= Scripts/python.exe
-else
-    SHELL ?= cmd
-    PYTHON ?= python
-    VENV_PYTHON ?= python.exe
-endif
 
-# Turn PYTHON into an explicit path
-override PYTHON := $(shell which $(PYTHON))
-PIPS = $(shell $(PYTHON) -m make --pips)
-$/venv/pip/ := $/venv/$(PIPS)
+    # Default to an installable Chocolatey package manager
+    ? ?= ~/AppData/Local/Chocolatey/bin
+    ! ?= $?/choco.exe install -y
 
-# A package manager for the PYTHON OS
-ifndef !
-    UNAME ?= $(shell which uname)
-    ifeq (,$(UNAME))
-        UNAME := $(PYTHON) -m make
-    endif
+    # Use C\: prefix for all global files so that make.exe finds them
+    override ? := $(subst :,\:,$(shell cygpath -m $?))
+    override CONDA_DIR := $(subst :,\:,$(shell cygpath -m $(CONDA_DIR)))
+    override PYTHON := $(subst :,\:,$(shell cygpath -m $(PYTHON)))
+    $(info 3 $(PYTHON))
 
-    CPU ?= $(shell $(UNAME) -m)
-    OS ?= $(shell $(UNAME) -s)
-    WINDOWS_OS := $(filter Windows_NT MINGW% MSYS%,$(OS))
-    ifneq (,$(WINDOWS_OS))
-        # Expand $($(PYTHON)) to a Windows mixed-mode path when used as a dependency
-        $(PYTHON) := $(shell cygpath -m $(PYTHON))
-        ! ?= choco install -y
-        ? ?= $(or $(ChocolateyInstall),C:/ProgramData/Chocolatey)/bin
-    else ifeq (MacOSX,$(OS))
-        $(PYTHON) = $(PYTHON)
-        ! ?= brew install
-        ? ?= /opt/homebrew/bin
-        FONTS ?= ~/Library/Fonts
-        COUSINE := $(FONTS)
-        CARLITO := $(FONTS)
-    else
-        $(PYTHON) = $(PYTHON)
-        CXX := /usr/bin/clang++
-        CC := /usr/bin/clang
-        ! ?= sudo apt update && sudo apt install -y
-        ? ?= /usr/bin
-        COUSINE ?= /usr/share/fonts/truetype/cousine
-        CARLITO ?= /usr/share/fonts/truetype/crosextra
-        /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
-	        # Need a more screen-readable normal font: carlito
-	        sudo apt-get install fonts-crosextra-carlito
-        /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
-	        # Need a more screen-readable fixed-size font: cousine
-	        ( sudo mkdir -p $(dir $@) && cd $(dir $@) && \
-	          fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \
-	          sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \
-	          sudo wget $$fonts/cousine/Cousine-Bold.ttf && \
-	          sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \
-	          sudo wget $$fonts/cousine/Cousine-Italic.ttf && \
-	          sudo wget $$fonts/cousine/Cousine-Regular.ttf )
-    endif
+    # Installable package manager, python interpreter and document compiler on Windows
+    "$?/choco.exe":
+	    powershell -NoProfile -ExecutionPolicy Bypass -Command \
+	      "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol \
+	      -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString(\
+	        'https://community.chocolatey.org/install.ps1'))" && \
+	    rm install.ps1
+    $(info 4 $(CONDA_DIR)python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR))
+    $(CONDA_DIR)python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR)
+	    powershell.exe -NoProfile -Command \
+	      "Start-Process -FilePath '$<' -Wait -NoNewWindow -ArgumentList \
+	        '/InstallationType=JustMe','/AddToPath=1','/RegisterPython=1','/S','/D=""$|""'" && \
+	    rm $<
+    "$?/xetex":
+	    $! miktex
 
-    # Install a normal package
-    $?/%:; $! $*
+else  # Probably Zsh on MacOSX
+    OS ?= MacOS
+    CONDA_DIR ?= ~/miniconda3/
+    PYTHON ?= python3
+    VENV_PYTHON ?= bin/python3
+    %-on-MacOSX-path: ~/.zshrc
+	    echo 'export PATH="$*:$$PATH"' >> $<
+	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
 
-    # Custom packages
-    $?/clang++: $?/clang
-    ifneq (,$(WINDOWS_OS))
-        $?/xetex:; $! miktex
-    else
-        $?/xetex:; $! texlive-xetex
-    endif
+    ! ?= brew install
+    ? ?= /opt/homebrew/bin
+    FONTS ?= ~/Library/Fonts
+    COUSINE := $(FONTS)
+    CARLITO := $(FONTS)
+    $?/xetex:
+	    $! texlive-xetex
 
-    .PRECIOUS: $?/jq $?/pandoc $?/xetex
+endif  # Package manager, python interpreter, document compiler and fonts for the OS
+$/make: $(PYTHON)
+
+# Installable Conda installer and directory
+Miniconda3-latest-%:
+	curl -sL "https://repo.anaconda.com/miniconda/$@" -O
+$(CONDA_DIR):
+	mkdir -p $@
+
+# Relative path to pips within a $(PYTHON) venv
+VENV_PIPS = $(shell $(PYTHON) -m make --pips)
+
+# Install a normal package
+$?/%:
+	$! $*
+
+# Default to an installable Clang ASM/C/C++ compiler
+CXX := $?/clang++
+CC := $?/clang
+
+# Custom packages
+$?/clang++: $?/clang
+
+# Make sure dependent packages remain on the OS
+PRECIOUS += jq pandoc xetex clang++
+.PRECIOUS: $(PRECIOUS:%=$?/%)
 
 # Notify the user if new rules were built and included, and make therefore restarted
 ifeq (2,$(MAKE_RESTARTS))
@@ -290,7 +349,7 @@ ifeq (2,$(MAKE_RESTARTS))
 
     MAKER := $(shell $(MAKE) -v))
     INCLUDING ?= $/build/
-    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $($/venv/bin/python3))
+    $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $/venv/$(VENV_PYTHON))
     INCLUDED := $(MAKEFILE_LIST)
     INCLUDING := $/build/
     ifneq (,$($/_SUBPROJECTS))
@@ -302,43 +361,6 @@ ifeq (2,$(MAKE_RESTARTS))
         $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
         $(info # https://aegis.sourceforge.net/auug97.pdf)
     endif
-endif
-
-# Install conda python
-ifndef CONDA
-    CONDA := ~/miniconda3/bin/conda
-    $~/miniconda3/bin/conda:
-	    curl -sL "https://repo.anaconda.com/miniconda/Miniconda3-latest-$(OS)-$(CPU).sh" -o miniconda.sh
-	    bash miniconda.sh -bfup $~/miniconda3
-	    echo 'TODO: $~/miniconda3/bin/conda init | grep modified | (read _ rc && echo "TODO: source $$rc && conda activate")'
-	    rm miniconda.sh
-endif
-
-# Install local commands before other commands
-ifndef .-ON-PATH_TARGETS
-    .-ON-PATH_TARGETS = 1
-    %-on-Linux-path: ~/.profile
-	    echo 'export PATH="$*:$$PATH"' >> $<
-	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
-    %-on-MacOSX-path: ~/.zshrc
-	    echo 'export PATH="$*:$$PATH"' >> $<
-	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
-    %-on-Windows_NT-path:
-	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
-endif
-
-ifndef SPEEDUP_WSL_DNS_TARGET
-    SPEEDUP_WSL_DNS_TARGET = 1
-    $~/use_windows_dns.sh:
-	    echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@
-	    echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
-	    echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
-	    echo -n   "'(Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | " >> $@
-	    echo -n    "ForEach-Object { \"nameserver \$$_\" }' | tr -d '\\r' | " >> $@
-	    echo "tee -a /etc/resolv.conf > /dev/null" >> $@
-	    sudo sed -i '\|command=$@|d' /etc/wsl.conf
-	    echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
-	    sudo sh $@
 endif
 
 endif ### Generics ###
@@ -616,7 +638,7 @@ $/build/%.bringup: $/%
 	mkdir -p $(dir $@) && touch $@
 
 # Make a Python executable
-$/build/%.py.shebang: $($/venv/bin/python3) $/%.py
+$/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py
 	$^ --shebang > $@
 
 # Build a recipy for $/build/%.py.bringup
@@ -624,26 +646,27 @@ $/build/%.py.mk: $/%.py | $/make.py
 	rm -f $@ && ( cd $(dir $<). && $(PYTHON) $*.py --generic --dep build/$*.py.mk ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
 
 # Check Python 3.9 syntax
-$/build/%.py.syntax: $($/venv/bin/python3) $/%.py | $($/venv/pip/)ruff
+$/build/%.py.syntax: $/venv/$(VENV_PYTHON) $/%.py | $/venv/$(VENV_PIPS)ruff
 	$< -m ruff check --select=E9,F63,F7,F82 --target-version=py39 $(lastword,$^) > $@ || (cat $@ && false)
 
 # Install pip package in the local python:
-$($/venv/pip/)%: $($/venv/bin/python3)
+$(info 6 $/venv/$(VENV_PIPS)%: $/venv/$(VENV_PYTHON))
+$/venv/$(VENV_PIPS)%: $/venv/$(VENV_PYTHON)
 	 $< -m pip install --prefer-binary $*
 
 # Setup a local shebang python
-$/%/$(VENV_PYTHON): | $($(PYTHON)) $(PYTHON_DEP) $(SPEEDUP_WSL_DNS)
+$/%/$(VENV_PYTHON): | $(PYTHON) $(PYTHON_DEP) $(SPEEDUP_WSL_DNS)
 	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $* && \
 	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m make --prompt
 
 
 # Check Python 3.9 style
-$/build/%.py.style: $/%.py $/build/%.py.syntax $($/venv/bin/python3)
+$/build/%.py.style: $/%.py $/build/%.py.syntax $/venv/$(VENV_PYTHON)
 	$(word 3,$^) -m ruff check --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
 define META
     # Check Python and command line usage examples in .py files
-    $/build/%.py.tested: $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $($/venv/bin/python3)
+    $/build/%.py.tested: $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $/venv/$(VENV_PYTHON)
 	    ( cd $/. && $$*.py --test ) > $$@ || (cat $$@ && false)
 
     # Check command line usage examples in .md files
@@ -703,8 +726,8 @@ $/build/report-details.md:
 	echo "$(_heading)# Source code, installation and test result" >> $@
 
 # Use GPT for a release review.
-$/build/audit.diff: $/make.py $/build/prompt.diff $/build/make.py.bringup
-	( cd $(dir $<) && venv/bin/python3 -m make --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
+$/build/audit.diff: $/make.py $/build/prompt.diff $/build/make.py.bringup | $/venv/$(VENV_PYTHON)
+	( cd $(dir $<) && $| -m make --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
 $/build/prompt.diff: $/build/review.diff
 	$(PYTHON) -m make -c 'print(REVIEW)' > $@
 	echo "$$ $(MAKE) $(@:%build/prompt.diff=%)review" >> $@
