@@ -236,7 +236,7 @@ ifeq ($~,/home/$I)  # Probably Bash on Ubuntu
     COUSINE ?= /usr/share/fonts/truetype/cousine
     CARLITO ?= /usr/share/fonts/truetype/crosextra
 
-    # Installable python interpreter, document compiler and fonts on Ubuntu
+    # Installable python interpreter, shebang path, document compiler and fonts on Ubuntu
     ifeq (,$(wildcard $(CONDA_DIR)python.exe))
         $(CONDA_DIR)bin/python3: Miniconda3-latest-Linux-$(CPU).sh | $(CONDA_DIR)
 	        bash $< -bfup $| && \
@@ -264,8 +264,6 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     ifeq (AMD64,$(CPU))
         CPU := x86_64
     endif
-    %-on-Windows_NT-path:
-	    $(call ps1,[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User'))
 
     # Default to an installable Conda python interpreter
     CONDA_DIR ?= $~/AppData/Local/miniconda3/
@@ -287,7 +285,7 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     override PYTHON := $(shell cygpath -m $(PYTHON))
     $(info 3 $(PYTHON))
 
-    # Installable package manager, python interpreter and document compiler on Windows
+    # Installable package manager, python interpreter, shebang path and document compiler on Windows
     $? := $(subst :,\:,$?)
     $(CONDA_DIR) := $(subst :,\:,$(CONDA_DIR))
     $($?)/choco.exe:
@@ -303,6 +301,15 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
                 '/InstallationType=JustMe','/AddToPath=1','/RegisterPython=1','/S','/D=""$|""'" && \
             rm $<
     endif
+    ifeq (,$(filter .;%,$(PATH)))
+        .-on-Windows_NT-path:
+	        # Git Bash MSYS normally filters away . from PATH, but we want it to stick
+	        echo 'PATH=".:$$PATH"' >> ~/.bash_profile
+	        # ToDo: source ~/.bash_profile && make $(MAKECMDGOALS)
+	        false
+    endif
+    %-on-Windows_NT-path:
+	    powershell -Command "[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')"
     $($?)/xetex:
 	    $! miktex
 
@@ -365,6 +372,12 @@ ifeq (2,$(MAKE_RESTARTS))
         $(info # Warning: This is a recursive $(MAKE). Please use global variable names and include instead.)
         $(info # https://aegis.sourceforge.net/auug97.pdf)
     endif
+endif
+
+# Make local commands available
+PATHS := $(subst ;, ,$(subst :, ,$(PATH)))
+ifeq (,$(filter .,$(PATHS)))
+    .-ON-PATH := .-on-$(OS)-path
 endif
 
 endif ### Generics ###
@@ -642,7 +655,8 @@ $/build/%.bringup: $/%
 	mkdir -p $(dir $@) && touch $@
 
 # Make a Python executable
-$/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py
+$(info 8 $/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py | $/make.py $(.-ON-PATH))
+$/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py | $/make.py $(.-ON-PATH)
 	$^ --shebang > $@
 
 # Build a recipy for $/build/%.py.bringup
