@@ -335,7 +335,7 @@ Miniconda3-latest-%:
 	curl -sL "https://repo.anaconda.com/miniconda/$@" -O
 PYTHON ?= python3
 VENV_PYTHON ?= bin/python3
-VENV_PIPS ?=
+VENV_PIPS ?= lib/site-packages/
 
 # Default to an installable Clang ASM/C/C++ compiler
 CXX := $?/clang++
@@ -809,8 +809,8 @@ ifeq (old,$(findstring old,$(MAKECMDGOALS)))
         $/_SUBPROJECTS += $($/_BASELINE_DIR)
     endif
 endif
-$/_DEPS += $($/_SUBPROJECTS:%=%Makefile)
+#$/_DEPS += $($/_SUBPROJECTS:%=%Makefile)
 $/_DEPS := $(filter-out $($/_NON-DEPS),$($/_DEPS))
-#-include $($/_DEPS)
+-include $($/_DEPS)
 
 endif # first time
