@@ -238,8 +238,8 @@ def make(make=False, generic=False, dep=None):
             print(GENERIC_MAKEFILE)
         pattern = "%"
         source = "$<"
-        python = "$/venv/bin/python3"
-        recipy_python = "$(dir $<)venv/bin/python3"
+        python = "$/venv/$(VENV_PYTHON)"
+        recipy_python = "$|"
         src_dir = "$/"
         build_dir = "$/build/"
     else:
