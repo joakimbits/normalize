@@ -174,7 +174,7 @@ def run_command_examples(commands, timeout=3):
     for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
         command = "\n".join(map("".join, zip(command_lines, comment_lines)))
         if platform.system() == 'Windows':
-            command = f"cmd /C {command}"
+            command = f'bash -lc "{command}"'
 
         if module_dir:
             command = f"( cd {module_dir} && {command} )"
@@ -618,7 +618,6 @@ class Uname(Action):
     ])
 
     def __call__(self, parser, args, values, option_string=None):
-        import platform
 
         command = self.OPTIONS.get(option_string, option_string)[2:]
         command = self.TRANSLATIONS.get(command, command)
@@ -789,8 +788,8 @@ if __name__ == '__main__':
 $ make.py --generic --dep build/my-bringup.mk
 
 $ cat build/my-bringup.mk
-$/build/make.py.bringup: $/make.py $/build/my-bringup.mk | $/venv/bin/python3
-	$(dir $<)venv/bin/python3 -m pip install requests tiktoken --no-warn-script-location > $@
+$/build/make.py.bringup: $/make.py $/build/my-bringup.mk | $/venv/$(VENV_PYTHON)
+	$| -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --dep make.py.mk
 make.py.mk: make.py | $(PYTHON)
