@@ -2,14 +2,19 @@
 
 ---
 
-Run this in your project directory:
+Preparation - install make:
+- `% xcode-select --install` on MacOS
+- `$ sudo apt update && sudo apt install -y build-essential` on Ubuntu
+- `> iwr -useb get.scoop.sh | iex; & ~\scoop\shims\scoop.ps1 install make` on Windows
 
+Then run this in your project directory:
 ```
 curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -O && make
 ```
 
 - Creates executables from all source files.
 - Recursively also in sub-directories with a README.md file, or any other .md file.
+- Once this small `Makefile` is committed, you can remove built (and other uncommited) files using `git clean -fxd`.
 
 ---
 
@@ -109,6 +114,6 @@ make.py.mk: make.py | $(PYTHON)
 
 ```
 
-- Python version 3.9 or later is required.
+- Python version 3.9 or later is required, and will be installed automatically if missing on the OS.
 
 [example/README.md](example/README.md)
