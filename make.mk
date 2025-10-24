@@ -261,39 +261,28 @@ ifeq ($~,/home/$I)  # Probably Bash on Ubuntu
 else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     OS ?= Windows
     CPU ?= $(shell echo $$PROCESSOR_ARCHITECTURE)
+    ~ := $(shell cygpath -m $~)
+    ? ?= $~/scoop/shims
+    ! ?= powershell.exe -NoProfile -Command "& ~\scoop\shims\scoop.ps1 install @args"
+    OS_PACKAGE_MANAGER ?= $~/scoop/shims/scoop.ps1
     ifeq (AMD64,$(CPU))
         CPU := x86_64
     endif
 
     # Default to an installable Conda python interpreter
     CONDA_DIR ?= $~/AppData/Local/miniconda3/
-    $(info 1 $(PYTHON))
     PYTHON ?= $(CONDA_DIR)python.exe
     VENV_PYTHON ?= Scripts/python.exe
-
-    # Default to an installable Chocolatey package manager
-    ? ?= ~/AppData/Local/Chocolatey/bin
-    ! ?= $?/choco.exe install -y
 
     # Default to installable (?) Pandoc fonts
     COUSINE ?= /TBD/cousine
     CARLITO ?= /TBD/crosextra
 
-    # Use C\: prefix for all global files so that make.exe finds them
-    override ? := $(shell cygpath -m $?)
-    override CONDA_DIR := $(shell cygpath -m $(CONDA_DIR))
-    override PYTHON := $(shell cygpath -m $(PYTHON))
-    $(info 3 $(PYTHON))
-
     # Installable package manager, python interpreter, shebang path and document compiler on Windows
-    $? := $(subst :,\:,$?)
+    $~ := $(subst :,\:,$~)
+    $($~)/scoop/shims/scoop.ps1:
+	    powershell.exe -NoProfile -Command "iwr -useb get.scoop.sh | iex"
     $(CONDA_DIR) := $(subst :,\:,$(CONDA_DIR))
-    $($?)/choco.exe:
-	    powershell -NoProfile -ExecutionPolicy Bypass -Command \
-	      "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol \
-	      -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString(\
-	        'https://community.chocolatey.org/install.ps1'))" && \
-	    rm install.ps1
     ifeq (,$(wildcard $(CONDA_DIR)python.exe))
         $(info 4 $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR))
         $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR)
@@ -310,7 +299,14 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     endif
     %-on-Windows_NT-path:
 	    powershell -Command "[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')"
-    $($?)/xetex:
+    CXX := $?/clang++.exe
+    CC := $?/clang.exe
+    $? := $(subst :,\:,$?)
+    $($?)/clang.exe $($?)/clang++.exe:
+	    $! llvm
+    PANDOC ?= $?/pandoc.exe
+    XELATEX ?= $?/xelatex.exe
+    $($?)/xetex.exe:
 	    $! miktex
 
 else  # Probably Zsh on MacOSX
@@ -320,6 +316,12 @@ else  # Probably Zsh on MacOSX
 	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
     ! ?= brew install
     ? ?= /opt/homebrew/bin
+
+    # Default to an installable Clang ASM/C/C++ compiler
+    CXX := $?/clang++
+    CC := $?/clang
+    $($?)/clang++: $?/clang
+
     FONTS ?= ~/Library/Fonts
     COUSINE := $(FONTS)
     CARLITO := $(FONTS)
@@ -327,6 +329,9 @@ else  # Probably Zsh on MacOSX
 	    $! texlive-xetex
 
 endif  # Package manager, python interpreter, document compiler and fonts for the OS
+$? ?= $?
+$($?)/%: | $(OS_PACKAGE_MANAGER)
+	$! $(basename $*)
 CONDA_DIR ?= ~/miniconda3/
 $(CONDA_DIR) ?= $(CONDA_DIR)
 $($(CONDA_DIR)):
@@ -336,17 +341,8 @@ Miniconda3-latest-%:
 PYTHON ?= python3
 VENV_PYTHON ?= bin/python3
 VENV_PIPS ?= lib/site-packages/
-
-# Default to an installable Clang ASM/C/C++ compiler
-CXX := $?/clang++
-CC := $?/clang
-
-# Normal package
-$?/%:
-	$! $*
-
-# Custom packages
-$?/clang++: $?/clang
+PANDOC ?= $?/pandoc
+XELATEX ?= $?/xetex
 
 # Make sure dependent packages remain on the OS
 PRECIOUS += jq pandoc xetex clang clang++
@@ -728,14 +724,14 @@ $/build/report.md: $/build/result.txt $($/*.md) $($/_EXES)
 	make.py --report $($/_NAME) $< "$($/*.md:$/%=%)" "$($/_LINKABLE:$/%=%)" "$($/_EXE:$/%=%)" "$($/*.py:$/%=%)" > $@
 
 define META
-    $$/%.gfm: $/build/%.md
+    $/%.gfm: $/build/%.md
 	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
-	           -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`"
-    $$/%.html $$/%.pdf $$/%.dzslides: $$/build/%.md | $$?/pandoc $$?/xetex $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
-	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
-	           -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
-	           -V min-width=80%\!important -V geometry:margin=1in \
-	           --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
+	           -M title="$/_NAME $$*" -M author="`git log -1 --pretty=format:'%an'`"
+    $/%.html $/%.pdf $/%.dzslides: $/build/%.md | $(PANDOC) $(XELATEX) $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
+	    $(PANDOC) --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
+	              -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
+	              -V min-width=80%\!important -V geometry:margin=1in \
+	              --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 endef
 $(eval $(META))
 $/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT)
