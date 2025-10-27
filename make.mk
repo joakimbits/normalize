@@ -685,7 +685,11 @@ define META
 	    tmp=$$@-$$$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	    ( cd $/. && $(PYTHON) -m make --timeout 60 --sh-test build/$$*.sh-test ) > $$$$tmp && mv $$$$tmp $$@
     $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
-	    mkdir -p $$(dir $$@) && pandoc -i $$< -t json --preserve-tabs | jq -r '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1]' > $$@ && truncate -s -1 $$@
+	    mkdir -p $$(dir $$@) && \
+	    ( pandoc -i $$< -t json --preserve-tabs | \
+	      jq -rj '.blocks[] | select(.t | contains("CodeBlock"))? | \
+	              .c | select(.[0][1][0] | contains("sh"))? | \
+	              .[1] + "\n"' ) > $$@
 endef
 $(eval $(META))
 
