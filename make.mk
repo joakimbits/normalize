@@ -284,7 +284,6 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
 	    powershell.exe -NoProfile -Command "iwr -useb get.scoop.sh | iex"
     $(CONDA_DIR) := $(subst :,\:,$(CONDA_DIR))
     ifeq (,$(wildcard $(CONDA_DIR)python.exe))
-        $(info 4 $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR))
         $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR)
 	        powershell.exe -NoProfile -Command "Start-Process -FilePath '$<' -Wait -NoNewWindow -ArgumentList \
                 '/InstallationType=JustMe','/AddToPath=1','/RegisterPython=1','/S','/D=""$|""'" && \
@@ -651,7 +650,6 @@ $/build/%.bringup: $/%
 	mkdir -p $(dir $@) && touch $@
 
 # Make a Python executable
-$(info 8 $/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py | $/make.py $(.-ON-PATH))
 $/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py | $/make.py $(.-ON-PATH)
 	$^ --shebang > $@
 
@@ -664,7 +662,6 @@ $/build/%.py.syntax: $/venv/$(VENV_PYTHON) $/%.py | $/venv/$(VENV_PIPS)ruff
 	$< -m ruff check --select=E9,F63,F7,F82 --target-version=py39 $(lastword,$^) > $@ || (cat $@ && false)
 
 # Install pip package in the local python:
-$(info 6 $/venv/$(VENV_PIPS)%: $/venv/$(VENV_PYTHON))
 $/venv/$(VENV_PIPS)%: $/venv/$(VENV_PYTHON)
 	 $< -m pip install --prefer-binary $*
 
@@ -805,7 +802,7 @@ ifeq (old,$(findstring old,$(MAKECMDGOALS)))
         $/_SUBPROJECTS += $($/_BASELINE_DIR)
     endif
 endif
-#$/_DEPS += $($/_SUBPROJECTS:%=%Makefile)
+$/_DEPS += $($/_SUBPROJECTS:%=%Makefile)
 $/_DEPS := $(filter-out $($/_NON-DEPS),$($/_DEPS))
 -include $($/_DEPS)
 
