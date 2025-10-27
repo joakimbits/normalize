@@ -339,6 +339,9 @@ Miniconda3-latest-%:
 	curl -sL "https://repo.anaconda.com/miniconda/$@" -O
 PYTHON ?= python3
 VENV_PYTHON ?= bin/python3
+%/$(VENV_PYTHON): | $(PYTHON) $(PYTHON_DEP) $(SPEEDUP_WSL_DNS)
+	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $* && \
+	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m make --prompt
 VENV_PIPS ?= lib/site-packages/
 PANDOC ?= $?/pandoc
 XELATEX ?= $?/xetex
@@ -664,12 +667,6 @@ $/build/%.py.syntax: $/venv/$(VENV_PYTHON) $/%.py | $/venv/$(VENV_PIPS)ruff
 # Install pip package in the local python:
 $/venv/$(VENV_PIPS)%: $/venv/$(VENV_PYTHON)
 	 $< -m pip install --prefer-binary $*
-
-# Setup a local shebang python
-$/%/$(VENV_PYTHON): | $(PYTHON) $(PYTHON_DEP) $(SPEEDUP_WSL_DNS)
-	$(SPEEDUP_WSL_PIP)$(PYTHON) -m venv --upgrade-deps $* && \
-	$(SPEEDUP_WSL_PIP)$@ -m pip install requests  # Needed by -m make --prompt
-
 
 # Check Python 3.9 style
 $/build/%.py.style: $/%.py $/build/%.py.syntax $/venv/$(VENV_PYTHON)
