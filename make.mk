@@ -292,8 +292,8 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     ifeq (,$(filter .;%,$(PATH)))
         .-on-Windows_NT-path:
 	        # Git Bash MSYS normally filters away . from PATH, but we want it to stick
-	        echo 'PATH=".:$$PATH"' >> ~/.bash_profile
-	        # ToDo: source ~/.bash_profile && make $(MAKECMDGOALS)
+	        echo 'PATH=".:$$PATH"' >> ~/.bashrc
+	        # ToDo: source ~/.bashrc && make $(MAKECMDGOALS)
 	        false
     endif
     %-on-Windows_NT-path:
