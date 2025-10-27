@@ -36,7 +36,7 @@ User manual:
 
 ```sh
 $ make.py -c 'print(__doc__)'
-Print a Makefile for handling a python module and exit
+Print a Makefile for handling a python module ond/or linkable source code, and exit
 
 Adds the following command line options to the main module:
 
