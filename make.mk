@@ -298,13 +298,16 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     endif
     %-on-Windows_NT-path:
 	    powershell -Command "[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')"
-    CXX := $?/clang++.exe
-    CC := $?/clang.exe
-    $? := $(subst :,\:,$?)
-    $($?)/clang.exe $($?)/clang++.exe:
-	    $! llvm
+    LLM ?= mingw-mstorsjo-llvm-ucrt
+    CXX := $~/scoop/apps/$(LLM)/current/bin/clang++.exe
+    CC := $~/scoop/apps/$(LLM)/current/bin/clang.exe
+    $($~)/scoop/apps/$(LLM)/current/bin/clang.exe $($~)/scoop/apps/$(LLM)/current/bin/clang++.exe:
+	    $! mingw-mstorsjo-llvm-ucrt
+    SYSTEM ?= $~/scoop/apps/$(LLM)/current/include
+    TARGET ?= $(CPU)-w64-mingw32
     PANDOC ?= $?/pandoc.exe
     XELATEX ?= $?/xelatex.exe
+    $? := $(subst :,\:,$?)
     $($?)/xetex.exe:
 	    $! miktex
 
@@ -517,6 +520,7 @@ $/_CODE += $($/*.py)
 
 ## Prepare for compilation
 $/_LDFLAGS += $(LDFLAGS)
+$/_LDFLAGS += --target=$(TARGET)
 
 # A linked executable has the same name as the project
 ifneq (,$($/_LINKABLE))
@@ -530,6 +534,7 @@ ifneq ($(strip $($/*.s)),)
 endif
 
 $/_CXXFLAGS := $($/_LDFLAGS)
+$/_CXXFLAGS += -isystem=$(SYSTEM)
 $/_CXXFLAGS += -S $(addprefix -I,$($/_INC_DIRS)) -MMD -MP
 $/_CFLAGS := -Wno-deprecated $($/_CXXFLAGS)
 $/_CXXFLAGS += $(CXXFLAGS)
@@ -631,21 +636,17 @@ ifneq (,$($/_OBJS))
     $/build/$($/_NAME).tested: $/$($/_NAME)
 	    true | ./$< > $@ || (cat $@ && false)
 
-    # Use project specific compile flags
-    define META
-        # Compile C++
-        $$/build/%.s: $$/% | $$(CXX)
-	        $$(CXX) $$($/_CXXFLAGS) -c $$< -o $$@
+    # Compile C++
+    $/build/%.s: $/% | $(CXX)
+	    $| $($/_CXXFLAGS) $< -o $@
 
-        # Compile C
-        $$/build/%.c.s: $$/%.c | $$(CXX)
-	        $$(CXX) $$($/_CFLAGS) -c $$< -o $$@
+    # Compile C
+    $/build/%.c.s: $/%.c | $(CXX)
+	    $| $($/_CFLAGS) $< -o $@
 
-        # Link executable
-        $$/$$($$/_NAME): $$($$/_OBJS) | $$(CC)
-	        $$(CC) $$($/_LDFLAGS) $$^ -o $$@
-    endef
-    $(eval $(META))
+   # Link executable
+    $/$($/_NAME): $($/_OBJS) | $(CXX)
+	    $| $($/_LDFLAGS) $^ -o $@
 endif
 
 # Build a recipy for $/build/%.py.bringup
