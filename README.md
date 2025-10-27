@@ -35,9 +35,8 @@ make old new review audit
 User manual:
 
 ```sh
-$  head -39 make.py
-#!venv/bin/python3
-"""Print a Makefile for handling a python module and exit
+$ make.py -c 'print(__doc__)'
+Print a Makefile for handling a python module and exit
 
 Adds the following command line options to the main module:
 
@@ -74,7 +73,7 @@ To self-test all such tools in a directory - while adding their dependencies int
 
 Dependencies:
 requests tiktoken # Needed for the --prompt option
-"""
+
 
 ```
 
@@ -111,7 +110,6 @@ make.py.shebang: make.py make.py.bringup
 make.py.mk: make.py | $(PYTHON)
 	$(PYTHON) make.py --dep $@ > /dev/null
 -include make.py.mk
-
 ```
 
 - Python version 3.9 or later is required, and will be installed automatically if missing on the OS.
