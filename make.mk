@@ -496,8 +496,8 @@ endef
 define META
     .PHONY: $/make $/help $/list $/venv $/bringup $/syntax $/style $/tested $/result $/old $/new $/html $/pdf $/slides
     .PHONY: $/clean $/clean/keep_venv
-    #$(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
-    #  $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
+    $(foreach t,make venv bringup syntax style tested old new html pdf slides clean clean/keep_venv, \
+      $/$t: | $($/_ACTIVE_SUBPROJECTS:%=$/%$t)$n)
     $/clean: $/clean/keep_venv
 	    rm -rf $/venv/ $/.ruff_cache/
     $/clean/keep_venv:
