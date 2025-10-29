@@ -167,21 +167,20 @@ def run_command_examples(commands, timeout=3):
 
     import subprocess
 
-    # Add PWD to Path so that Windows can run files from there.
     my_env = os.environ.copy()
-    my_env["PATH"] = f".{os.pathsep}{my_env['PATH']}"
-
     for i, (command_lines, comment_lines, output_lines) in enumerate(commands):
         command = "\n".join(map("".join, zip(command_lines, comment_lines)))
-        if platform.system() == 'Windows':
-            command = f'bash -lc "{command}"'
-
         if module_dir:
             command = f"( cd {module_dir} && {command} )"
 
         expected = "\n".join(output_lines)
-        result = subprocess.run(command, shell=True, capture_output=True, text=True,
-                                timeout=timeout, env=my_env)
+        if platform.system() == 'Windows':
+            result = subprocess.run(['bash.exe', '--login'], input=(command + "\nexit\n").encode('ascii'),
+                                    shell=False, capture_output=True, text=False, timeout=timeout, env=my_env)
+            result.stdout = result.stdout.replace(b'\r\r\n', b'\n').replace(b'\r\n', b'\n').decode('ascii')
+        else:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True,
+                                    timeout=timeout, env=my_env)
         assert not result.returncode, (
             f"Example {i + 1} failed ({result.returncode}): $ {command}\n"
             f"stdout: {result.stdout}\n"
@@ -193,8 +192,8 @@ def run_command_examples(commands, timeout=3):
             assert re.fullmatch(pattern, received)
         except AssertionError as e:
             diff = '\n'.join(difflib.unified_diff(
-                expected.splitlines(keepends=True), received.splitlines(keepends=True),
-                fromfile="expected", tofile="received", lineterm=''))
+                expected.splitlines(), received.splitlines(),
+                fromfile="expected", tofile="received"))
             raise AssertionError(
                 f"Example {i + 1}: $ {command}\n"
                 f"Expected: {repr(expected)}\n"
