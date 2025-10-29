@@ -2,17 +2,14 @@
 
 \footnotesize
 ~~~ {.sh}
-$ ./example
+$ example
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ ./greeter.py
+$ greeter.py hello
 Hello from greeter.py!
 Hello from main.c!
 Hello from greeter.cpp!
-
-$ ./greeter.py world
-Hello world!
 
 ~~~
 \normalsize
@@ -21,28 +18,25 @@ Hello world!
 
 ### How it works
 
-- Makefile includes make.mk.
-- make.mk includes test.py.mk.
+- Makefile has 'bringup' as default target and includes make.mk (downloading it if missing).
+- make.mk finds main.c and greeter.cpp, adds build/example.bringup, compiles example, and includes build/main.c.d build/greeter.cpp.d.
+- make.mk downloads make.py if missing, finds greeter.py, adds build/greeter.py.bringup, and includes build/greeter.py.mk.
 
 \footnotesize
 ~~~ {.sh}
 $ cat build/greeter.py.mk
-$/build/greeter.py.bringup: $/greeter.py $/build/greeter.py.mk | $/venv/bin/python3
+$/build/greeter.py.bringup: $/greeter.py $/build/greeter.py.mk | $/venv/$(VENV_PYTHON)
 	( cd $(dir $<). && make example --no-print-directory ) > $@ && \
-	$(dir $<)venv/bin/python3 -m pip install fire --no-warn-script-location >> $@
+	$| -m pip install fire --no-warn-script-location >> $@
 
 $ greeter.py --help | awk '{ print "\t" $0 }'
 	usage: greeter.py [-h] [--make] [--generic] [--dep DEP] [--pips] [-c C]
 	                  [--timeout TIMEOUT] [--test] [--sh-test SH_TEST] [--shebang]
-	                  ...
 	
 	Greetings from the source code
 	
 		function hello: Greetings from the source code examples in this folder
 		function run: Run a command and return the decoded result
-	
-	positional arguments:
-	  world              hello(world)
 	
 	option...:
 	  -h, --help         show this help message and exit
@@ -60,16 +54,29 @@ $ greeter.py --help | awk '{ print "\t" $0 }'
 	                     if needed, and exit
 	
 	Examples:
-	$ ./greeter.py
+	$ greeter.py
+	NAME
+	    greeter.py
+	
+	SYNOPSIS
+	    greeter.py COMMAND
+	
+	COMMANDS
+	    COMMAND is one of the following:
+	
+	     hello
+	       Greetings from the source code examples in this folder
+	
+	     run
+	       Run a command and return the decoded result
+	
+	$ greeter.py hello
 	Hello from greeter.py!
 	Hello from main.c!
 	Hello from greeter.cpp!
 	
-	$ ./greeter.py world
-	Hello world!
-
-$ greeter.py README.md reader
-Hello README.md reader!
-
+	$ greeter.py run example
+	Hello from main.c!
+	Hello from greeter.cpp!
 ~~~
 \normalsize

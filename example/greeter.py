@@ -1,4 +1,4 @@
-#!venv/bin/python3
+#!venv/Scripts/python.exe
 """Greetings from the source code
 
 Dependencies:
@@ -28,20 +28,34 @@ def hello(*world):
     Hello from greeter.cpp!
     """
 
-    if world:
-        print(f"Hello {' '.join(world)}!")
-    else:
-        print("Hello from greeter.py!")
-        print(run(f"{make.path}example"))
+    print("Hello from greeter.py!")
+    print(run(f"{make.path}example"))
 
 EXAMPLES = """
-$ ./greeter.py
+$ greeter.py
+NAME
+    greeter.py
+
+SYNOPSIS
+    greeter.py COMMAND
+
+COMMANDS
+    COMMAND is one of the following:
+
+     hello
+       Greetings from the source code examples in this folder
+
+     run
+       Run a command and return the decoded result
+
+$ greeter.py hello
 Hello from greeter.py!
 Hello from main.c!
 Hello from greeter.cpp!
 
-$ ./greeter.py world
-Hello world!
+$ greeter.py run example
+Hello from main.c!
+Hello from greeter.cpp!
 """
 
 if __name__ == '__main__':
@@ -49,8 +63,6 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=make.brief(),
         epilog=f"Examples:{EXAMPLES}")
-    argparser.add_argument('world', nargs=argparse.REMAINDER, help=(
-        "hello(world)"))
     make.add_arguments(argparser)
-    args = argparser.parse_args()
-    fire.Fire(hello)
+    args = argparser.parse_known_args()
+    fire.Fire(dict(hello=hello, run=run))
