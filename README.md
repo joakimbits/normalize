@@ -2,10 +2,22 @@
 
 ---
 
-Preparation - install make:
-- `% xcode-select --install` on MacOS
-- `$ sudo apt update && sudo apt install -y build-essential` on Ubuntu
-- `> iwr -useb get.scoop.sh | iex; & ~\scoop\shims\scoop.ps1 install make` on Windows
+Preparation - install ln, git and make:
+- On MacOS:
+```zsh
+xcode-select --install
+```
+
+- On Ubuntu or Windows WSL: 
+```bash
+sudo apt update && sudo apt install -y git build-essential
+```
+
+- On Windows (admin PowerShell for setup below, then use bash.exe — Git Bash — not WSL's bash):
+```powershell
+reg add 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d 1 /f
+iwr -useb get.scoop.sh | iex; & ~\scoop\shims\scoop.ps1 install git make
+```
 
 Then run this in your project directory:
 ```
@@ -36,40 +48,26 @@ User manual:
 
 ```sh
 $ make.py -c 'print(__doc__)'
-Print a Makefile for handling a python module ond/or linkable source code, and exit
-
-Adds the following command line options to the main module:
-
---make: Print a Makefile for bringup and test of the parent module.
---generic: Generalize it to make everything that is makeable within the parent module directory, and from anywhere.
---dep <file>: Create a separate Makefile for bringup of the parent module, and set the build directory to its parent
-  directory.
-
-Makes it easy to add the following command line options to the parent module:
-
---timeout: Time in seconds before giving up on a command-line test.
---sh-test <file>: Test command line usage examples in a file and exit.
---test: Verify python and command line usage examples in the module and exit.
--c <string>: Execute a program string in the module and exit.
---prompt <file> <openai model> <T> <rot13-encoded key>: Print a GPT continuation of the file and exit.
-
-
 USER MANUAL
 
 To integrate a tool.py module that uses make, check the Dependencies section in its
 header. Dependencies can include pip installation lines as well as bash commands.
 
-To self-test a tool.py that uses make - while adding its dependencies into python3:
+To install and self-test a tool.py that uses make:
 
-    $ python3 tool.py --make > tool.mk && make -f tool.mk
+    $ python3 tool.py --make > tool.mk && make -f tool.mk && tool.py --test
 
-To self-test all such tools in a directory - while adding their dependencies into a directory python venv:
+To install all such tools in a directory - while adding their dependencies into a directory python venv:
 
-    $ sudo apt update && sudo apt -y upgrade && sudo apt install -y make
     $ python3 tool.py --make --generic > Makefile
     $ make
     <modify any source file in the same folder>
     $ make
+
+The Makefile will automatically also compile any C/C++ code into assembly code for the CPU used,
+and build an executable with that and any other assembly code it finds in the same folder.
+It needs access to internet to grab a make.mk file that handles that, which in turn installs make.py.
+If they are already in the directory or linked to from the directory, internet access is not needed.
 
 Dependencies:
 requests tiktoken # Needed for the --prompt option
@@ -83,15 +81,16 @@ Standalone variant:
 
 ```sh
 $ make.py --make
-bringup: build/make.py.bringup
-tested: build/make.py.tested
-build/make.py.tested: make.py build/make.py.shebang
-	make.py --test > $@
-build/make.py.shebang: make.py build/make.py.bringup
-	$(PYTHON) make.py --shebang > $@
-build/make.py.bringup: make.py | $(PYTHON)
+bringup: build/make.py.bringup  # Default: Make sure everything is setup OK
+tested: build/make.py.tested  # Make sure everything tested OK
+
+build/make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
 	mkdir -p build/ && \
+	make.py --shebang > $@
+build/make.py.bringup: make.py build/make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
+build/make.py.tested: make.py build/make.py.bringup   # Make sure make.py tested OK
+	make.py --test > $@
 
 ```
 
@@ -101,15 +100,16 @@ Standalone variant with dynamic bringup:
 
 ```sh
 $ make.py --make --dep make.py.mk
-bringup: make.py.bringup
-tested: make.py.tested
-make.py.tested: make.py make.py.shebang make.py.mk
-	make.py --test > $@
-make.py.shebang: make.py make.py.bringup
-	$(PYTHON) make.py --shebang > $@
-make.py.mk: make.py | $(PYTHON)
+bringup: make.py.bringup  # Default: Make sure everything is setup OK
+tested: make.py.tested  # Make sure everything tested OK
+
+make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
+	make.py --shebang > $@
+make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
 	$(PYTHON) make.py --dep $@ > /dev/null
--include make.py.mk
+-include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
+make.py.tested: make.py make.py.bringup make.py.mk   # Make sure make.py tested OK
+	make.py --test > $@
 ```
 
 - Python version 3.9 or later is required, and will be installed automatically if missing on the OS.

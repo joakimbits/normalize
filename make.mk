@@ -261,6 +261,7 @@ ifeq ($~,/home/$I)  # Probably Bash on Ubuntu
 else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     OS ?= Windows
     CPU ?= $(shell echo $$PROCESSOR_ARCHITECTURE)
+    .exe := .exe
     ~ := $(shell cygpath -m $~)
     ? ?= $~/scoop/shims
     ! ?= powershell.exe -NoProfile -Command "& ~\scoop\shims\scoop.ps1 install @args"
@@ -524,8 +525,8 @@ $/_LDFLAGS += --target=$(TARGET)
 
 # A linked executable has the same name as the project
 ifneq (,$($/_LINKABLE))
-    $/_EXE := $/$($/_NAME)
-    $/_EXE_TESTED := $/build/$($/_NAME).tested
+    $/_EXE := $/$($/_NAME)$(.exe)
+    $/_EXE_TESTED := $/build/$($/_NAME)$(.exe).tested
 endif
 
 # If we got assembly source, assume it has _start code
@@ -547,8 +548,7 @@ $/_EXES := $($/_EXE)
 $/_EXES += $($/*.py)
 
 # Collect bringup and tested targets
-$/build/*.bringup := $($/_EXES:$/%=$/build/%.bringup)
-$/build/*.bringup += $($/*.py:$/%=$/build/%.shebang)
+$/build/*.bringup := $($/_EXES) $($/*.py:$/%=$/build/%.bringup)
 $/build/*.tested += $($/_EXES:$/%=$/build/%.tested)
 ifndef PRETESTED
     PRETESTED :=
@@ -633,9 +633,6 @@ $/slides.html: $/report.dzslides
 
 # Make a linked executable
 ifneq (,$($/_OBJS))
-    $/build/$($/_NAME).tested: $/$($/_NAME)
-	    true | ./$< > $@ || (cat $@ && false)
-
     # Compile C++
     $/build/%.s: $/% | $(CXX)
 	    $| $($/_CXXFLAGS) $< -o $@
@@ -644,14 +641,17 @@ ifneq (,$($/_OBJS))
     $/build/%.c.s: $/%.c | $(CXX)
 	    $| $($/_CFLAGS) $< -o $@
 
-   # Link executable
-    $/$($/_NAME): $($/_OBJS) | $(CXX)
+    # Link executable
+    $/$($/_NAME)$(.exe): $($/_OBJS) | $(CXX)
 	    $| $($/_LDFLAGS) $^ -o $@
+
+    # Test executable
+    $/build/$($/_NAME)$(.exe).tested: $/$($/_NAME)$(.exe)
+	    true | ./$< > $@ || (cat $@ && false)
 endif
 
-# Build a recipy for $/build/%.py.bringup
-$/build/%.bringup: $/%
-	mkdir -p $(dir $@) && touch $@
+# Build a local venv after any linked local executable is built
+$/venv/$(VENV_PYTHON): $($/_EXE)
 
 # Make a Python executable
 $/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py | $/make.py $(.-ON-PATH)

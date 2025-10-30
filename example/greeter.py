@@ -2,7 +2,6 @@
 """Greetings from the source code
 
 Dependencies:
-$ make example --no-print-directory
 fire
 """
 import subprocess

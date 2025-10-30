@@ -1,38 +1,24 @@
 #!venv/Scripts/python.exe
-"""Print a Makefile for handling a python module ond/or linkable source code, and exit
-
-Adds the following command line options to the main module:
-
---make: Print a Makefile for bringup and test of the parent module.
---generic: Generalize it to make everything that is makeable within the parent module directory, and from anywhere.
---dep <file>: Create a separate Makefile for bringup of the parent module, and set the build directory to its parent
-  directory.
-
-Makes it easy to add the following command line options to the parent module:
-
---timeout: Time in seconds before giving up on a command-line test.
---sh-test <file>: Test command line usage examples in a file and exit.
---test: Verify python and command line usage examples in the module and exit.
--c <string>: Execute a program string in the module and exit.
---prompt <file> <openai model> <T> <rot13-encoded key>: Print a GPT continuation of the file and exit.
-
-
-USER MANUAL
+"""USER MANUAL
 
 To integrate a tool.py module that uses make, check the Dependencies section in its
 header. Dependencies can include pip installation lines as well as bash commands.
 
-To self-test a tool.py that uses make - while adding its dependencies into python3:
+To install and self-test a tool.py that uses make:
 
-    $ python3 tool.py --make > tool.mk && make -f tool.mk
+    $ python3 tool.py --make > tool.mk && make -f tool.mk && tool.py --test
 
-To self-test all such tools in a directory - while adding their dependencies into a directory python venv:
+To install all such tools in a directory - while adding their dependencies into a directory python venv:
 
-    $ sudo apt update && sudo apt -y upgrade && sudo apt install -y make
     $ python3 tool.py --make --generic > Makefile
     $ make
     <modify any source file in the same folder>
     $ make
+
+The Makefile will automatically also compile any C/C++ code into assembly code for the CPU used,
+and build an executable with that and any other assembly code it finds in the same folder.
+It needs access to internet to grab a make.mk file that handles that, which in turn installs make.py.
+If they are already in the directory or linked to from the directory, internet access is not needed.
 
 Dependencies:
 requests tiktoken # Needed for the --prompt option
@@ -107,6 +93,53 @@ $/make.mk:
 -include $/make.mk"""
 
 COMMENT_GROUP_PATTERN = re.compile(r"(\s*#.*)?$")
+
+
+def is_executable(path):
+    """True if the file at 'path' is executable"""
+    return os.access(path, os.X_OK)
+
+
+def make_executable(path):
+    """Make the file at 'path' executable"""
+    os.chmod(path, 0o777)
+
+
+def shebang():
+    """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
+
+    SHEBANG, EOL = (b'#!venv/Scripts/python.exe', b'\r\n') if os.name == 'nt' else (b'#!venv/bin/python3', b'\n')
+    PATHSEP_INSTALL = {
+        ':': "export PATH='.:$PATH'",
+        ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
+    }
+    match_shebang_eol_code = re.compile(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z').match
+
+    # Make it have a correct shebang with both a Linux and a Windows line ending
+    src = open(module_path, 'rb').read()
+    shebang, eol, code = match_shebang_eol_code(src).groups()
+    if shebang != SHEBANG:
+        open(module_path, 'wb').write(SHEBANG + EOL + code)
+        print(f'# {module_path} now updated with shebang {shebang}')
+
+    # Print any command needed to disable Windows-style crlf checkouts
+    if eol[0] != ord('\n'):
+        print('# Please consider permanently changing to LF instead of CR after a shebang, like below.')
+        print('git config --global core.autocrlf input')
+
+    # Make it an executable
+    if not is_executable(module_path):
+        make_executable(module_path)
+        print(f'# {module_path} is now executable with shebang {shebang}')
+
+    # Print any commands needed to run it without ./ or .\ prefix
+    search_path = os.environ['PATH']
+    search_dirs = search_path.split(os.pathsep)
+    if '.' not in search_dirs:
+        print(f'# {module_path} needs the following . on PATH configuration to use shebang {shebang}')
+        print(PATHSEP_INSTALL[os.pathsep])
+
+    exit(0)
 
 
 def make_rule(rule, commands, file=sys.stdout):
@@ -200,14 +233,16 @@ def run_command_examples(commands, timeout=3):
                 f"Received: {repr(received)}\n"
                 f"{diff}") from e
 
+    sys.exit(0)
 
-def make(make=False, generic=False, dep=None):
-    """
-    Generate Makefile or depfile.
+
+def make(generic=False, make=False, dep=None):
+    """Print a Makefile and/or generate a dependency bringup file, and exit
+
     Args:
-        make: Print a Makefile (plain or generic).
-        generic: If True, use generic Makefile/dep output.
-        dep: Path to dependency file to generate.
+        --generic: Generate rules and recipies that works for any code in the directory.
+        --make: Print a Makefile.
+        --dep PATH: Create a dependency bringup file.
     """
     # Determine build dir + dep file
     if dep:
@@ -254,7 +289,7 @@ def make(make=False, generic=False, dep=None):
     else:
         dep_target = ""
 
-    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {build_dir}{pattern}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
+    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {build_dir}{module}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
     commands = []
     bringup = [bringup_rule,
                commands]
@@ -316,10 +351,14 @@ def make(make=False, generic=False, dep=None):
         else:
             make_rule(rule, commands)
 
+    sys.exit(0)
+
 
 if parent_module.__name__ == "__main__":
     args = sys.argv[1:]
-    if any(opt in args for opt in ("--make", "--generic", "--dep")):
+    if args == ['--shebang']:
+        shebang()
+    elif any(opt in args for opt in ("--make", "--generic", "--dep")):
         dep_file = None
         if "--dep" in args:
             i = args.index("--dep")
@@ -329,17 +368,6 @@ if parent_module.__name__ == "__main__":
              generic="--generic" in args,
              dep=dep_file)
 
-        sys.exit(0)
-
-
-def is_executable(path):
-    """True if the file at 'path' is executable"""
-    return os.access(path, os.X_OK)
-
-def make_executable(path):
-    """Make the file at 'path' executable"""
-    os.chmod(path, 0o777)
-
 
 class Pips(Action):
     """Print the path to pips within a python environment, and exit"""
@@ -347,44 +375,6 @@ class Pips(Action):
     def __call__(self, parser, args, values, option_string=None):
         pip_path = re.compile(r'(?i)(?:^|[\\/])((?:lib|lib64)[\\/](?:[^\\/]+[\\/])?(?:site|dist)-packages)')
         print(pip_path.search(sysconfig.get_path("purelib")).group(1) + os.sep)
-        exit(0)
-
-
-class Shebang(Action):
-    """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
-
-    SHEBANG, EOL = (b'#!venv/Scripts/python.exe', b'\r\n') if os.name == 'nt' else (b'#!venv/bin/python3', b'\n')
-    PATHSEP_INSTALL = {
-        ':': "export PATH='.:$PATH'",
-        ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
-    }
-    match_shebang_eol_code = re.compile(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z').match
-
-    def __call__(self, parser, args, values, option_string=None):
-        # Make it have a correct shebang with both a Linux and a Windows line ending
-        src = open(module_path, 'rb').read()
-        shebang, eol, code = self.match_shebang_eol_code(src).groups()
-        if shebang != self.SHEBANG:
-            open(module_path, 'wb').write(self.SHEBANG + self.EOL + code)
-            print(f'# {module_path} now updated with shebang {shebang}')
-
-        # Print any command needed to disable Windows-style crlf checkouts
-        if eol[0] != ord('\n'):
-                print('# Please consider permanently changing to LF instead of CR after a shebang, like below.')
-                print('git config --global core.autocrlf input')
-
-        # Make it an executable
-        if not is_executable(module_path):
-            make_executable(module_path)
-            print(f'# {module_path} is now executable with shebang {shebang}')
-
-        # Print any commands needed to run it without ./ or .\ prefix
-        search_path = os.environ['PATH']
-        search_dirs = search_path.split(os.pathsep)
-        if '.' not in search_dirs:
-            print(f'# {module_path} needs the following . on PATH configuration to use shebang {shebang}')
-            print(self.PATHSEP_INSTALL[os.pathsep])
-
         exit(0)
 
 
@@ -768,10 +758,11 @@ def brief(*callables):
 
 
 def add_arguments(argparser):
+    argparser.add_argument('--shebang', action='store_true', help=shebang.__doc__)
+    argparser.add_argument('--generic', action='store_true', help=(
+        "Make generic build rules for all source code in the current directory in --make/--dep options"))
     argparser.add_argument('--make', action='store_true', help=(
         f"Print Makefile for {module_path}, and exit"))
-    argparser.add_argument('--generic', action='store_true', help=(
-        f"Print generic Makefile for {module_path}, and exit"))
     argparser.add_argument('--dep', action='store', help=(
         f"Build a {module}.dep target, print its Makefile include statement, and exit"))
     argparser.add_argument('--pips', nargs=0, action=Pips, help=Pips.__doc__)
@@ -780,7 +771,6 @@ def add_arguments(argparser):
         "Test timeout in seconds (3)"))
     argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
     argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
-    argparser.add_argument('--shebang', nargs=0, action=Shebang, help=Shebang.__doc__)
 
 
 if __name__ == '__main__':
@@ -793,39 +783,41 @@ if __name__ == '__main__':
 $ make.py --generic --dep build/my-bringup.mk
 
 $ cat build/my-bringup.mk
-$/build/make.py.bringup: $/make.py $/build/my-bringup.mk | $/venv/$(VENV_PYTHON)
+$/build/make.py.bringup: $/make.py $/build/make.py.shebang $/build/my-bringup.mk | $/venv/$(VENV_PYTHON)  # Make sure $/make.py is setup OK
 	$| -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --dep make.py.mk
-make.py.mk: make.py | $(PYTHON)
+make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
 	$(PYTHON) make.py --dep $@ > /dev/null
--include make.py.mk
+-include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
 
 $ cat make.py.mk
-make.py.bringup: make.py make.py.mk | $(PYTHON)
+make.py.bringup: make.py make.py.shebang make.py.mk | $(PYTHON)  # Make sure make.py is setup OK
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --make --dep make.py.mk
-bringup: make.py.bringup
-tested: make.py.tested
-make.py.tested: make.py make.py.shebang make.py.mk
-	make.py --test > $@
-make.py.shebang: make.py make.py.bringup
-	$(PYTHON) make.py --shebang > $@
-make.py.mk: make.py | $(PYTHON)
+bringup: make.py.bringup  # Default: Make sure everything is setup OK
+tested: make.py.tested  # Make sure everything tested OK
+
+make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
+	make.py --shebang > $@
+make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
 	$(PYTHON) make.py --dep $@ > /dev/null
--include make.py.mk
+-include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
+make.py.tested: make.py make.py.bringup make.py.mk   # Make sure make.py tested OK
+	make.py --test > $@
 
 $ make.py --make
-bringup: build/make.py.bringup
-tested: build/make.py.tested
-build/make.py.tested: make.py build/make.py.shebang
-	make.py --test > $@
-build/make.py.shebang: make.py build/make.py.bringup
-	$(PYTHON) make.py --shebang > $@
-build/make.py.bringup: make.py | $(PYTHON)
+bringup: build/make.py.bringup  # Default: Make sure everything is setup OK
+tested: build/make.py.tested  # Make sure everything tested OK
+
+build/make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
 	mkdir -p build/ && \\
+	make.py --shebang > $@
+build/make.py.bringup: make.py build/make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
+build/make.py.tested: make.py build/make.py.bringup   # Make sure make.py tested OK
+	make.py --test > $@
 """)
     add_arguments(argparser)
     argparser.add_argument('--report', nargs=6, action=Report, help=Report.__doc__, metavar=(
