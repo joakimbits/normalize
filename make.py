@@ -249,30 +249,42 @@ def make(make=False, generic=False, dep=None):
         src_dir = ""
         build_dir = build_dir
 
+    if generic or dep:
+        dep_target = f"{build_dir}{dep_filename} "
+    else:
+        dep_target = ""
+
+    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {build_dir}{pattern}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
+    commands = []
+    bringup = [bringup_rule,
+               commands]
+    shebang = [f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py | {python}  # Make sure {src_dir}{pattern}.py has a working shebang",
+               [f"{source} --shebang > $@"]]
+
     if generic:
         embed = "( cd $(dir $<). && %s"
         end = " )"
-        rules = []  # generic rules already printed
+        rules = [bringup]  # generic rules already printed
     else:
         embed = "%s"
         end = ""
         mk_dep = f" {build_dir}{pattern}.py.mk" if dep else ""
-        rules = [
-            (f"bringup: {build_dir}{pattern}.py.bringup", []),
-            (f"tested: {build_dir}{pattern}.py.tested", []),
-            (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {build_dir}{pattern}.py.shebang{mk_dep}",
-             [f"{source} --test > $@"]),
-            (f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup",
-             [f"{recipy_python} {source} --shebang > $@"]),
-        ] if make else []
-        if dep:
-            rules.append(
-                (f"{build_dir}{dep_filename}: {src_dir}{pattern}.py | {python}",
-                 [f"{python} {source} --dep $@ > /dev/null"])
-            )
+        rules = ([
+                     (f"bringup: {build_dir}{pattern}.py.bringup  # Default: Make sure everything is setup OK", []),
+                     (f"tested: {build_dir}{pattern}.py.tested  # Make sure everything tested OK", []),
+                     ("", []),
+                     shebang,
+                 ] if make else []) + ([
+                     (f"{build_dir}{dep_filename}: {source} {build_dir}{pattern}.py.shebang | {python}  # Make sure {source} can be setup",
+                      [f"{recipy_python} {source} --dep $@ > /dev/null"]),
+                 ] if dep else []) + ([
+                     bringup,
+                 ]) + ([
+                     (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup{mk_dep}   # Make sure {src_dir}{pattern}.py tested OK",
+                      [f"{source} --test > $@"]),
+                 ] if make else [])
 
     # Commands for bringup (requires your existing build_commands + make_rule helpers)
-    commands = []
     bringups = build_commands(parent_module.__doc__, "\nDependencies:", embed, end,
                               pip=f"{recipy_python} -m pip")
     op = ">"
@@ -284,22 +296,16 @@ def make(make=False, generic=False, dep=None):
         commands.append(f"{command_lines[-1]} {op} $@{glue}")
         op = ">>"
 
-    if generic or dep:
-        dep_target = f"{build_dir}{dep_filename} "
-    else:
-        dep_target = ""
-        commands = [f"mkdir -p {build_dir}" + (" &&" if commands else "")] + commands
-
-    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {dep_target}| {python}"
-    rules.append((bringup_rule, commands))
+    if build_dir:
+        shebang[1] = [f"mkdir -p {build_dir} &&"] + shebang[1]
 
     if not commands:
-        commands += ["touch $@"]
+        bringup[1] += ["touch $@"]
 
     for rule, commands in rules:
         if rule == bringup_rule and (dep or generic):
             if not generic:
-                print(f"-include {build_dir}{dep_filename}")
+                print(f"-include {build_dir}{dep_filename}  # {build_dir}{pattern}.py.bringup: {build_dir}{pattern}.py.shebang ; <setup>")
 
             if build_dir and dep_dir_now and not os.path.exists(dep_dir_now):
                 os.makedirs(dep_dir_now)
