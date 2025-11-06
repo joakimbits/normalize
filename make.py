@@ -286,6 +286,8 @@ def make(generic=False, make=False, dep=None):
 
     if generic or dep:
         dep_target = f"{build_dir}{dep_filename} "
+        if generic:
+            dep_target += "$($/_EXE) "  # Any linkable executable needs to be up to date too
     else:
         dep_target = ""
 

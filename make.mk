@@ -650,9 +650,6 @@ ifneq (,$($/_OBJS))
 	    true | ./$< > $@ || (cat $@ && false)
 endif
 
-# Build a local venv after any linked local executable is built
-$/venv/$(VENV_PYTHON): $($/_EXE)
-
 # Make a Python executable
 $/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py | $/make.py $(.-ON-PATH)
 	$^ --shebang > $@
