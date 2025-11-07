@@ -679,7 +679,7 @@ define META
     $/build/%.sh-test.tested: $(PRETESTED) $/build/%.sh-test | $/make.py
 	    tmp=$$@-$$$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	    ( cd $/. && $(PYTHON) -m make --timeout 60 --sh-test build/$$*.sh-test ) > $$$$tmp && mv $$$$tmp $$@
-    $/build/%.md.sh-test: $/%.md | $?/pandoc $?/jq
+    $/build/%.md.sh-test: $/%.md | $?/pandoc$(.exe) $?/jq$(.exe)
 	    mkdir -p $$(dir $$@) && \
 	    ( pandoc -i $$< -t json --preserve-tabs | \
 	      jq -rj '.blocks[] | select(.t | contains("CodeBlock"))? | \
