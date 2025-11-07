@@ -236,6 +236,14 @@ ifeq ($~,/home/$I)  # Probably Bash on Ubuntu
     COUSINE ?= /usr/share/fonts/truetype/cousine
     CARLITO ?= /usr/share/fonts/truetype/crosextra
 
+    # Compiler
+    CXX := $?/clang++
+    CC := $?/clang
+
+    # Default system and target
+    SYSTEM ?= /usr/include
+    TARGET ?= $(CPU)-pc-linux-gnu
+
     # Installable python interpreter, shebang path, document compiler and fonts on Ubuntu
     ifeq (,$(wildcard $(CONDA_DIR)python.exe))
         $(CONDA_DIR)bin/python3: Miniconda3-latest-Linux-$(CPU).sh | $(CONDA_DIR)
@@ -299,13 +307,18 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     endif
     %-on-Windows_NT-path:
 	    powershell -Command "[System.Environment]::SetEnvironmentVariable('Path', '$*;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')"
+
+    # Compiler
     LLM ?= mingw-mstorsjo-llvm-ucrt
     CXX := $~/scoop/apps/$(LLM)/current/bin/clang++.exe
     CC := $~/scoop/apps/$(LLM)/current/bin/clang.exe
     $($~)/scoop/apps/$(LLM)/current/bin/clang.exe $($~)/scoop/apps/$(LLM)/current/bin/clang++.exe:
 	    $! mingw-mstorsjo-llvm-ucrt
+
+	# Default system and target
     SYSTEM ?= $~/scoop/apps/$(LLM)/current/include
     TARGET ?= $(CPU)-w64-mingw32
+
     PANDOC ?= $?/pandoc.exe
     XELATEX ?= $?/xelatex.exe
     $? := $(subst :,\:,$?)
