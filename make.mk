@@ -594,7 +594,7 @@ $/%/Makefile: | $/Makefile $/%/make.py
 $/%/make.py: | $/make.py
 	ln -s `$(PYTHON) -m make --relpath $* .`make.py $@
 $/make.py:
-	mkdir -p $(dir $@) && curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.py -o $@
+	curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.py -O
 
 .PRECIOUS: $/make.py $($/_SUBPROJECTS:%=%make.py)
 
