@@ -670,23 +670,20 @@ $/venv/$(VENV_PIPS)%: $/venv/$(VENV_PYTHON)
 $/build/%.py.style: $/%.py $/build/%.py.syntax $/venv/$(VENV_PYTHON)
 	$(word 3,$^) -m ruff check --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
-define META
-    # Check Python and command line usage examples in .py files
-    $/build/%.py.tested: $/%.py $/build/%.py.mk $/build/%.py.style $/build/%.py.bringup $/build/%.py.shebang $($/_EXE_TESTED) | $/venv/$(VENV_PYTHON)
-	    ( cd $/. && $$*.py --test ) > $$@ || (cat $$@ && false)
+# Check Python and command line usage examples in .py files
+$/build/%.py.tested: $/%.py $/build/%.py.style $/build/%.py.bringup $($/_EXE_TESTED) | $/venv/$(VENV_PYTHON)
+	( cd $(dir $<) && $*.py --test ) > $@ || (cat $@ && false)
 
-    # Check command line usage examples in .md files
-    $/build/%.sh-test.tested: $(PRETESTED) $/build/%.sh-test | $/make.py
-	    tmp=$$@-$$$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
-	    ( cd $/. && $(PYTHON) -m make --timeout 60 --sh-test build/$$*.sh-test ) > $$$$tmp && mv $$$$tmp $$@
-    $/build/%.md.sh-test: $/%.md | $?/pandoc$(.exe) $?/jq$(.exe)
-	    mkdir -p $$(dir $$@) && \
-	    ( pandoc -i $$< -t json --preserve-tabs | \
-	      jq -rj '.blocks[] | select(.t | contains("CodeBlock"))? | \
-	              .c | select(.[0][1][0] | contains("sh"))? | \
-	              .[1] + "\n"' ) > $$@
-endef
-$(eval $(META))
+# Extract command line usage examples from .md files
+$/build/%.md.sh-test: $/%.md | $?/pandoc$(.exe) $?/jq$(.exe)
+	mkdir -p $(dir $@) && \
+	( pandoc -i $< -t json --preserve-tabs | jq -rj \
+	  '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1] + "\n"' ) > $@
+
+# Check command line usage examples
+$/build/%.sh-test.tested: $(PRETESTED) $/build/%.sh-test | $/make.py
+	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
+	( cd $(dir $|) && $(PYTHON) -m make --timeout 60 --sh-test build/$*.sh-test ) > $$tmp && mv $$tmp $@
 
 # Document all test results.
 $/build/result.txt: $(TESTED)
@@ -718,18 +715,15 @@ $/build/%.tested.md: $/build/%.tested
 # Make a standalone gfm, html, pdf, or dzslides document.
 $/build/report.md: $/build/result.txt $($/*.md) $($/_EXES)
 	make.py --report $($/_NAME) $< "$($/*.md:$/%=%)" "$($/_LINKABLE:$/%=%)" "$($/_EXE:$/%=%)" "$($/*.py:$/%=%)" > $@
-
-define META
-    $/%.gfm: $/build/%.md
-	    pandoc --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
-	           -M title="$/_NAME $$*" -M author="`git log -1 --pretty=format:'%an'`"
-    $/%.html $/%.pdf $/%.dzslides: $/build/%.md | $(PANDOC) $(XELATEX) $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
-	    $(PANDOC) --standalone -t $$(patsubst .%,%,$$(suffix $$@)) -o $$@ $$^ \
-	              -M title="$$($/_NAME) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
-	              -V min-width=80%\!important -V geometry:margin=1in \
-	              --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
-endef
-$(eval $(META))
+.PHONY: $/_NAME
+$/%.gfm: $/build/%.md | $($/_NAME)
+	pandoc --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
+		   -M title="$|" -M author="`git log -1 --pretty=format:'%an'`"
+$/%.html $/%.pdf $/%.dzslides: $/build/%.md | $($/_NAME) $(PANDOC) $(XELATEX) $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
+	$(PANDOC) --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
+			  -M title="$(firstword $|) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
+			  -V min-width=80%\!important -V geometry:margin=1in \
+			  --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 $/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT)
 
 $/build/report-details.md:
