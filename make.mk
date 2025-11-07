@@ -456,10 +456,9 @@ $/_SOURCE += $($/*.md)
 # Find our git status
 $/_BRANCH := $(shell git branch --show-current)
 $/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
-$/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
+$/_ADD := $(filter-out $($/_SOURCE),$($/_KNOWN))
 $/_MODIFIED := $(shell cd $/. && $(PYTHON) -m make --git-status . M)
-$(info $/_REMOVE := $$(filter-out $($/_SOURCE),$($/_KNOWN)))
-$/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
+$/_REMOVE := $(filter-out $($/_KNOWN),$($/_SOURCE))
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
