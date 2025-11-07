@@ -108,7 +108,7 @@ make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
 make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
 	$(PYTHON) make.py --dep $@ > /dev/null
 -include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
-make.py.tested: make.py make.py.bringup make.py.mk   # Make sure make.py tested OK
+make.py.tested: make.py make.py.bringup   # Make sure make.py tested OK
 	make.py --test > $@
 ```
 

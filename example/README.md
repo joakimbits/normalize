@@ -41,7 +41,7 @@ Hello from greeter.cpp!
 \footnotesize
 ~~~ {.sh}
 $ cat build/greeter.py.mk
-$/build/greeter.py.bringup: $/greeter.py $/build/greeter.py.shebang $/build/greeter.py.mk | $/venv/$(VENV_PYTHON)  # Make sure $/greeter.py is setup OK
+$/build/greeter.py.bringup: $/greeter.py $/build/greeter.py.shebang $($/_EXE) | $/venv/$(VENV_PYTHON)  # Make sure $/greeter.py is setup OK
 	$| -m pip install fire --no-warn-script-location > $@
 
 $ greeter.py --help | awk '{ print "\t" $0 }'

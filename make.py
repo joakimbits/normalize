@@ -276,6 +276,7 @@ def make(generic=False, make=False, dep=None):
         recipy_python = "$|"
         src_dir = "$/"
         build_dir = "$/build/"
+        dep_target = "$($/_EXE) "  # Any linkable executable needs to be up to date too
     else:
         pattern = module
         source = module_path
@@ -283,12 +284,6 @@ def make(generic=False, make=False, dep=None):
         recipy_python = python
         src_dir = ""
         build_dir = build_dir
-
-    if generic or dep:
-        dep_target = f"{build_dir}{dep_filename} "
-        if generic:
-            dep_target += "$($/_EXE) "  # Any linkable executable needs to be up to date too
-    else:
         dep_target = ""
 
     bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {build_dir}{module}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
@@ -305,7 +300,6 @@ def make(generic=False, make=False, dep=None):
     else:
         embed = "%s"
         end = ""
-        mk_dep = f" {build_dir}{pattern}.py.mk" if dep else ""
         rules = ([
                      (f"bringup: {build_dir}{pattern}.py.bringup  # Default: Make sure everything is setup OK", []),
                      (f"tested: {build_dir}{pattern}.py.tested  # Make sure everything tested OK", []),
@@ -317,7 +311,7 @@ def make(generic=False, make=False, dep=None):
                  ] if dep else []) + ([
                      bringup,
                  ]) + ([
-                     (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup{mk_dep}   # Make sure {src_dir}{pattern}.py tested OK",
+                     (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup   # Make sure {src_dir}{pattern}.py tested OK",
                       [f"{source} --test > $@"]),
                  ] if make else [])
 
@@ -785,7 +779,7 @@ if __name__ == '__main__':
 $ make.py --generic --dep build/my-bringup.mk
 
 $ cat build/my-bringup.mk
-$/build/make.py.bringup: $/make.py $/build/make.py.shebang $/build/my-bringup.mk | $/venv/$(VENV_PYTHON)  # Make sure $/make.py is setup OK
+$/build/make.py.bringup: $/make.py $/build/make.py.shebang $($/_EXE) | $/venv/$(VENV_PYTHON)  # Make sure $/make.py is setup OK
 	$| -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --dep make.py.mk
@@ -794,7 +788,7 @@ make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setu
 -include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
 
 $ cat make.py.mk
-make.py.bringup: make.py make.py.shebang make.py.mk | $(PYTHON)  # Make sure make.py is setup OK
+make.py.bringup: make.py make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --make --dep make.py.mk
@@ -806,7 +800,7 @@ make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
 make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
 	$(PYTHON) make.py --dep $@ > /dev/null
 -include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
-make.py.tested: make.py make.py.bringup make.py.mk   # Make sure make.py tested OK
+make.py.tested: make.py make.py.bringup   # Make sure make.py tested OK
 	make.py --test > $@
 
 $ make.py --make
