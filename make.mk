@@ -548,7 +548,7 @@ $/_EXES := $($/_EXE)
 $/_EXES += $($/*.py)
 
 # Collect bringup and tested targets
-$/build/*.bringup := $($/_EXES) $($/*.py:$/%=$/build/%.bringup)
+$/build/*.bringup := $($/*.py:$/%=$/build/%.bringup)
 $/build/*.tested += $($/_EXES:$/%=$/build/%.tested)
 ifndef PRETESTED
     PRETESTED :=
