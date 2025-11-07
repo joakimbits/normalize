@@ -431,6 +431,8 @@ $/_OLD := $($/_BASELINE_DIR)$($/_HERE)
 $/_SOURCE :=
 $/_MAKEFILE := $(shell find $/Makefile \! -type l 2>/dev/null)
 $/_SOURCE += $($/_MAKEFILE)
+$/*.mk := $(wildcard $/*.mk)
+$/_SOURCE += $($/*.mk)
 $/*.s := $(wildcard $/*.s)
 $/_SOURCE += $($/*.s)
 $/*.c := $(wildcard $/*.c)
@@ -456,6 +458,7 @@ $/_BRANCH := $(shell git branch --show-current)
 $/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
 $/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
 $/_MODIFIED := $(shell cd $/. && $(PYTHON) -m make --git-status . M)
+$(info $/_REMOVE := $$(filter-out $($/_SOURCE),$($/_KNOWN)))
 $/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
 
 ## Colorize edited files by their git status
@@ -518,6 +521,7 @@ $/_COMPILABLE += $($/*.cpp)
 $/_LINKABLE += $($/_COMPILABLE)
 $/_CODE := $($/_LINKABLE)
 $/_CODE += $($/*.py)
+$/_CODE += $($/*.mk)
 
 ## Prepare for compilation
 $/_LDFLAGS += $(LDFLAGS)
@@ -715,7 +719,7 @@ $/build/%.tested.md: $/build/%.tested
 # Make a standalone gfm, html, pdf, or dzslides document.
 $/build/report.md: $/build/result.txt $($/*.md) $($/_EXES)
 	make.py --report $($/_NAME) $< "$($/*.md:$/%=%)" "$($/_LINKABLE:$/%=%)" "$($/_EXE:$/%=%)" "$($/*.py:$/%=%)" > $@
-.PHONY: $/_NAME
+.PHONY: $($/_NAME)
 $/%.gfm: $/build/%.md | $($/_NAME)
 	pandoc --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
 		   -M title="$|" -M author="`git log -1 --pretty=format:'%an'`"
