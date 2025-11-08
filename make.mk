@@ -189,83 +189,106 @@ endif
 #  - python & choco in Windows
 #  - python3 & brew on MacOS
 #  - or any given PYTHON=python-interpreter !=OS-install-command ?=OS-install-directory
-ifeq ($~,/home/$I)  # Probably Bash on Ubuntu
+ifeq ($~,/home/$I)  # Linux
     CPU = $(shell uname -m)
-    ifneq (,$(shell echo $$WSL_DISTRO_NAME))  # Probably Bash on Windows WSL Ubuntu
-        OS ?= WSL
 
-    	# Clone Windows home git and ssh settings
-        ifndef H
-            H := $(shell wslpath "$(cmd.exe /C echo '%USERPROFILE%' | head -c -2)")
-            ~/.gitconfig: $H/.gitconfig
-	            cp $< $@
-            ~/.ssh: $H/.ssh
-	            cp -r $< $(dir $@)
-        endif
+    ifeq (Darwin,$(shell uname))  # Probably Zsh on MacOSX
+        OS ?= MacOS
+        %-on-MacOSX-path: ~/.zshrc
+	        echo 'export PATH="$*:$$PATH"' >> $<
+	        false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+        ! ?= brew install
+        ? ?= /opt/homebrew/bin
 
-        # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
-        SPEEDUP_WSL_DNS ?= $~/use_windows_dns.sh
-        SPEEDUP_WSL_PIP ?= DISPLAY= #
-        $~/use_windows_dns.sh:
-	        echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@
-	        echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
-	        echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
-	        echo -n   "'(Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | " >> $@
-	        echo -n    "ForEach-Object { \"nameserver \$$_\" }' | tr -d '\\r' | " >> $@
-	        echo "tee -a /etc/resolv.conf > /dev/null" >> $@
-	        sudo sed -i '\|command=$@|d' /etc/wsl.conf
-	        echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
-	        sudo sh $@
+        # Default to XCode compiler
+        CXX := $(which clang++)
+        CC := $(which clang)
+
+        FONTS ?= ~/Library/Fonts
+        COUSINE := $(FONTS)
+        CARLITO := $(FONTS)
+        $?/xetex:
+	        $! texlive-xetex
+
+        CONDA_DIR ?= ~/opt/anaconda3/
+
     else
-        OS ?= Linux
+        ifneq (,$(shell echo $$WSL_DISTRO_NAME))  # Probably Bash on Windows WSL Ubuntu
+            OS ?= WSL
+
+            # Clone Windows home git and ssh settings
+            ifndef H
+                H := $(shell wslpath "$(cmd.exe /C echo '%USERPROFILE%' | head -c -2)")
+                ~/.gitconfig: $H/.gitconfig
+	                cp $< $@
+                ~/.ssh: $H/.ssh
+	                cp -r $< $(dir $@)
+            endif
+
+            # Workaround Windows WSL bridge bug: Timeout on ipv6 internet routes - slows down pip.
+            SPEEDUP_WSL_DNS ?= $~/use_windows_dns.sh
+            SPEEDUP_WSL_PIP ?= DISPLAY= #
+            $~/use_windows_dns.sh:
+	            echo "# Fixing DNS issue in WSL https://gist.github.com/ThePlenkov/6ecf2a43e2b3898e8cd4986d277b5ecf#file-boot-sh" > $@
+	            echo -n "sed -i '/nameserver/d' /etc/resolv.conf && " >> $@
+	            echo -n  "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command " >> $@
+	            echo -n   "'(Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses | " >> $@
+	            echo -n    "ForEach-Object { \"nameserver \$$_\" }' | tr -d '\\r' | " >> $@
+	            echo "tee -a /etc/resolv.conf > /dev/null" >> $@
+	            sudo sed -i '\|command=$@|d' /etc/wsl.conf
+	            echo "command=$@" | sudo tee -a /etc/wsl.conf > /dev/null
+	            sudo sh $@
+        else
+            OS ?= Linux
+        endif
+        %-on-Linux-path: ~/.profile
+	        echo 'export PATH="$*:$$PATH"' >> $<
+	        false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
+
+        # Default to an installable Conda python interpreter
+        CONDA_DIR ?= ~/miniconda3/
+        PYTHON ?= $(CONDA_DIR)bin/python3
+        VENV_PYTHON ?= bin/python3
+
+        # Default to an existing Apt package manager
+        ! ?= sudo apt update && sudo apt install -y
+        ? ?= /usr/bin
+
+        # Default to installable Pandoc fonts
+        COUSINE ?= /usr/share/fonts/truetype/cousine
+        CARLITO ?= /usr/share/fonts/truetype/crosextra
+
+        # Compiler
+        CXX := $?/clang++
+        CC := $?/clang
+
+        # Default system and target
+        SYSTEM ?= /usr/include
+        TARGET ?= $(CPU)-pc-linux-gnu
+
+        # Installable python interpreter, shebang path, document compiler and fonts on Ubuntu
+        ifeq (,$(wildcard $(CONDA_DIR)python.exe))
+            $(CONDA_DIR)bin/python3: Miniconda3-latest-Linux-$(CPU).sh | $(CONDA_DIR)
+	            bash $< -bfup $| && \
+	            rm $<
+        endif
+        $?/xetex:
+	        # Need a document compiler: Texlive
+	        $! texlive-xetex
+        /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
+	        # Need a more screen-readable normal font: Carlito
+	        sudo apt-get install fonts-crosextra-carlito
+        /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
+	        # Need a more screen-readable fixed-size font: Cousine
+	        ( sudo mkdir -p $(dir $@) && cd $(dir $@) && \
+	          fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \
+	          sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \
+	          sudo wget $$fonts/cousine/Cousine-Bold.ttf && \
+	          sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \
+	          sudo wget $$fonts/cousine/Cousine-Italic.ttf && \
+	          sudo wget $$fonts/cousine/Cousine-Regular.ttf )
+
     endif
-    %-on-Linux-path: ~/.profile
-	    echo 'export PATH="$*:$$PATH"' >> $<
-	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
-
-    # Default to an installable Conda python interpreter
-    CONDA_DIR ?= ~/miniconda3/
-    PYTHON ?= $(CONDA_DIR)bin/python3
-    VENV_PYTHON ?= bin/python3
-
-    # Default to an existing Apt package manager
-    ! ?= sudo apt update && sudo apt install -y
-    ? ?= /usr/bin
-
-    # Default to installable Pandoc fonts
-    COUSINE ?= /usr/share/fonts/truetype/cousine
-    CARLITO ?= /usr/share/fonts/truetype/crosextra
-
-    # Compiler
-    CXX := $?/clang++
-    CC := $?/clang
-
-    # Default system and target
-    SYSTEM ?= /usr/include
-    TARGET ?= $(CPU)-pc-linux-gnu
-
-    # Installable python interpreter, shebang path, document compiler and fonts on Ubuntu
-    ifeq (,$(wildcard $(CONDA_DIR)python.exe))
-        $(CONDA_DIR)bin/python3: Miniconda3-latest-Linux-$(CPU).sh | $(CONDA_DIR)
-	        bash $< -bfup $| && \
-            rm $<
-    endif
-    $?/xetex:
-	    # Need a document compiler: Texlive
-	    $! texlive-xetex
-    /usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf:
-	    # Need a more screen-readable normal font: Carlito
-	    sudo apt-get install fonts-crosextra-carlito
-    /usr/share/fonts/truetype/cousine/Cousine-Regular.ttf:
-	    # Need a more screen-readable fixed-size font: Cousine
-	    ( sudo mkdir -p $(dir $@) && cd $(dir $@) && \
-	      fonts=https://raw.githubusercontent.com/google/fonts/main/apache && \
-	      sudo wget $$fonts/cousine/DESCRIPTION.en_us.html && \
-	      sudo wget $$fonts/cousine/Cousine-Bold.ttf && \
-	      sudo wget $$fonts/cousine/Cousine-BoldItalic.ttf && \
-	      sudo wget $$fonts/cousine/Cousine-Italic.ttf && \
-	      sudo wget $$fonts/cousine/Cousine-Regular.ttf )
-
 else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     OS ?= Windows
     CPU ?= $(shell echo $$PROCESSOR_ARCHITECTURE)
@@ -295,8 +318,8 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     ifeq (,$(wildcard $(CONDA_DIR)python.exe))
         $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR)
 	        powershell.exe -NoProfile -Command "Start-Process -FilePath '$<' -Wait -NoNewWindow -ArgumentList \
-                '/InstallationType=JustMe','/AddToPath=1','/RegisterPython=1','/S','/D=""$|""'" && \
-            rm $<
+	            '/InstallationType=JustMe','/AddToPath=1','/RegisterPython=1','/S','/D=""$|""'" && \
+	        rm $<
     endif
     ifeq (,$(filter .;%,$(PATH)))
         .-on-Windows_NT-path:
@@ -325,30 +348,11 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     $($?)/xetex.exe:
 	    $! miktex
 
-else  # Probably Zsh on MacOSX
-    OS ?= MacOS
-    %-on-MacOSX-path: ~/.zshrc
-	    echo 'export PATH="$*:$$PATH"' >> $<
-	    false # Please `source $<` or open a new shell to get $* on PATH, and retry `make $(MAKECMDGOALS)`.
-    ! ?= brew install
-    ? ?= /opt/homebrew/bin
+endif  # Package manager, python interpreter, compilers and fonts for the OS
 
-    # Default to an installable Clang ASM/C/C++ compiler
-    CXX := $?/clang++
-    CC := $?/clang
-    $($?)/clang++: $?/clang
-
-    FONTS ?= ~/Library/Fonts
-    COUSINE := $(FONTS)
-    CARLITO := $(FONTS)
-    $?/xetex:
-	    $! texlive-xetex
-
-endif  # Package manager, python interpreter, document compiler and fonts for the OS
 $? ?= $?
 $($?)/%: | $(OS_PACKAGE_MANAGER)
 	$! $(basename $*)
-CONDA_DIR ?= ~/miniconda3/
 $(CONDA_DIR) ?= $(CONDA_DIR)
 $($(CONDA_DIR)):
 	mkdir -p $@
