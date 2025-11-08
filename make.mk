@@ -377,7 +377,7 @@ ifeq (2,$(MAKE_RESTARTS))
         $(info # Hello $I, Welcome to generic make https://github.com/joakimbits/normalize)
     endif
 
-    MAKER := $(shell $(MAKE) -v))
+    MAKER := $(shell $(MAKE) -v)
     INCLUDING ?= $/build/
     $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $/venv/$(VENV_PYTHON))
     INCLUDED := $(MAKEFILE_LIST)
