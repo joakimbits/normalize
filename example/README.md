@@ -53,7 +53,7 @@ $ greeter.py --help | awk '{ print "\t" $0 }'
 		function hello: Greetings from the source code examples in this folder
 		function run: Run a command and return the decoded result
 	
-	options:
+	option...:
 	  -h, --help         show this help message and exit
 	  --shebang          Insert a local venv shebang, print its PATH configuration
 	                     if needed, and exit
