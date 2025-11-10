@@ -185,11 +185,12 @@ ifeq ($~,/Users/$I)
 endif
 
 # A base PYTHON & OS manager. It can be one of:
-#  - python3 & apt on Ubuntu
-#  - python & choco in Windows
 #  - python3 & brew on MacOS
+#  - python3 & apt on Ubuntu
+#  - python & scoop on Windows
 #  - or any given PYTHON=python-interpreter !=OS-install-command ?=OS-install-directory
 ifeq ($~,/home/$I)  # Linux
+    PYTHON ?= $(shell which python3)
     CPU = $(shell uname -m)
 
     ifeq (Darwin,$(shell uname))  # Probably Zsh on MacOSX
@@ -267,10 +268,12 @@ ifeq ($~,/home/$I)  # Linux
         TARGET ?= $(CPU)-pc-linux-gnu
 
         # Installable python interpreter, shebang path, document compiler and fonts on Ubuntu
-        ifeq (,$(wildcard $(CONDA_DIR)python.exe))
-            $(CONDA_DIR)bin/python3: Miniconda3-latest-Linux-$(CPU).sh | $(CONDA_DIR)
-	            bash $< -bfup $| && \
-	            rm $<
+        ifeq (,$(wildcard $(PYTHON)))
+            ifeq (,$(wildcard $(CONDA_DIR)python.exe))
+                $(CONDA_DIR)bin/python3: Miniconda3-latest-Linux-$(CPU).sh | $(CONDA_DIR)
+	                bash $< -bfup $| && \
+	                rm $<
+            endif
         endif
         $?/xetex:
 	        # Need a document compiler: Texlive
@@ -290,6 +293,7 @@ ifeq ($~,/home/$I)  # Linux
 
     endif
 else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
+    PYTHON ?= python
     OS ?= Windows
     CPU ?= $(shell echo $$PROCESSOR_ARCHITECTURE)
     .exe := .exe
@@ -315,11 +319,16 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     $($~)/scoop/shims/scoop.ps1:
 	    powershell.exe -NoProfile -Command "iwr -useb get.scoop.sh | iex"
     $(CONDA_DIR) := $(subst :,\:,$(CONDA_DIR))
-    ifeq (,$(wildcard $(CONDA_DIR)python.exe))
-        $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR)
-	        powershell.exe -NoProfile -Command "Start-Process -FilePath '$<' -Wait -NoNewWindow -ArgumentList \
-	            '/InstallationType=JustMe','/AddToPath=1','/RegisterPython=1','/S','/D=""$|""'" && \
-	        rm $<
+    PYTHON := $(PYTHON:.exe=).exe
+    PYTHON := $(shell which $(PYTHON))
+    PYTHON := $(shell cygpath -m $(PYTHON))
+    ifeq (,$(wildcard $(PYTHON)))
+        ifeq (,$(wildcard $(CONDA_DIR)python.exe))
+            $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR)
+	            powershell.exe -NoProfile -Command "Start-Process -FilePath '$<' -Wait -NoNewWindow -ArgumentList \
+	                '/InstallationType=JustMe','/AddToPath=1','/RegisterPython=1','/S','/D=""$|""'" && \
+	            rm $<
+        endif
     endif
     ifeq (,$(filter .;%,$(PATH)))
         .-on-Windows_NT-path:
