@@ -319,9 +319,7 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     $($~)/scoop/shims/scoop.ps1:
 	    powershell.exe -NoProfile -Command "iwr -useb get.scoop.sh | iex"
     $(CONDA_DIR) := $(subst :,\:,$(CONDA_DIR))
-    PYTHON := $(PYTHON:.exe=).exe
-    PYTHON := $(shell which $(PYTHON))
-    PYTHON := $(shell cygpath -m $(PYTHON))
+    PYTHON := $(shell cygpath -m `which $(PYTHON:.exe=).exe`)
     ifeq (,$(wildcard $(PYTHON)))
         ifeq (,$(wildcard $(CONDA_DIR)python.exe))
             $($(CONDA_DIR))python.exe: Miniconda3-latest-Windows-$(CPU).exe | $(CONDA_DIR)
