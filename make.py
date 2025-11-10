@@ -286,12 +286,11 @@ def make(generic=False, make=False, dep=None):
         build_dir = build_dir
         dep_target = ""
 
-    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {build_dir}{module}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
+    build_dir_dep = build_dir + ' ' if build_dir else ''
+    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {build_dir}{module}.py.shebang {dep_target}  # Make sure {src_dir}{module}.py is setup OK"
     commands = []
     bringup = [bringup_rule,
                commands]
-    shebang = [f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py | {python}  # Make sure {src_dir}{pattern}.py has a working shebang",
-               [f"{source} --shebang > $@"]]
 
     if generic:
         embed = "( cd $(dir $<). && %s"
@@ -301,13 +300,20 @@ def make(generic=False, make=False, dep=None):
         embed = "%s"
         end = ""
         rules = ([
+                     ("PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)", []),
+                     ("", []),
                      (f"bringup: {build_dir}{pattern}.py.bringup  # Default: Make sure everything is setup OK", []),
                      (f"tested: {build_dir}{pattern}.py.tested  # Make sure everything tested OK", []),
                      ("", []),
-                     shebang,
                  ] if make else []) + ([
-                     (f"{build_dir}{dep_filename}: {source} {build_dir}{pattern}.py.shebang | {python}  # Make sure {source} can be setup",
-                      [f"{recipy_python} {source} --dep $@ > /dev/null"]),
+                     (f"{build_dir}:  # Make sure the build directory exists",
+                      [f"mkdir -p $@"]),
+                 ] if make and build_dir else []) + ([
+                     (f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py | {build_dir_dep}{python}  # Make sure {src_dir}{pattern}.py has a working shebang",
+                      [f"$(PYTHON) {source} --shebang > $@"]),
+                 ] if make else []) + ([
+                     (f"{build_dir}{dep_filename}: {source} {build_dir}{pattern}.py.shebang  # Make sure {source} can be setup",
+                      [f"{source} --dep $@ > /dev/null"]),
                  ] if dep else []) + ([
                      bringup,
                  ]) + ([
@@ -326,9 +332,6 @@ def make(generic=False, make=False, dep=None):
         commands += command_lines[:-1]
         commands.append(f"{command_lines[-1]} {op} $@{glue}")
         op = ">>"
-
-    if build_dir:
-        shebang[1] = [f"mkdir -p {build_dir} &&"] + shebang[1]
 
     if not commands:
         bringup[1] += ["touch $@"]
@@ -792,6 +795,8 @@ make.py.bringup: make.py make.py.shebang | $(PYTHON)  # Make sure make.py is set
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --make --dep make.py.mk
+PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)
+
 bringup: make.py.bringup  # Default: Make sure everything is setup OK
 tested: make.py.tested  # Make sure everything tested OK
 
@@ -803,16 +808,21 @@ make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setu
 make.py.tested: make.py make.py.bringup   # Make sure make.py tested OK
 	make.py --test > $@
 
-$ make.py --make
-bringup: build/make.py.bringup  # Default: Make sure everything is setup OK
-tested: build/make.py.tested  # Make sure everything tested OK
+$ rm make.py.mk
 
-build/make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
-	mkdir -p build/ && \\
+$ make.py --make --dep test/make.py.mk
+PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)
+
+bringup: test/make.py.bringup  # Default: Make sure everything is setup OK
+tested: test/make.py.tested  # Make sure everything tested OK
+
+build/:  # Make sure the build directory exists
+	mkdir -p $@
+test/make.py.shebang: make.py | build/ $(PYTHON)  # Make sure make.py has a working shebang
 	make.py --shebang > $@
-build/make.py.bringup: make.py build/make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
+test/make.py.bringup: make.py test/make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
-build/make.py.tested: make.py build/make.py.bringup   # Make sure make.py tested OK
+test/make.py.tested: make.py test/make.py.bringup   # Make sure make.py tested OK
 	make.py --test > $@
 """)
     add_arguments(argparser)
