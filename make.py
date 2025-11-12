@@ -794,36 +794,7 @@ $ cat make.py.mk
 make.py.bringup: make.py make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
 	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
 
-$ make.py --make --dep make.py.mk
-PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)
-
-bringup: make.py.bringup  # Default: Make sure everything is setup OK
-tested: make.py.tested  # Make sure everything tested OK
-
-make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
-	make.py --shebang > $@
-make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
-	$(PYTHON) make.py --dep $@ > /dev/null
--include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
-make.py.tested: make.py make.py.bringup   # Make sure make.py tested OK
-	make.py --test > $@
-
 $ rm make.py.mk
-
-$ make.py --make --dep test/make.py.mk
-PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)
-
-bringup: test/make.py.bringup  # Default: Make sure everything is setup OK
-tested: test/make.py.tested  # Make sure everything tested OK
-
-build/:  # Make sure the build directory exists
-	mkdir -p $@
-test/make.py.shebang: make.py | build/ $(PYTHON)  # Make sure make.py has a working shebang
-	make.py --shebang > $@
-test/make.py.bringup: make.py test/make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
-	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
-test/make.py.tested: make.py test/make.py.bringup   # Make sure make.py tested OK
-	make.py --test > $@
 """)
     add_arguments(argparser)
     argparser.add_argument('--report', nargs=6, action=Report, help=Report.__doc__, metavar=(
