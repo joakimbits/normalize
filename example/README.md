@@ -155,5 +155,14 @@ $!$*.py.tested: $/$*.py $!$*.py.bringup
 $/clear:
 	git clean -xfd $(dir $@)
 
+$ make --no-print-directory -f test/greeter.mk tested
+.../python... make.py greeter.py --shebang > test/greeter.py.shebang && cat test/greeter.py.shebang && sh test/greeter.py.shebang
+greeter.py --dep test/greeter.py.mk > /dev/null
+.../python... -m pip install fire --no-warn-script-location > test/greeter.py.bringup
+greeter.py --test > test/greeter.py.tested
+
+$ cat test/greeter.py.tested
+All 2 python usage examples PASS
+
 $ rm -r test/
 ```
