@@ -5,7 +5,6 @@ Dependencies:
 fire
 """
 import subprocess
-import argparse
 
 import make
 import fire
@@ -30,7 +29,7 @@ def hello(*world):
     print("Hello from greeter.py!")
     print(run(f"{make.path}example"))
 
-EXAMPLES = """
+EXAMPLES = """Examples:
 $ greeter.py
 NAME
     greeter.py
@@ -58,10 +57,7 @@ Hello from greeter.cpp!
 """
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=make.brief(),
-        epilog=f"Examples:{EXAMPLES}")
-    make.add_arguments(argparser)
-    args = argparser.parse_known_args()
+    make.argparser.description = make.brief()
+    make.argparser.epilog = EXAMPLES
+    args = make.argparser.parse_known_args()
     fire.Fire(dict(hello=hello, run=run))

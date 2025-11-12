@@ -31,6 +31,7 @@ import os
 import subprocess
 import re
 import time
+import argparse
 from argparse import Action
 import pydoc
 import difflib
@@ -105,25 +106,40 @@ def make_executable(path):
     os.chmod(path, 0o777)
 
 
-def shebang():
+def shebang(path=None):
     """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
 
     SHEBANG, EOL = (b'#!venv/Scripts/python.exe', b'\r\n') if os.name == 'nt' else (b'#!venv/bin/python3', b'\n')
+    HAS_DOC = br'(?s)\A(?:\xef\xbb\xbf)?(?:#![^\n]*\n)?(?:\s*#.*\n)*\s*(?P<doc>\s*(?P<q>"""|\'\'\').*?(?P=q)\s*\n?)?'
+    HAS_IMPORT = br'(?m)^(?:from\s+[A-Za-z_][\w.]*\s+import\b|import\s+[^\n]+)'
+    HAS_MAKE = br'(?m)^(?:import\s+make\b|from\s+make\s+import\b)'
     PATHSEP_INSTALL = {
         ':': "export PATH='.:$PATH'",
         ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
     }
-    match_shebang_eol_code = re.compile(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z').match
+
+    src = open(path or module_path, 'rb').read()
+
+    # Inject "import make" if missing
+    if path and os.path.basename(path) != 'make.py' and not re.search(HAS_MAKE, src):
+        m = re.search(HAS_IMPORT, src)
+        if m:
+            insert_at = m.start()
+        else:
+            h = re.match(HAS_DOC, src)
+            insert_at = h.end('doc') if h and h.group('doc') else (h.end() if h else 0)
+        nl = b'\r\n' if b'\r\n' in src else b'\n'
+        src = src[:insert_at] + b'import make' + nl + src[insert_at:]
+        open(path, 'wb').write(src)
 
     # Make it have a correct shebang with both a Linux and a Windows line ending
-    src = open(module_path, 'rb').read()
-    shebang, eol, code = match_shebang_eol_code(src).groups()
+    shebang, eol, code = re.match(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z', src).groups()
     if shebang != SHEBANG:
         open(module_path, 'wb').write(SHEBANG + EOL + code)
         print(f'# {module_path} now updated with shebang {shebang}')
 
     # Print any command needed to disable Windows-style crlf checkouts
-    if eol[0] != ord('\n'):
+    if eol and eol[0] != ord('\n'):
         print('# Please consider permanently changing to LF instead of CR after a shebang, like below.')
         print('git config --global core.autocrlf input')
 
@@ -258,39 +274,29 @@ def make(generic=False, make=False, dep=None):
     elif generic:
         # generic mode, but no explicit dep: setup default depfile
         dep_dir_now = build_dir = "build/"
-        dep_filename = f"{module}.py.mk"
         dep = f"build/{module}.py.mk"
     else:
         # plain --make: no depfile at all
         dep = None
         dep_dir_now = build_dir = "build/"
-        dep_filename = None
 
     # Generic vs specific rules
+    python = "$($/_PYTHON)"
+    recipy_python = "$|"
+    src_dir = "$/"
     if generic:
         if make:
             print(GENERIC_MAKEFILE)
         pattern = "%"
-        source = "$<"
-        python = "$/venv/$(VENV_PYTHON)"
-        recipy_python = "$|"
-        src_dir = "$/"
-        build_dir = "$/build/"
         dep_target = "$($/_EXE) "  # Any linkable executable needs to be up to date too
     else:
         pattern = module
-        source = module_path
-        python = "$(PYTHON)"
-        recipy_python = python
-        src_dir = ""
-        build_dir = build_dir
         dep_target = ""
 
-    build_dir_dep = build_dir + ' ' if build_dir else ''
-    bringup_rule = f"{build_dir}{module}.py.bringup: {src_dir}{module}.py {build_dir}{module}.py.shebang {dep_target}  # Make sure {src_dir}{module}.py is setup OK"
-    commands = []
+    bringup_rule = f"$!{module}.py.bringup: $/{module}.py $!{module}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
+    bringup_commands = []
     bringup = [bringup_rule,
-               commands]
+               bringup_commands]
 
     if generic:
         embed = "( cd $(dir $<). && %s"
@@ -300,26 +306,54 @@ def make(generic=False, make=False, dep=None):
         embed = "%s"
         end = ""
         rules = ([
-                     ("PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)", []),
-                     ("", []),
-                     (f"bringup: {build_dir}{pattern}.py.bringup  # Default: Make sure everything is setup OK", []),
-                     (f"tested: {build_dir}{pattern}.py.tested  # Make sure everything tested OK", []),
-                     ("", []),
-                 ] if make else []) + ([
-                     (f"{build_dir}:  # Make sure the build directory exists",
-                      [f"mkdir -p $@"]),
-                 ] if make and build_dir else []) + ([
-                     (f"{build_dir}{pattern}.py.shebang: {src_dir}{pattern}.py | {build_dir_dep}{python}  # Make sure {src_dir}{pattern}.py has a working shebang",
-                      [f"$(PYTHON) {source} --shebang > $@"]),
-                 ] if make else []) + ([
-                     (f"{build_dir}{dep_filename}: {source} {build_dir}{pattern}.py.shebang  # Make sure {source} can be setup",
-                      [f"{source} --dep $@ > /dev/null"]),
-                 ] if dep else []) + ([
-                     bringup,
-                 ]) + ([
-                     (f"{build_dir}{pattern}.py.tested: {src_dir}{pattern}.py {build_dir}{pattern}.py.bringup   # Make sure {src_dir}{pattern}.py tested OK",
-                      [f"{source} --test > $@"]),
-                 ] if make else [])
+                ("# Path/variable prefix", []),
+                (r"/ := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))", []),
+                ("", []),
+                ("# Build directory", []),
+                (f"! ?= $/{build_dir}", []),
+                ("", []),
+                ("# Default python interpreter", []),
+                ("PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)", []),
+                ("", []),
+                ("# Python interpreter", []),
+                ("$/_PYTHON ?= $(PYTHON)", []),
+                ("", []),
+                ("# Local Python modules to match", []),
+                (f"* ?= {pattern}", []),
+                ("", []),
+                ("# Matched Python modules here", []),
+                ("*.py := $(wildcard $/$*.py)", []),
+                ("", []),
+                ("# Suggested targets", []),
+                ("$/bringup: $(*.py:%=$!%.bringup)  # Default: Make sure everything is setup OK", []),
+                ("$/tested: $(*.py:%=$!%.tested)  # Recommended: Make sure everything tested OK", []),
+                ("", []),
+                ("# Make sure a local build directory (@) exists", []),
+                ("ifneq (,$!)", []),
+                ("  $!:",
+                 ["  mkdir -p $@"]),
+                ("endif", []),
+                ("", []),
+                ("# Make sure the python module (<) uses make, has the right python shebang and is on PATH", []),
+                ("$!$*.py.shebang: $/make.py $/$*.py | $($/_PYTHON) $!",
+                 ["$(firstword $|) $^ --shebang > $@ && cat $@ && sh $@"]),
+            ]) + ([
+                ("", []),
+                ("# Make sure the python module (<) has an up-to-date $!$*.py.bringup recipy", []),
+                ("$!$*.py.mk: $/$*.py $!$*.py.shebang",
+                 ["$< --dep $@ > /dev/null"]),
+            ] if dep else []) + ([
+                ("", []),
+                bringup,
+                ("", []),
+                ("# Make sure the python module (<) tested OK", []),
+                ("$!$*.py.tested: $/$*.py $!$*.py.bringup",
+                 ["$< --test > $@"]),
+                ("", []),
+                ("# Clear the directory from *** ALL *** non-git files and directories", []),
+                ("$/clear:",
+                 ["git clean -xfd $(dir $@)"]),
+        ])
 
     # Commands for bringup (requires your existing build_commands + make_rule helpers)
     bringups = build_commands(parent_module.__doc__, "\nDependencies:", embed, end,
@@ -329,43 +363,49 @@ def make(generic=False, make=False, dep=None):
     for command_lines, comment_lines, output_lines in bringups:
         remaining -= 1
         glue = " &&" if remaining else ""
-        commands += command_lines[:-1]
-        commands.append(f"{command_lines[-1]} {op} $@{glue}")
+        bringup_commands += command_lines[:-1]
+        bringup_commands.append(f"{command_lines[-1]} {op} $@{glue}")
         op = ">>"
 
-    if not commands:
+    if not bringup_commands:
         bringup[1] += ["touch $@"]
 
-    for rule, commands in rules:
-        if rule == bringup_rule and (dep or generic):
-            if not generic:
-                print(f"-include {build_dir}{dep_filename}  # {build_dir}{pattern}.py.bringup: {build_dir}{pattern}.py.shebang ; <setup>")
+    if dep:
+        if build_dir and dep_dir_now and not os.path.exists(dep_dir_now):
+            os.makedirs(dep_dir_now)
 
-            if build_dir and dep_dir_now and not os.path.exists(dep_dir_now):
-                os.makedirs(dep_dir_now)
+        with open(dep, "w+") as dep_out:
+            make_rule(*bringup, file=dep_out)
 
-            if dep:
-                with open(dep, "w+") as dep_out:
-                    make_rule(rule, commands, file=dep_out)
-        else:
-            make_rule(rule, commands)
+    if make:
+        for rule, commands in rules:
+            if rule == bringup_rule and (dep or generic):
+                if not generic:
+                    print("# Include all $!$*.py.bringup: $!$*.py.shebang; <bringup commands>")
+                    print("-include $(*.py:%=$!%.mk)")
+            else:
+                make_rule(rule, commands)
 
     sys.exit(0)
 
 
-if parent_module.__name__ == "__main__":
-    args = sys.argv[1:]
-    if args == ['--shebang']:
-        shebang()
-    elif any(opt in args for opt in ("--make", "--generic", "--dep")):
-        dep_file = None
-        if "--dep" in args:
-            i = args.index("--dep")
-            if i + 1 < len(args):
-                dep_file = args[i+1]
-        make(make="--make" in args,
-             generic="--generic" in args,
-             dep=dep_file)
+argparser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
+argparser.add_argument('PYTHON_FILE', nargs='?', help='Python file to fixup')
+argparser.add_argument('--shebang', action='store_true', help=shebang.__doc__)
+argparser.add_argument('--generic', action='store_true', help=(
+    "Make generic build rules for all source code in the current directory in --make/--dep options"))
+argparser.add_argument('--make', action='store_true', help=(
+    f"Print Makefile for {module_path}, and exit"))
+argparser.add_argument('--dep', action='store', help=(
+    f"Build a {module}.dep target, print its Makefile include statement, and exit"))
+
+if parent_module.__name__ == "__main__" and '-h' not in sys.argv and '--help' not in sys.argv:
+    args, unknown = argparser.parse_known_args()
+    if args.shebang:
+        shebang(args.PYTHON_FILE)
+
+    if args.make or args.dep:
+        make(args.generic, args.make, args.dep)
 
 
 class Pips(Action):
@@ -756,57 +796,96 @@ def brief(*callables):
     return usage
 
 
-def add_arguments(argparser):
-    argparser.add_argument('--shebang', action='store_true', help=shebang.__doc__)
-    argparser.add_argument('--generic', action='store_true', help=(
-        "Make generic build rules for all source code in the current directory in --make/--dep options"))
-    argparser.add_argument('--make', action='store_true', help=(
-        f"Print Makefile for {module_path}, and exit"))
-    argparser.add_argument('--dep', action='store', help=(
-        f"Build a {module}.dep target, print its Makefile include statement, and exit"))
-    argparser.add_argument('--pips', nargs=0, action=Pips, help=Pips.__doc__)
-    argparser.add_argument('-c', nargs=1, action=Command, help=Command.__doc__)
-    argparser.add_argument('--timeout', type=int, default=3, help=(
-        "Test timeout in seconds (3)"))
-    argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
-    argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
+EXAMPLES = r"""Examples:
+$ make.py --make --dep test/make.py.mk
+# Path/variable prefix
+/ := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
 
+# Build directory
+! ?= $/test/
 
-if __name__ == '__main__':
-    import argparse
+# Default python interpreter
+PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)
 
-    argparser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=brief(),
-        epilog="""Examples:
-$ make.py --generic --dep build/my-bringup.mk
+# Python interpreter
+$/_PYTHON ?= $(PYTHON)
 
-$ cat build/my-bringup.mk
-$/build/make.py.bringup: $/make.py $/build/make.py.shebang $($/_EXE) | $/venv/$(VENV_PYTHON)  # Make sure $/make.py is setup OK
+# Local Python modules to match
+* ?= make
+
+# Matched Python modules here
+*.py := $(wildcard $/$*.py)
+
+# Suggested targets
+$/bringup: $(*.py:%=$!%.bringup)  # Default: Make sure everything is setup OK
+$/tested: $(*.py:%=$!%.tested)  # Recommended: Make sure everything tested OK
+
+# Make sure a local build directory (@) exists
+ifneq (,$!)
+  $!:
+	  mkdir -p $@
+endif
+
+# Make sure the python module (<) uses make, has the right python shebang and is on PATH
+$!$*.py.shebang: $/make.py $/$*.py | $($/_PYTHON) $!
+	$(firstword $|) $^ --shebang > $@ && cat $@ && sh $@
+
+# Make sure the python module (<) has an up-to-date $!$*.py.bringup recipy
+$!$*.py.mk: $/$*.py $!$*.py.shebang
+	$< --dep $@ > /dev/null
+
+# Include all $!$*.py.bringup: $!$*.py.shebang; <bringup commands>
+-include $(*.py:%=$!%.mk)
+
+# Make sure the python module (<) tested OK
+$!$*.py.tested: $/$*.py $!$*.py.bringup
+	$< --test > $@
+
+# Clear the directory from *** ALL *** non-git files and directories
+$/clear:
+	git clean -xfd $(dir $@)
+
+$ cat test/make.py.mk
+$!make.py.bringup: $/make.py $!make.py.shebang | $($/_PYTHON)  # Make sure $/make.py is setup OK
 	$| -m pip install requests tiktoken --no-warn-script-location > $@
 
-$ make.py --dep make.py.mk
-make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
-	$(PYTHON) make.py --dep $@ > /dev/null
--include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
+$ make.py --generic --make
+# ...$ ./make.py --generic --make
+_Makefile := $(lastword $(MAKEFILE_LIST))
+/ := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
+$/bringup:
 
-$ cat make.py.mk
-make.py.bringup: make.py make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
-	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
+# Bringup executables and define 'tested report html pdf slides audit' targets for .md .py .cpp .c .s sources here.
+$/make.mk:
+	if [ -e "$(dir $@)../make.mk" ]; then \
+	  ln -sf ../make.mk "$@"; \
+	else \
+	  curl https://raw.githubusercontent.com/joakimbits/normalize/main/make.mk -o $@; \
+	fi
 
-$ rm make.py.mk
-""")
-    add_arguments(argparser)
+-include $/make.mk
+"""
+
+argparser.add_argument('--pips', nargs=0, action=Pips, help=Pips.__doc__)
+argparser.add_argument('-c', nargs=1, action=Command, help=Command.__doc__)
+argparser.add_argument('--timeout', type=int, default=3, help=(
+    "Test timeout in seconds (3)"))
+argparser.add_argument('--test', nargs=0, action=Test, help=Test.__doc__)
+argparser.add_argument('--sh-test', nargs=1, action=ShTest, help=ShTest.__doc__)
+
+if __name__ == '__main__':
     argparser.add_argument('--report', nargs=6, action=Report, help=Report.__doc__, metavar=(
         "NAME", "RESULT", "MD", "LINKABLE", "EXE", "PY"))
     argparser.add_argument('--split', nargs=3, action=Split, help=Split.__doc__, metavar=(
         "FILE", "SEPARATOR", "PATTERN"))
     argparser.add_argument('--prompt', nargs=4, action=Prompt, help=Prompt.__doc__, metavar=(
         "FILE", "MODEL", "TEMPERATURE", "KEY"))
-    for brief, long in Uname.OPTIONS.items():
-        argparser.add_argument(brief, long, nargs=0, action=Uname, help=Uname.__doc__)
+    for short, long in Uname.OPTIONS.items():
+        argparser.add_argument(short, long, nargs=0, action=Uname, help=Uname.__doc__)
     argparser.add_argument('--git-status', nargs=2, action=GitStatus, help=GitStatus.__doc__, metavar=(
         'DIRECTORY', 'WANTED_STATUS'), default=('.', 'M'))
     argparser.add_argument('--relpath', nargs=2, action=Relpath, help=Relpath.__doc__, metavar=(
         'RELATIVE_TO', 'PATH'))
+    argparser.description = brief()
+    argparser.epilog = EXAMPLES
     args = argparser.parse_args()

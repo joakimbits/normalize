@@ -72,44 +72,6 @@ If they are already in the directory or linked to from the directory, internet a
 Dependencies:
 requests tiktoken # Needed for the --prompt option
 
-
-```
-
----
-
-Standalone variant:
-
-```sh
-$ make.py --make
-bringup: build/make.py.bringup  # Default: Make sure everything is setup OK
-tested: build/make.py.tested  # Make sure everything tested OK
-
-build/make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
-	mkdir -p build/ && \
-	make.py --shebang > $@
-build/make.py.bringup: make.py build/make.py.shebang | $(PYTHON)  # Make sure make.py is setup OK
-	$(PYTHON) -m pip install requests tiktoken --no-warn-script-location > $@
-build/make.py.tested: make.py build/make.py.bringup   # Make sure make.py tested OK
-	make.py --test > $@
-
-```
-
----
-
-Standalone variant with dynamic bringup:
-
-```sh
-$ make.py --make --dep make.py.mk
-bringup: make.py.bringup  # Default: Make sure everything is setup OK
-tested: make.py.tested  # Make sure everything tested OK
-
-make.py.shebang: make.py | $(PYTHON)  # Make sure make.py has a working shebang
-	make.py --shebang > $@
-make.py.mk: make.py make.py.shebang | $(PYTHON)  # Make sure make.py can be setup
-	$(PYTHON) make.py --dep $@ > /dev/null
--include make.py.mk  # make.py.bringup: make.py.shebang ; <setup>
-make.py.tested: make.py make.py.bringup   # Make sure make.py tested OK
-	make.py --test > $@
 ```
 
 - Python version 3.9 or later is required, and will be installed automatically if missing on the OS.

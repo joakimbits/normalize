@@ -161,6 +161,9 @@ GPT_MODEL ?= gpt-3.5-turbo-16k
 GPT_BEARER_rot13 ?= fx-ZyOYgw6hQnfZ5Shey79vG3OyoxSWtuyB30oAOhe3M33ofaPj
 GPT_TEMPERATURE ?= 0.7
 
+# Build directory - late evaluated
+! ?= $/build/
+
 # The maker's home directory and name
 ~ := $(shell echo ~)
 I := $(shell whoami)
@@ -385,10 +388,10 @@ ifeq (2,$(MAKE_RESTARTS))
     endif
 
     MAKER := $(shell $(MAKE) -v)
-    INCLUDING ?= $/build/
+    INCLUDING ?= $!
     $(info # $(PWD) $(filter-out $(INCLUDING)%,$(subst $(INCLUDED),,$(MAKEFILE_LIST))) in $(word 6,$(MAKER)) $(wordlist 2,3,$(MAKER)) building $I `$(MAKE) $(MAKECMDGOALS)` on $(OS)-$(CPU) $(PYTHON) $/venv/$(VENV_PYTHON))
     INCLUDED := $(MAKEFILE_LIST)
-    INCLUDING := $/build/
+    INCLUDING := $!
     ifneq (,$($/_SUBPROJECTS))
         $(info $/_SUBPROJECTS = $($/_SUBPROJECTS))
     endif
@@ -438,6 +441,8 @@ endif ### Generics ###
 
 ### Variables
 
+$/_PYTHON := $/venv/$(VENV_PYTHON)
+
 # $($/_OLD) is a $/_BASELINE worktree of $./ in the same git at $/_HOME_DIR.
 $/_NAME := $(notdir $(realpath $/.))
 $/_HOME_DIR := $(dir $(shell git rev-parse --git-common-dir))
@@ -471,7 +476,7 @@ $/_SOURCE += $($/*.hpp)
 $/*.py := $(shell find $/*.py \! -type l 2>/dev/null)
 ifneq (normalize ./,$($/_HOME_NAME) $($/_HOME_DIR))
     $/*.py := $(filter-out $/make.py,$($/*.py))
-	$/_DEPS += $/build/make.py.mk
+	$/_DEPS += $!make.py.mk
 endif
 $/_SOURCE += $($/*.py)
 $/*.md := $(shell find $/*.md \! -type l 2>/dev/null)
@@ -480,9 +485,9 @@ $/_SOURCE += $($/*.md)
 # Find our git status
 $/_BRANCH := $(shell git branch --show-current)
 $/_KNOWN := $(addprefix $/,$(shell cd $/. ; git ls-files . ':!:*/*'))
-$/_ADD := $(filter-out $($/_SOURCE),$($/_KNOWN))
+$/_ADD := $(filter-out $($/_KNOWN),$($/_SOURCE))
 $/_MODIFIED := $(shell cd $/. && $(PYTHON) -m make --git-status . M)
-$/_REMOVE := $(filter-out $($/_KNOWN),$($/_SOURCE))
+$/_REMOVE := $(filter-out $($/_SOURCE),$($/_KNOWN))
 
 ## Colorize edited files by their git status
 NORMAL ?= `tput sgr0`
@@ -509,7 +514,7 @@ $/_CHANGES_AUDIT += $($/_MODIFIED)
 $/_CHANGES_AUDIT += $($/_COMMIT_INFO)
 
 #### Find subdirectories containing at least one .md file
-$/_NON-SUBPROJECTS += $/build/
+$/_NON-SUBPROJECTS += $!
 $/_SUBDIRS := $(foreach d,$(shell find $/. -mindepth 1 -maxdepth 1),$(notdir $d))
 $/_SUBPROJECTS += $(sort $(dir $(foreach d,$($/_SUBDIRS),$(wildcard $/$d/*.md))))
 $/_SUBPROJECTS := $(filter-out $($/_NON-SUBPROJECTS),$($/_SUBPROJECTS))
@@ -528,7 +533,7 @@ define META
     $/clean: $/clean/keep_venv
 	    rm -rf $/venv/ $/.ruff_cache/
     $/clean/keep_venv:
-	    rm -rf $/build/
+	    rm -rf $!
 endef
 $(eval $(META))
 
@@ -553,7 +558,7 @@ $/_LDFLAGS += --target=$(TARGET)
 # A linked executable has the same name as the project
 ifneq (,$($/_LINKABLE))
     $/_EXE := $/$($/_NAME)$(.exe)
-    $/_EXE_TESTED := $/build/$($/_NAME)$(.exe).tested
+    $/_EXE_TESTED := $!$($/_NAME)$(.exe).tested
 endif
 
 # If we got assembly source, assume it has _start code
@@ -567,7 +572,7 @@ $/_CXXFLAGS += -S $(addprefix -I,$($/_INC_DIRS)) -MMD -MP
 $/_CFLAGS := -Wno-deprecated $($/_CXXFLAGS)
 $/_CXXFLAGS += $(CXXFLAGS)
 $/_CFLAGS += $(CFLAGS)
-$/_COBJS := $($/_COMPILABLE:$/%=$/build/%.s)
+$/_COBJS := $($/_COMPILABLE:$/%=$!%.s)
 $/_DEPS += $($/_COBJS:.s=.d)
 $/_OBJS := $($/*.s)
 $/_OBJS += $($/_COBJS)
@@ -575,28 +580,28 @@ $/_EXES := $($/_EXE)
 $/_EXES += $($/*.py)
 
 # Collect bringup and tested targets
-$/build/*.bringup := $($/*.py:$/%=$/build/%.bringup)
-$/build/*.tested += $($/_EXES:$/%=$/build/%.tested)
+$!*.bringup := $($/*.py:$/%=$!%.bringup)
+$!*.tested += $($/_EXES:$/%=$!%.tested)
 ifndef PRETESTED
     PRETESTED :=
     TESTED :=
 endif
-PRETESTED += $($/build/*.tested)
-$/build/*.tested += $($/*.md:$/%=$/build/%.sh-test.tested)
-TESTED += $($/build/*.tested)
+PRETESTED += $($!*.tested)
+$!*.tested += $($/*.md:$/%=$!%.sh-test.tested)
+TESTED += $($!*.tested)
 
 # Prepare for bringup
-$/build/*.py.mk := $($/*.py:$/%=$/build/%.mk)
-$/_DEPS += $($/build/*.py.mk)
+$!*.py.mk := $($/*.py:$/%=$!%.mk)
+$/_DEPS += $($!*.py.mk)
 
 # Prepare for reporting
 $/_LOGIC := $($/_MAKEFILE)
 $/_LOGIC += $($/_CODE)
-$/_RESULT := $($/build/*.py.mk)
-$/_RESULT += $($/build/*.bringup)
-$/_RESULT += $($/build/*.tested)
-$/_REPORT := $/build/report-details.md
-$/_REPORT += $($/_LOGIC:$/%=$/build/%.md)
+$/_RESULT := $($!*.py.mk)
+$/_RESULT += $($!*.bringup)
+$/_RESULT += $($!*.tested)
+$/_REPORT := $!report-details.md
+$/_REPORT += $($/_LOGIC:$/%=$!%.md)
 $/_REPORT += $($/_RESULT:%=%.md)
 
 
@@ -636,12 +641,12 @@ define META
 	      | grep '^$/' \
 	      | sed 's/^/  /'
     $/venv: $/venv/$(VENV_PYTHON)
-    $/bringup: $($/_EXE) $($/build/*.bringup)
-    $/tested: $($/build/*.tested)
-    $/result: $/build/result.txt
+    $/bringup: $($/_EXE) $($!*.bringup)
+    $/tested: $($!*.tested)
+    $/result: $!result.txt
 	    @cat $$<
-    $/syntax: $($/*.py:$/%=$/build/%.syntax)
-    $/style: $($/*.py:$/%=$/build/%.style)
+    $/syntax: $($/*.py:$/%=$!%.syntax)
+    $/style: $($/*.py:$/%=$!%.style)
     $/old: $($/_OLD)report.gfm
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BASELINE_INFO)"
     $/new: $/report.gfm
@@ -650,7 +655,7 @@ define META
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
     $/slides: $/slides.html
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_BRANCH_STATUS)"
-    $/%: $/build/%.diff
+    $/%: $!%.diff
 	    @echo "# file://$$(subst /mnt/c/,/C:/,$$(realpath $$<)) $$($/_CHANGES)"
 endef
 $(eval $(META))
@@ -661,11 +666,11 @@ $/slides.html: $/report.dzslides
 # Make a linked executable
 ifneq (,$($/_OBJS))
     # Compile C++
-    $/build/%.s: $/% | $(CXX)
+    $!%.s: $/% | $(CXX)
 	    $| $($/_CXXFLAGS) $< -o $@
 
     # Compile C
-    $/build/%.c.s: $/%.c | $(CXX)
+    $!%.c.s: $/%.c | $(CXX)
 	    $| $($/_CFLAGS) $< -o $@
 
     # Link executable
@@ -673,20 +678,20 @@ ifneq (,$($/_OBJS))
 	    $| $($/_LDFLAGS) $^ -o $@
 
     # Test executable
-    $/build/$($/_NAME)$(.exe).tested: $/$($/_NAME)$(.exe)
+    $!$($/_NAME)$(.exe).tested: $/$($/_NAME)$(.exe)
 	    true | ./$< > $@ || (cat $@ && false)
 endif
 
 # Make a Python executable
-$/build/%.py.shebang: $/venv/$(VENV_PYTHON) $/%.py | $/make.py $(.-ON-PATH)
-	$^ --shebang > $@
+$!%.py.shebang: $/make.py $/%.py | $($/_PYTHON) $(.-ON-PATH)
+	$(firstword $|) $^ --shebang > $@
 
-# Build a recipy for $/build/%.py.bringup
-$/build/%.py.mk: $/%.py | $/make.py
-	rm -f $@ && ( cd $(dir $<). && $(PYTHON) $*.py --generic --dep build/$*.py.mk ) ; [ -e $@ ] || echo "\$$/build/$*.py.bringup:; touch \$$@" > $@
+# Build a recipy for $!%.py.bringup
+$!%.py.mk: $/%.py | $/make.py
+	rm -f $@ && ( cd $(dir $<). && $(PYTHON) $*.py --generic --dep build/$*.py.mk ) ; [ -e $@ ] || echo "\$$!$*.py.bringup:; touch \$$@" > $@
 
 # Check Python 3.9 syntax
-$/build/%.py.syntax: $/venv/$(VENV_PYTHON) $/%.py | $/venv/$(VENV_PIPS)ruff
+$!%.py.syntax: $/venv/$(VENV_PYTHON) $/%.py | $/venv/$(VENV_PIPS)ruff
 	$< -m ruff check --select=E9,F63,F7,F82 --target-version=py39 $(lastword,$^) > $@ || (cat $@ && false)
 
 # Install pip package in the local python:
@@ -694,26 +699,26 @@ $/venv/$(VENV_PIPS)%: $/venv/$(VENV_PYTHON)
 	 $< -m pip install --prefer-binary $*
 
 # Check Python 3.9 style
-$/build/%.py.style: $/%.py $/build/%.py.syntax $/venv/$(VENV_PYTHON)
+$!%.py.style: $/%.py $!%.py.syntax $/venv/$(VENV_PYTHON)
 	$(word 3,$^) -m ruff check --fix --target-version=py39 $< > $@ || (cat $@ && false)
 
 # Check Python and command line usage examples in .py files
-$/build/%.py.tested: $/%.py $/build/%.py.style $/build/%.py.bringup $($/_EXE_TESTED) | $/venv/$(VENV_PYTHON)
+$!%.py.tested: $/%.py $!%.py.style $!%.py.bringup $($/_EXE_TESTED) | $/venv/$(VENV_PYTHON)
 	( cd $(dir $<) && $*.py --test ) > $@ || (cat $@ && false)
 
 # Extract command line usage examples from .md files
-$/build/%.md.sh-test: $/%.md | $?/pandoc$(.exe) $?/jq$(.exe)
+$!%.md.sh-test: $/%.md | $?/pandoc$(.exe) $?/jq$(.exe)
 	mkdir -p $(dir $@) && \
 	( pandoc -i $< -t json --preserve-tabs | jq -rj \
 	  '.blocks[] | select(.t | contains("CodeBlock"))? | .c | select(.[0][1][0] | contains("sh"))? | .[1] + "\n"' ) > $@
 
 # Check command line usage examples
-$/build/%.sh-test.tested: $(PRETESTED) $/build/%.sh-test | $/make.py
+$!%.sh-test.tested: $(PRETESTED) $!%.sh-test | $/make.py
 	tmp=$@-$$(if [ -e $@-0 ] ; then echo 1 ; else echo 0 ; fi) && \
 	( cd $(dir $|) && $(PYTHON) -m make --timeout 60 --sh-test build/$*.sh-test ) > $$tmp && mv $$tmp $@
 
 # Document all test results.
-$/build/result.txt: $(TESTED)
+$!result.txt: $(TESTED)
 	( $(foreach t,$^,echo "___ $(t): ____" && cat $(t) ; ) ) > $@
 
 # Make a markdown document.
@@ -728,55 +733,55 @@ ifndef __
     __ := ~~~\n\\\\normalsize\n
 endif
 
-$/build/Makefile.md: $/Makefile
+$!Makefile.md: $/Makefile
 	( echo "$(_heading)## $(call _link,Makefile)" && echo "$(call _.,.mk)" && cat $< && echo "$(__)" ) > $@
-$/build/%.md: $/%
+$!%.md: $/%
 	( echo "$(_heading)## $(call _link,$*)" && echo "$(call _.,$(suffix $<))" && cat $< && echo "$(__)" ) > $@
-$/build/%.md: $/build/%
+$!%.md: $!%
 	( echo "$(_heading)## $(call _link,build/$*)" && echo "$(call _.,$(suffix $<))" && cat $< && echo "$(__)" ) > $@
-$/build/%.bringup.md: $/build/%.bringup
+$!%.bringup.md: $!%.bringup
 	( echo "$(_heading)## $(call _link,build/$*.bringup)" && echo "$(_sh)" && cat $< && echo "$(__)" ) > $@
-$/build/%.tested.md: $/build/%.tested
+$!%.tested.md: $!%.tested
 	( echo "$(_heading)## $(call _link,build/$*.tested)" && echo "$(_sh)" && cat $< && echo "$(__)" ) > $@
 
 # Make a standalone gfm, html, pdf, or dzslides document.
-$/build/report.md: $/build/result.txt $($/*.md) $($/_EXES)
+$!report.md: $!result.txt $($/*.md) $($/_EXES)
 	make.py --report $($/_NAME) $< "$($/*.md:$/%=%)" "$($/_LINKABLE:$/%=%)" "$($/_EXE:$/%=%)" "$($/*.py:$/%=%)" > $@
 .PHONY: $($/_NAME)
-$/%.gfm: $/build/%.md | $($/_NAME)
+$/%.gfm: $!%.md | $($/_NAME)
 	pandoc --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
 		   -M title="$|" -M author="`git log -1 --pretty=format:'%an'`"
-$/%.html $/%.pdf $/%.dzslides: $/build/%.md | $($/_NAME) $(PANDOC) $(XELATEX) $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
+$/%.html $/%.pdf $/%.dzslides: $!%.md | $($/_NAME) $(PANDOC) $(XELATEX) $(CARLITO)/Carlito-Regular.ttf $(COUSINE)/Cousine-Regular.ttf
 	$(PANDOC) --standalone -t $(patsubst .%,%,$(suffix $@)) -o $@ $^ \
 			  -M title="$(firstword $|) $$*" -M author="`git log -1 --pretty=format:'%an'`" \
 			  -V min-width=80%\!important -V geometry:margin=1in \
 			  --pdf-engine=xelatex -V mainfont="Carlito" -V monofont="Cousine"
 $/report.gfm $/report.html $/report.pdf $/report.dzslides: $($/*.md) $($/_REPORT)
 
-$/build/report-details.md:
+$!report-details.md:
 	echo "$(_heading)# Source code, installation and test result" >> $@
 
 # Use GPT for a release review.
-$/build/audit.diff: $/make.py $/build/prompt.diff $/build/make.py.bringup | $/venv/$(VENV_PYTHON)
+$!audit.diff: $/make.py $!prompt.diff $!make.py.bringup | $/venv/$(VENV_PYTHON)
 	( cd $(dir $<) && $| -m make --prompt build/prompt.diff $(GPT_MODEL) $(GPT_TEMPERATURE) $(GPT_BEARER_rot13) ) > $@ && cat $(word 2,$^) $@ || ( cat $@ && false )
-$/build/prompt.diff: $/build/review.diff
+$!prompt.diff: $!review.diff
 	$(PYTHON) -m make -c 'print(REVIEW)' > $@
 	echo "$$ $(MAKE) $(@:%build/prompt.diff=%)review" >> $@
 	cat $^ >> $@
 	echo -n "$$ " >> $@
-$/build/review.diff: $/build/files.diff $/build/comments.diff $/build/report.diff
+$!review.diff: $!files.diff $!comments.diff $!report.diff
 	cat $^ > $@
-$/build/files.diff: $($/build/*.tested)
+$!files.diff: $($!*.tested)
 	echo "# $($/_CHANGES_AUDIT)" > $@
 
 define META
-    $$/build/comments.diff: $($/build/*.tested)
+    $$!comments.diff: $($!*.tested)
 	    echo "git --no-pager log --no-merges $$($/_BASELINE)..HEAD $/." > $$@
 	    git --no-pager log --no-merges $$($/_BASELINE)..HEAD $/. >> $$@
 endef
 $(eval $(META))
 
-$/build/report.diff: $($/_OLD)report.gfm $/report.gfm $/make.py
+$!report.diff: $($/_OLD)report.gfm $/report.gfm $/make.py
 	echo "diff -u -U 100000 $< $(word 2,$^) | fold-unchanged" > $@
 	( diff -u -U 100000 $< $(word 2,$^) | csplit -s - /----/ '{*}' && \
 	  parts=`ls xx**` && \
