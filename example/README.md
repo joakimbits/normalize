@@ -104,7 +104,7 @@ $ greeter.py --help | awk '{ print "\t" $0 }'
 
 ---
 
-Standalone variant:
+A finished build contain the bringup recipies used and their command output. Here is how that works for .py files:
 
 ```sh
 $ greeter.py --make --dep test/greeter.py.mk | tee test/greeter.mk
@@ -155,14 +155,27 @@ $!$*.py.tested: $/$*.py $!$*.py.bringup
 $/clear:
 	git clean -xfd $(dir $@)
 
+$ cat test/greeter.py.mk
+$!greeter.py.bringup: $/greeter.py $!greeter.py.shebang | $($/_PYTHON)  # Make sure $/greeter.py is setup OK
+	$| -m pip install fire --no-warn-script-location > $@
+
 $ make --no-print-directory -f test/greeter.mk tested
 .../python... make.py greeter.py --shebang > test/greeter.py.shebang && cat test/greeter.py.shebang && sh test/greeter.py.shebang
 greeter.py --dep test/greeter.py.mk > /dev/null
 .../python... -m pip install fire --no-warn-script-location > test/greeter.py.bringup
 greeter.py --test > test/greeter.py.tested
 
+$ cat test/greeter.py.shebang
+
+$ cat test/greeter.py.bringup
+... fire in ... (...)
+... termcolor in ... (from fire) (...)
+
 $ cat test/greeter.py.tested
 All 2 python usage examples PASS
 
 $ rm -r test/
 ```
+The .shebang recipy normalizes the python script by injecting a shebang (OS informer on which interpreter to use)
+but it also injects an `import make` statement if missing and installs the local directory `.` on PATH. This is used
+in later recipies. The goal is to make developing script-based local tools as natural as compiled ones. 
