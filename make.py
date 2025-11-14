@@ -293,7 +293,7 @@ def make(generic=False, make=False, dep=None):
         pattern = module
         dep_target = ""
 
-    bringup_rule = f"$!{module}.py.bringup: $/{module}.py $!{module}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
+    bringup_rule = f"$B{module}.py.bringup: $/{module}.py $B{module}.py.shebang {dep_target}| {python}  # Make sure {src_dir}{module}.py is setup OK"
     bringup_commands = []
     bringup = [bringup_rule,
                bringup_commands]
@@ -310,7 +310,7 @@ def make(generic=False, make=False, dep=None):
                 (r"/ := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))", []),
                 ("", []),
                 ("# Build directory", []),
-                (f"! ?= $/{build_dir}", []),
+                (f"B ?= $/{build_dir}", []),
                 ("", []),
                 ("# Default python interpreter", []),
                 ("PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)", []),
@@ -325,29 +325,29 @@ def make(generic=False, make=False, dep=None):
                 ("*.py := $(wildcard $/$*.py)", []),
                 ("", []),
                 ("# Suggested targets", []),
-                ("$/bringup: $(*.py:%=$!%.bringup)  # Default: Make sure everything is setup OK", []),
-                ("$/tested: $(*.py:%=$!%.tested)  # Recommended: Make sure everything tested OK", []),
+                ("$/bringup: $(*.py:%=$B%.bringup)  # Default: Make sure everything is setup OK", []),
+                ("$/tested: $(*.py:%=$B%.tested)  # Recommended: Make sure everything tested OK", []),
                 ("", []),
                 ("# Make sure a local build directory (@) exists", []),
-                ("ifneq (,$!)", []),
-                ("  $!:",
+                ("ifneq (,$B)", []),
+                ("  $B:",
                  ["  mkdir -p $@"]),
                 ("endif", []),
                 ("", []),
                 ("# Make sure the python module (<) uses make, has the right python shebang and is on PATH", []),
-                ("$!$*.py.shebang: $/make.py $/$*.py | $($/_PYTHON) $!",
+                ("$B$*.py.shebang: $/make.py $/$*.py | $($/_PYTHON) $B",
                  ["$(firstword $|) $^ --shebang > $@ && cat $@ && sh $@"]),
             ]) + ([
                 ("", []),
-                ("# Make sure the python module (<) has an up-to-date $!$*.py.bringup recipy", []),
-                ("$!$*.py.mk: $/$*.py $!$*.py.shebang",
+                ("# Make sure the python module (<) has an up-to-date $B$*.py.bringup recipy", []),
+                ("$B$*.py.mk: $/$*.py $B$*.py.shebang",
                  ["$< --dep $@ > /dev/null"]),
             ] if dep else []) + ([
                 ("", []),
                 bringup,
                 ("", []),
                 ("# Make sure the python module (<) tested OK", []),
-                ("$!$*.py.tested: $/$*.py $!$*.py.bringup",
+                ("$B$*.py.tested: $/$*.py $B$*.py.bringup",
                  ["$< --test > $@"]),
                 ("", []),
                 ("# Clear the directory from *** ALL *** non-git files and directories", []),
@@ -381,8 +381,8 @@ def make(generic=False, make=False, dep=None):
         for rule, commands in rules:
             if rule == bringup_rule and (dep or generic):
                 if not generic:
-                    print("# Include all $!$*.py.bringup: $!$*.py.shebang; <bringup commands>")
-                    print("-include $(*.py:%=$!%.mk)")
+                    print("# Include all $B$*.py.bringup: $B$*.py.shebang; <bringup commands>")
+                    print("-include $(*.py:%=$B%.mk)")
             else:
                 make_rule(rule, commands)
 
@@ -802,7 +802,7 @@ $ make.py --make --dep test/make.py.mk
 / := $(patsubst %build/,%,$(patsubst ./%,%,$(patsubst C:/%,/c/%,$(subst \,/,$(dir $(Makefile))))))
 
 # Build directory
-! ?= $/test/
+B ?= $/test/
 
 # Default python interpreter
 PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)
@@ -817,28 +817,28 @@ $/_PYTHON ?= $(PYTHON)
 *.py := $(wildcard $/$*.py)
 
 # Suggested targets
-$/bringup: $(*.py:%=$!%.bringup)  # Default: Make sure everything is setup OK
-$/tested: $(*.py:%=$!%.tested)  # Recommended: Make sure everything tested OK
+$/bringup: $(*.py:%=$B%.bringup)  # Default: Make sure everything is setup OK
+$/tested: $(*.py:%=$B%.tested)  # Recommended: Make sure everything tested OK
 
 # Make sure a local build directory (@) exists
-ifneq (,$!)
-  $!:
+ifneq (,$B)
+  $B:
 	  mkdir -p $@
 endif
 
 # Make sure the python module (<) uses make, has the right python shebang and is on PATH
-$!$*.py.shebang: $/make.py $/$*.py | $($/_PYTHON) $!
+$B$*.py.shebang: $/make.py $/$*.py | $($/_PYTHON) $B
 	$(firstword $|) $^ --shebang > $@ && cat $@ && sh $@
 
-# Make sure the python module (<) has an up-to-date $!$*.py.bringup recipy
-$!$*.py.mk: $/$*.py $!$*.py.shebang
+# Make sure the python module (<) has an up-to-date $B$*.py.bringup recipy
+$B$*.py.mk: $/$*.py $B$*.py.shebang
 	$< --dep $@ > /dev/null
 
-# Include all $!$*.py.bringup: $!$*.py.shebang; <bringup commands>
--include $(*.py:%=$!%.mk)
+# Include all $B$*.py.bringup: $B$*.py.shebang; <bringup commands>
+-include $(*.py:%=$B%.mk)
 
 # Make sure the python module (<) tested OK
-$!$*.py.tested: $/$*.py $!$*.py.bringup
+$B$*.py.tested: $/$*.py $B$*.py.bringup
 	$< --test > $@
 
 # Clear the directory from *** ALL *** non-git files and directories
@@ -846,7 +846,7 @@ $/clear:
 	git clean -xfd $(dir $@)
 
 $ cat test/make.py.mk
-$!make.py.bringup: $/make.py $!make.py.shebang | $($/_PYTHON)  # Make sure $/make.py is setup OK
+$Bmake.py.bringup: $/make.py $Bmake.py.shebang | $($/_PYTHON)  # Make sure $/make.py is setup OK
 	$| -m pip install requests tiktoken --no-warn-script-location > $@
 
 $ make.py --generic --make
