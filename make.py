@@ -106,17 +106,31 @@ def make_executable(path):
     os.chmod(path, 0o777)
 
 
-def shebang(path=None):
+def shortest_form(path: str, paths=sys.path) -> str:
+    """Shortest findable form of the target (no symlink resolution)"""
+    target = os.path.abspath(path)
+    best = target
+    for entry in paths:
+        base = os.path.abspath(entry or ".")
+        try:
+            if os.path.commonpath([base, target]) != base:
+                continue
+        except ValueError:
+            continue
+        rel = os.path.relpath(target, base)
+        if len(rel) < len(best):
+            best = rel
+    p = "." + os.sep
+    return best[len(p):] if best.startswith(p) else best
+
+
+def shebang(path=None, short=True):
     """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
 
-    SHEBANG, EOL = (b'#!venv/Scripts/python.exe', b'\r\n') if os.name == 'nt' else (b'#!venv/bin/python3', b'\n')
+    EOL = b'\r\n' if os.name == 'nt' else b'\n'
     HAS_DOC = br'(?s)\A(?:\xef\xbb\xbf)?(?:#![^\n]*\n)?(?:\s*#.*\n)*\s*(?P<doc>\s*(?P<q>"""|\'\'\').*?(?P=q)\s*\n?)?'
     HAS_IMPORT = br'(?m)^(?:from\s+[A-Za-z_][\w.]*\s+import\b|import\s+[^\n]+)'
     HAS_MAKE = br'(?m)^(?:import\s+make\b|from\s+make\s+import\b)'
-    PATHSEP_INSTALL = {
-        ':': "export PATH='.:$PATH'",
-        ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
-    }
     path = path or module_path
     src = open(path, 'rb').read()
 
@@ -134,21 +148,16 @@ def shebang(path=None):
 
     # Make it have a correct shebang with both a Linux and a Windows line ending
     shebang, eol, code = re.match(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z', src).groups()
-    if shebang != SHEBANG or eol != EOL:
-        open(path, 'wb').write(SHEBANG + EOL + code)
-        print(f'# {path} now updated with shebang {SHEBANG}{repr(EOL)[1:-1] if eol != EOL else ""}')
+    executable = shortest_form(sys.executable) if short else sys.executable
+    wanted_shebang = b'#!' + executable.encode('utf-8')
+    if shebang != wanted_shebang or eol != EOL:
+        open(path, 'wb').write(wanted_shebang + EOL + code)
+        print(f'# {path} now updated with shebang {wanted_shebang}{repr(EOL)[1:-1] if eol != EOL else ""}')
 
     # Make it an executable
     if not is_executable(path):
         make_executable(path)
-        print(f'# {path} is now executable with shebang {SHEBANG}')
-
-    # Print any commands needed to run it without ./ or .\ prefix
-    search_path = os.environ['PATH']
-    search_dirs = search_path.split(os.pathsep)
-    if '.' not in search_dirs:
-        print(f'# {path} needs the following . on PATH configuration to use shebang {SHEBANG}')
-        print(PATHSEP_INSTALL[os.pathsep])
+        print(f'# {path} is now executable with shebang {wanted_shebang}')
 
     exit(0)
 
