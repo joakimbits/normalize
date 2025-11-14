@@ -117,8 +117,8 @@ def shebang(path=None):
         ':': "export PATH='.:$PATH'",
         ';': "[System.Environment]::SetEnvironmentVariable('Path', '.;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'User')",
     }
-
-    src = open(path or module_path, 'rb').read()
+    path = path or module_path
+    src = open(path, 'rb').read()
 
     # Inject "import make" if missing
     if path and os.path.basename(path) != 'make.py' and not re.search(HAS_MAKE, src):
@@ -135,19 +135,19 @@ def shebang(path=None):
     # Make it have a correct shebang with both a Linux and a Windows line ending
     shebang, eol, code = re.match(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z', src).groups()
     if shebang != SHEBANG or eol != EOL:
-        open(module_path, 'wb').write(SHEBANG + EOL + code)
-        print(f'# {module_path} now updated with shebang {SHEBANG}{repr(EOL)[1:-1] if eol != EOL else ""}')
+        open(path, 'wb').write(SHEBANG + EOL + code)
+        print(f'# {path} now updated with shebang {SHEBANG}{repr(EOL)[1:-1] if eol != EOL else ""}')
 
     # Make it an executable
-    if not is_executable(module_path):
-        make_executable(module_path)
-        print(f'# {module_path} is now executable with shebang {SHEBANG}')
+    if not is_executable(path):
+        make_executable(path)
+        print(f'# {path} is now executable with shebang {SHEBANG}')
 
     # Print any commands needed to run it without ./ or .\ prefix
     search_path = os.environ['PATH']
     search_dirs = search_path.split(os.pathsep)
     if '.' not in search_dirs:
-        print(f'# {module_path} needs the following . on PATH configuration to use shebang {SHEBANG}')
+        print(f'# {path} needs the following . on PATH configuration to use shebang {SHEBANG}')
         print(PATHSEP_INSTALL[os.pathsep])
 
     exit(0)
