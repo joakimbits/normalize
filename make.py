@@ -134,25 +134,20 @@ def shebang(path=None):
 
     # Make it have a correct shebang with both a Linux and a Windows line ending
     shebang, eol, code = re.match(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z', src).groups()
-    if shebang != SHEBANG:
+    if shebang != SHEBANG or eol != EOL:
         open(module_path, 'wb').write(SHEBANG + EOL + code)
-        print(f'# {module_path} now updated with shebang {shebang}')
-
-    # Print any command needed to disable Windows-style crlf checkouts
-    if eol and eol[0] != ord('\n'):
-        print('# Please consider permanently changing to LF instead of CR after a shebang, like below.')
-        print('git config --global core.autocrlf input')
+        print(f'# {module_path} now updated with shebang {SHEBANG}{repr(EOL)[1:-1] if eol != EOL else ""}')
 
     # Make it an executable
     if not is_executable(module_path):
         make_executable(module_path)
-        print(f'# {module_path} is now executable with shebang {shebang}')
+        print(f'# {module_path} is now executable with shebang {SHEBANG}')
 
     # Print any commands needed to run it without ./ or .\ prefix
     search_path = os.environ['PATH']
     search_dirs = search_path.split(os.pathsep)
     if '.' not in search_dirs:
-        print(f'# {module_path} needs the following . on PATH configuration to use shebang {shebang}')
+        print(f'# {module_path} needs the following . on PATH configuration to use shebang {SHEBANG}')
         print(PATHSEP_INSTALL[os.pathsep])
 
     exit(0)
