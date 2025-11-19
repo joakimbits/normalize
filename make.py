@@ -124,40 +124,100 @@ def shortest_form(path: str, paths=sys.path) -> str:
     return best[len(p):] if best.startswith(p) else best
 
 
-def shebang(path=None, short=True):
-    """Insert a local venv shebang, print its PATH configuration if needed, and exit"""
+DEPENDENCIES = b"""
+Dependencies:
+fire
+"""
 
+CLI = b"""
+if __name__ == '__main__':
+    make.argparser.parse_known_args()
+    import fire
+    fire.Fire(dict([(name, item) for name, item in globals().items() if callable(item)]))
+"""
+
+BOM = "\ufeff"  # BOM in text mode
+IMPORT_LINE   = r'^(?:import\b|from\b.+\bimport\b).*\n'
+CLI_SENTINEL  = r"""^if[\ \t]+__name__[\ \t]*==[\ \t]*["']__main__["']:.*\n"""
+MODULE = rf"""(?mx)\A
+(?P<bom>(?:{BOM})?)
+(?P<shebang>\#!.*\n)?
+(?P<header>(?:[ \t]*(?:\#.*)?\n)*)
+(?:
+    (?P<doc_prefix>[rRuU]{{0,2}})
+    (?P<doc_marker>['"]{{1,3}})
+    (?P<doc_text>(?:(?!^Dependencies:|(?P=doc_marker))(?s:.))*)
+    (?P<doc_deps>Dependencies:(?:(?!(?P=doc_marker))(?s:.))*)?
+    (?P=doc_marker)
+    (?P<doc_tail>.*\n?)
+    )?
+(?P<preparations>(?:(?!{IMPORT_LINE}|{CLI_SENTINEL}).*\n?)*)
+(?P<imports>(?:(?:^[ \t]*\r?\n)*{IMPORT_LINE})*)
+(?P<code>(?:^(?!{CLI_SENTINEL}).*\n)*)
+(?P<cli>{CLI_SENTINEL}[ \t].*(?:\n[ \t].*)*)?
+(?P<tail>(?:\n.*)*)
+\Z
+""".encode('utf-8')
+
+def shebang(path=None, short=True):
+    """Inject shebang, make and CLI, set as executable, and exit"""
+    HAS_MAKE = rb"(?m)^import\b.*\bmake\b|^from\smake\b.*\bimport\b"
     EOL = b'\r\n' if os.name == 'nt' else b'\n'
-    HAS_DOC = br'(?s)\A(?:\xef\xbb\xbf)?(?:#![^\n]*\n)?(?:\s*#.*\n)*\s*(?P<doc>\s*(?P<q>"""|\'\'\').*?(?P=q)\s*\n?)?'
-    HAS_IMPORT = br'(?m)^(?:from\s+[A-Za-z_][\w.]*\s+import\b|import\s+[^\n]+)'
-    HAS_MAKE = br'(?m)^(?:import\s+make\b|from\s+make\s+import\b)'
     path = path or module_path
     src = open(path, 'rb').read()
+    m = re.match(MODULE, src)
+    (bom,
+     shebang,
+     header,
+     doc_prefix,
+     doc_marker,
+     doc_text,
+     doc_deps,
+     doc_tail,
+     preparations,
+     imports,
+     code,
+     cli,
+     tail) = m.groups()
 
-    # Inject "import make" if missing
-    if path and os.path.basename(path) != 'make.py' and not re.search(HAS_MAKE, src):
-        m = re.search(HAS_IMPORT, src)
-        if m:
-            insert_at = m.start()
-        else:
-            h = re.match(HAS_DOC, src)
-            insert_at = h.end('doc') if h and h.group('doc') else (h.end() if h else 0)
-        nl = b'\r\n' if b'\r\n' in src else b'\n'
-        src = src[:insert_at] + b'import make' + nl + src[insert_at:]
-        open(path, 'wb').write(src)
-
-    # Make it have a correct shebang with both a Linux and a Windows line ending
-    shebang, eol, code = re.match(rb'(?s)^(#![^\r\n]*)?([\r\n]*)(.*)\Z', src).groups()
+    # Make it have a correct shebang
     executable = shortest_form(sys.executable) if short else sys.executable
-    wanted_shebang = b'#!' + executable.encode('utf-8')
-    if shebang != wanted_shebang or eol != EOL:
-        open(path, 'wb').write(wanted_shebang + EOL + code)
-        print(f'# {path} now updated with shebang {wanted_shebang}{repr(EOL)[1:-1] if eol != EOL else ""}')
+    shebang = b'#!' + executable.encode('utf-8') + EOL
+
+    # Make it have a proper __doc__ string
+    if not doc_marker or len(doc_marker) != 3:
+        doc_marker = b'"""'
+
+    # Make it have make
+    if path and os.path.basename(path) != 'make.py' and not re.search(HAS_MAKE, imports):
+        imports += b"import make" + EOL
+        if not code:
+            preparations, code = "", preparations
+
+    # Update the module if needed
+    new_src = b"".join(part or b"" for part in (
+         bom,
+         shebang,
+         header,
+         doc_prefix,
+         doc_marker,
+         doc_text,
+         doc_deps or DEPENDENCIES,
+         doc_marker,
+         doc_tail or EOL,
+         preparations,
+         imports,
+         code,
+         cli or CLI,
+         tail))
+    if new_src != src:
+        open(path, 'wb').write(new_src)
+        print(f'# {path} is now updated with shebang {shebang}')
 
     # Make it an executable
     if not is_executable(path):
         make_executable(path)
-        print(f'# {path} is now executable with shebang {wanted_shebang}')
+        print(f'# {path} is now executable with shebang {shebang}')
 
     exit(0)
 
@@ -252,8 +312,6 @@ def run_command_examples(commands, timeout=3):
                 f"Expected: {repr(expected)}\n"
                 f"Received: {repr(received)}\n"
                 f"{diff}") from e
-
-    sys.exit(0)
 
 
 def make(generic=False, make=False, dep=None):
