@@ -11,13 +11,18 @@ B ?= build/
 * ?= %
 
 # Default python interpreter
-PYTHON ?= $(shell command -v python3 || cygpath -m `which python.exe`)
+OSTYPE ?= $(shell echo $$OSTYPE)
+ifneq (,$(findstring $(OSTYPE),win32 msys cygwin))
+    PYTHON ?= $(shell cygpath -m `which python.exe`)
+else
+    PYTHON ?= $(shell where python3)
+endif
 
 # Python interpreter
 $/_PYTHON ?= $(PYTHON)
 
 # Matched Python modules here
-$/*.py := $(filter-out $/make.py,$(wildcard $(subst %,*,$/$*.py)))
+$/*.py := $(wildcard $(subst %,*,$/$*.py))
 
 # Suggested targets
 $/bringup: $($/*.py:$/%=$/$B%.bringup)  # Default: Make sure everything is setup OK
@@ -38,6 +43,9 @@ endif
 $/$B$*.py.shebang: $/make.py $/$*.py | $($/_PYTHON) $/$B
 	$(firstword $|) $^ --shebang >> $@
 
+# Make sure . is on path by depending on $(.-ON-PATH)
+-include $/.-on-bash-path.mk
+
 # Make sure the python module has an up-to-date bringup recipy
 $/$B$*.py.mk: $/$*.py $/$B$*.py.shebang | $(.-ON-PATH)
 	$< --dep $@
@@ -50,44 +58,8 @@ $/$B$*.py.tested: $/$*.py $/$B$*.py.bringup
 	$< --test > $@
 
 
-### Document usage of this builder
+# self-test
 
-# We are going build a python module with a doctest in a hello function available as a command line argument:
-define SH-TEST
-$$ cat build/test.py.tested
-All 1 python usage examples PASS
-
-$$ test.py
-
-$$ test.py hello
-Hello World!
-
-$$ cat test.py
-
-endef
-
-# We are going verify all the command usages above:
-define SH-TEST.EXPECTED
-All 4 command usage examples PASS
-endef
-
-# After bringup, these are the exact sections we expect to see in the module:
-define SHEBANG
-#!...python...
-
-endef
-define DEPENDENCIES
-"""
-Dependencies:
-pip
-"""
-
-endef
-define IMPORTS
-import make
-import pip
-
-endef
 define FUNCTION
 def hello():
     """
@@ -95,13 +67,33 @@ def hello():
     Hello World!
     """
     print('Hello World!')
+endef
+
+define SH-TEST
+$$ cat build/test.py.tested
+All 1 python usage examples PASS
+All 0 command usage examples PASS
+
+$$ test.py
+NAME
+    test.py
+
+SYNOPSIS
+    test.py COMMAND
+
+COMMANDS
+    COMMAND is one of the following:
+
+     hello
+       >>> hello() Hello World!
+
+$$ test.py hello
+Hello World!
 
 endef
-define CLI
-if __name__ == '__main__':
-    make.argparser.parse_known_args()
-    fire.fire(dict([(name, item) for name, item in globals().items() if callable(item)]))
 
+define SH-TEST.EXPECTED
+All 3 command usage examples PASS
 endef
 
 $/.py/build/:
@@ -111,33 +103,17 @@ $/.py/build/test.py.sh-test.expected: | $/.py/build/
 	$(file >$@,$(SH-TEST.EXPECTED))
 
 $/.py/build/test.py.sh-test: | $/.py/build/
-	$(file >$@,$(SH-TEST)$(SHEBANG)$(DEPENDENCIES)$(IMPORTS)$(FUNCTION)$(CLI))
+	$(file >$@,$(SH-TEST))
 
 $/.py/test.py: $/.py/build/test.py.sh-test | $/.py/build/
 	$(file >$@,$(FUNCTION))
 
-# Put the bare function into test.py and verify that make.py test.py --shebang inserts make into it:
 $/.py/build/test.py.tested: $/.py/test.py $/.py.mk $/make.py | $/.py/
-	@echo
-	# Self-tested source code:
-	cat $<
-	@echo
-	# The Makefile for .py source code:
 	ln -sf ../.py.mk $|Makefile
-	@echo
-	# The python module that Makefile needs:
 	ln -sf ../make.py $|make.py
-	@echo
-	# Now building $@
 	(cd $| && make tested)
 
-# Verify
-$/.py/build/test.py.sh-test.tested: $/.py/build/test.py.sh-test \
-  $/.py/build/test.py.tested $/.py/build/test.py.sh-test.expected | $/.py/
-	@echo
-	# Expected command line usage:
-	cat $<
-	@echo
-	# Now verifying that
-	(cd $| && test.py --sh-test $<) > $@ && \
+$/.py/build/test.py.sh-test.tested: $/.py/test.py $/.py/build/test.py.tested \
+  $/.py/build/test.py.sh-test $/.py/build/test.py.sh-test.expected
+	$< --sh-test $(word 3,$^) > $@ && \
 	diff -u $(lastword $^) $@
