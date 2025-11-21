@@ -13,9 +13,8 @@ xcode-select --install
 sudo apt update && sudo apt install -y git build-essential
 ```
 
-- On Windows (admin PowerShell for setup below, then use bash.exe — Git Bash — not WSL's bash):
+- On Windows (PowerShell for setup below, then use bash.exe — Git Bash — not WSL's bash):
 ```powershell
-reg add 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d 1 /f
 iwr -useb get.scoop.sh | iex; & ~\scoop\shims\scoop.ps1 install git make
 ```
 
