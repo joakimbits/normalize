@@ -1,4 +1,4 @@
-#!venv/Scripts/python.exe
+#!python.exe
 """USER MANUAL
 
 To integrate a tool.py module that uses make, check the Dependencies section in its
@@ -288,7 +288,8 @@ def run_command_examples(commands, timeout=3):
 
         expected = "\n".join(output_lines)
         if platform.system() == 'Windows':
-            result = subprocess.run(['bash.exe', '--login'], input=(command + "\nexit\n").encode('ascii'),
+            bash = os.path.expandvars(os.path.expanduser('~/scoop/shims/bash.exe'))
+            result = subprocess.run([bash, '--login'], input=(command + "\nexit\n").encode('ascii'),
                                     shell=False, capture_output=True, text=False, timeout=timeout, env=my_env)
             result.stdout = result.stdout.replace(b'\r\r\n', b'\n').replace(b'\r\n', b'\n').decode('ascii')
         else:
