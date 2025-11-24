@@ -1,4 +1,4 @@
-#!python.exe
+#!venv/Scripts/python.exe
 """USER MANUAL
 
 To integrate a tool.py module that uses make, check the Dependencies section in its
@@ -106,7 +106,7 @@ def make_executable(path):
     os.chmod(path, 0o777)
 
 
-def shortest_form(path: str, paths=sys.path) -> str:
+def shortest_form(path: str, paths=sys.path[:-2]) -> str:
     """Shortest findable form of the target (no symlink resolution)"""
     target = os.path.abspath(path)
     best = target
@@ -182,7 +182,7 @@ def shebang(path=None, short=True):
 
     # Make it have a correct shebang
     executable = shortest_form(sys.executable) if short else sys.executable
-    shebang = b'#!' + executable.encode('utf-8') + EOL
+    shebang = b'#!' + executable.replace("\\", "/").encode('utf-8') + EOL
 
     # Make it have a proper __doc__ string
     if not doc_marker or len(doc_marker) != 3:
