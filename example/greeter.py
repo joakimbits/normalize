@@ -7,7 +7,6 @@ fire
 import subprocess
 
 import make
-import fire
 
 def run(cmd):
     """Run a command and return the decoded result
@@ -29,35 +28,7 @@ def hello(*world):
     print("Hello from greeter.py!")
     print(run(f"{make.path}example"))
 
-EXAMPLES = """Examples:
-$ greeter.py
-NAME
-    greeter.py
-
-SYNOPSIS
-    greeter.py COMMAND
-
-COMMANDS
-    COMMAND is one of the following:
-
-     hello
-       Greetings from the source code examples in this folder
-
-     run
-       Run a command and return the decoded result
-
-$ greeter.py hello
-Hello from greeter.py!
-Hello from main.c!
-Hello from greeter.cpp!
-
-$ greeter.py run example
-Hello from main.c!
-Hello from greeter.cpp!
-"""
-
 if __name__ == '__main__':
-    make.argparser.description = make.brief()
-    make.argparser.epilog = EXAMPLES
-    args = make.argparser.parse_known_args()
-    fire.Fire(dict(hello=hello, run=run))
+    make.argparser.parse_known_args()
+    import fire
+    fire.Fire(dict([(name, item) for name, item in globals().items() if callable(item)]))
