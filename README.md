@@ -1,50 +1,88 @@
-## Tool for using and reporting arbitrary nested projects 
+# Tool for using and reporting arbitrary nested projects
+
+* Software and its documentation built and verified incrementally together as one unit.
+* Keeps a technical file up-to-date for Continuous Integration, product release and CE.
+* Gives immediate release recommendations using GPT_MODEL=gpt-3.5-turbo-16k GPT_TEMPERATURE=0.7 (configurable). 
 
 ---
 
-Preparation - install ln, git and make:
-- On MacOS:
+## Preparation - install make
+
+### MacOS
+
 ```zsh
 xcode-select --install
 ```
 
-- On Ubuntu or Windows WSL: 
+### Ubuntu / WSL
+
 ```bash
 sudo apt update && sudo apt install -y git build-essential
 ```
 
-- On Windows (PowerShell for setup below, then use bash.exe — Git Bash — not WSL's bash):
+### Windows (PowerShell)
+
 ```powershell
-iwr -useb get.scoop.sh | iex; & ~\scoop\shims\scoop.ps1 install git make
+iwr -useb get.scoop.sh | iex; & ~\scoop\shims\scoop.ps1 install git make python
+git config --global core.symlinks true
+setx MSYS "winsymlinks:nativestrict"
+setx MAKEFLAGS "SHELL=$((Join-Path $HOME 'scoop\shims\bash.exe') -replace '\\','/') .SHELLFLAGS=-lc"
+setx U "%USERPROFILE%\scoop\apps\git\current\usr\bin"
 ```
 
-Then run this in your project directory:
-```
-curl https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile -O && make
+<details>
+<summary>After Windows setup above, <strong>open a new terminal (click to see examples)</summary>
+
+**Git Bash** (bash.exe) — *no prefix needed* (MSYS tools already on PATH)
+
+**Other terminals** — Scoop installed tools are on PATH; *use U* for others
+
+Example: Format an absolute path into mixed-mode (bash.exe vs cmd vs powershell)
+```bash
+$ cygpath -m C:/
+C:/
 ```
 
-- Creates executables from all source files.
-- Recursively also in sub-directories with a README.md file, or any other .md file.
-- Once this small `Makefile` is committed, you can remove built (and other uncommited) files using `git clean -fxd`.
+```cmd
+> %U%\cygpath.exe -m C:\
+C:/
+```
+
+```PowerShell
+PS > & "${env:U}\cygpath.exe" -m 'C:\'
+C:/
+```
+
+</details>
 
 ---
 
-Test and document:
-
+## Build
+From your project directory:
+```bash
+curl -O https://raw.githubusercontent.com/joakimbits/normalize/main/Makefile && make
 ```
+
+- Builds executables from source files.
+- Recurses into sub-directories containing a `README.md` (or any `.md`).
+- After committing the small `Makefile`, clean untracked/built files:
+  ```bash
+  git clean -fxd
+  ```
+
+## Test & document
+```bash
 make pdf html slides
 ```
 
-Analyze changes since your last release:
-
-```
+## Analyze changes since last release
+```bash
 make old new review audit
 ```
 
 ---
 
-User manual:
-
+## User manual
 ```sh
 $ make.py -c 'print(__doc__)'
 USER MANUAL
@@ -70,9 +108,8 @@ If they are already in the directory or linked to from the directory, internet a
 
 Dependencies:
 requests tiktoken # Needed for the --prompt option
-
 ```
 
-- Python version 3.9 or later is required, and will be installed automatically if missing on the OS.
+> Python **3.9+** is required
 
-[example/README.md](example/README.md)
+See [`example/README.md`](example/README.md).
