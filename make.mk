@@ -302,7 +302,7 @@ else ifeq ($~,/c/Users/$I)  # Probably Git Bash in Windows
     .exe := .exe
     ~ := $(shell cygpath -m $~)
     ? ?= $~/scoop/shims
-    ! ?= powershell.exe -NoProfile -Command "& ~\scoop\shims\scoop.ps1 install @args"
+    ! ?= scoop install
     OS_PACKAGE_MANAGER ?= $~/scoop/shims/scoop.ps1
     ifeq (AMD64,$(CPU))
         CPU := x86_64
