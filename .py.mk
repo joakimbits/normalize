@@ -14,12 +14,15 @@ B ?= build/
 OSTYPE ?= $(shell echo $$OSTYPE)
 ifneq (,$(findstring $(OSTYPE),win32 msys cygwin))
     PYTHON ?= $(shell cygpath -m `which python.exe`)
+    VENV_PYTHON ?= Scripts/python.exe
 else
     PYTHON ?= $(shell where python3)
+    VENV_PYTHON ?= bin/python3
 endif
 
 # Python interpreter
-$/_PYTHON ?= $(PYTHON)
+$/_PYTHON ?= $/.venv/$(VENV_PYTHON)
+$/_PIP_DIR ?= $($/_PYTHON:%/$(VENV_PYTHON)=%)/lib/site-packages/
 
 # Matched Python modules here
 $/*.py := $(wildcard $(subst %,*,$/$*.py))
@@ -32,6 +35,14 @@ $/self-test: $/.py/build/test.py.sh-test.tested
 # Do not leave and risk using any broken stuff!
 .DELETE_ON_ERROR:
 .PRECIOUS: $($/*.py:$/%=$/$B%.shebang)
+
+# Make sure python exists where expected
+$($/_PYTHON): | $(PYTHON)
+	$| -m venv --upgrade-deps $(@:%/$(VENV_PYTHON)=%)
+
+# Make sure a pip package exists
+$($/_PIP_DIR)%: | $($/_PYTHON)
+	 $| -m pip install --prefer-binary $*
 
 # Make sure a local build directory exists
 ifneq (,$B)
@@ -53,8 +64,16 @@ $/$B$*.py.mk: $/$*.py $/$B$*.py.shebang | $(.-ON-PATH)
 # Include all those bringup recipies
 -include $($/*.py:$/%=$/$B%.mk)
 
+# Check Python 3.9 syntax
+$B$*.py.syntax: $/$*.py | $($/_PYTHON) $($/_PIP_DIR)ruff
+	$(firstword $|) -m ruff check --select=E9,F63,F7,F82 --target-version=py39 $< > $@ || (cat $@ && false)
+
+# Check Python 3.9 style
+$B$*.py.style: $/$*.py $B$*.py.syntax | $($/_PYTHON)
+	$| -m ruff check --fix --target-version=py39 $< > $@ || (cat $@ && false)
+
 # Make sure the python module tested OK
-$/$B$*.py.tested: $/$*.py $/$B$*.py.bringup
+$/$B$*.py.tested: $/$*.py $/$B$*.py.style $/$B$*.py.bringup
 	$< --test > $@
 
 
